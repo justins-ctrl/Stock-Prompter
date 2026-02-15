@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Trade Promoter</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #0b0f14;
+  color: #eaeaea;
+}
+
+.container {
+  max-width: 420px;
+  margin: auto;
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+input, button {
+  width: 100%;
+  padding: 12px;
+  margin-top: 10px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: none;
+}
+
+input {
+  background: #121821;
+  color: white;
+}
+
+button {
+  background: #1e90ff;
+  color: white;
+  font-weight: bold;
+}
+
+.card {
+  background: #121821;
+  border-radius: 12px;
+  padding: 15px;
+  margin-top: 15px;
+}
+
+.bullish { color: #00ff99; }
+.bearish { color: #ff4d4d; }
+.neutral { color: #cccccc; }
+
+.signal {
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: 8px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h1>📊 Trade Promoter</h1>
+
+  <input id="ticker" placeholder="Enter ticker (AAPL, TSLA, SPY)" />
+  <button onclick="loadStock()">Analyze</button>
+
+  <div id="output"></div>
+</div>
+
+<script>
+async function loadStock() {
+  const ticker = document.getElementById("ticker").value.toUpperCase();
+  if (!ticker) return;
+
+  const output = document.getElementById("output");
+  output.innerHTML = "Loading...";
+
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=7d&interval=15m`
+    );
+    const data = await res.json();
+    const prices = data.chart.result[0].indicators.quote[0].close.filter(p => p);
+    const current = prices[prices.length - 1];
+    const prevWeek = prices[0];
+
+    const change = (((current - prevWeek) / prevWeek) * 100).toFixed(2);
+
+    let signal = "Neutral / No Trade";
+    let cls = "neutral";
+
+    if (change > 2) {
+      signal = "📈 Bullish Momentum — CALL Bias";
+      cls = "bullish";
+    } else if (change < -2) {
+      signal = "📉 Bearish Momentum — PUT Bias";
+      cls = "bearish";
+    }
+
+    output.innerHTML = `
+      <div class="card">
+        <h2>${ticker}</h2>
+        <p>Current Price: <strong>$${current.toFixed(2)}</strong></p>
+        <p>7-Day Change: <strong>${change}%</strong></p>
+        <p class="signal ${cls}">${signal}</p>
+      </div>
+    `;
+  } catch (e) {
+    output.innerHTML = "Error loading data.";
+  }
+}
+</script>
+</body>
+</html>
