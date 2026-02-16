@@ -61,8 +61,8 @@ async function analyze() {
 
   try {
     const res = await fetch(
-      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=7d&interval=30m`
-    );
+  `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=7d&interval=30m`
+);
     const data = await res.json();
     const prices = data.chart.result[0].indicators.quote[0].close.filter(p => p);
     const current = prices[prices.length - 1];
