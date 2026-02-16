@@ -5,14 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
-      margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
       background: #0e1117;
       color: #e6e6e6;
       padding: 20px;
     }
     h1 { text-align: center; }
-    input, button {
+    input, select, button {
       width: 100%;
       padding: 14px;
       margin-top: 10px;
@@ -20,7 +19,7 @@
       border: none;
       font-size: 16px;
     }
-    input { background: #161b22; color: white; }
+    input, select { background: #161b22; color: white; }
     button { background: #2563eb; color: white; font-weight: bold; }
     .card {
       background: #161b22;
@@ -37,8 +36,14 @@
 
 <h1>📈 Trade Prompter</h1>
 
-<input id="tickers" placeholder="Enter tickers (SPY, AAPL, TSLA)" />
-<button onclick="scan()">Start Watchlist Scan</button>
+<input id="tickers" placeholder="Tickers (SPY, AAPL, TSLA)" />
+<select id="strategy">
+  <option value="scalp">Scalp</option>
+  <option value="momentum">Momentum</option>
+  <option value="reversal">Reversal</option>
+</select>
+<input id="account" placeholder="Account size (e.g. 5000)" />
+<button onclick="scan()">Start Scanner</button>
 
 <div id="results"></div>
 
@@ -46,9 +51,9 @@
 let lastAlerts = {};
 
 function marketIsOpen() {
-  const now = new Date();
-  const h = now.getUTCHours() - 5;
-  const m = now.getUTCMinutes();
+  const d = new Date();
+  const h = d.getUTCHours() - 5;
+  const m = d.getUTCMinutes();
   return (h > 9 || (h === 9 && m >= 30)) && h < 16;
 }
 
@@ -56,45 +61,55 @@ function rsi(prices, period = 14) {
   let gains = 0, losses = 0;
   for (let i = prices.length - period; i < prices.length - 1; i++) {
     const diff = prices[i + 1] - prices[i];
-    if (diff >= 0) gains += diff;
-    else losses -= diff;
+    diff >= 0 ? gains += diff : losses -= diff;
   }
   const rs = gains / (losses || 1);
   return 100 - (100 / (1 + rs));
 }
 
-async function analyzeTicker(ticker) {
+async function analyzeTicker(ticker, strategy, account) {
   try {
     const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=5m`;
     const res = await fetch(url);
     const data = await res.json();
 
-    const prices = data.chart.result[0].indicators.quote[0].close.filter(Boolean);
+    const q = data.chart.result[0].indicators.quote[0];
+    const prices = q.close.filter(Boolean);
+    const volumes = q.volume.filter(Boolean);
+
     const current = prices.at(-1);
-    const start = prices[0];
-    const change = ((current - start) / start * 100);
+    const open = prices[0];
+    const change = ((current - open) / open) * 100;
     const rsiVal = rsi(prices);
+
+    const avgVol = volumes.slice(0, -1).reduce((a,b)=>a+b,0)/(volumes.length-1);
+    const volSpike = volumes.at(-1) > avgVol * 1.5;
 
     let bias = "Neutral";
     let cls = "neutral";
 
-    if (change > 0.7 && rsiVal < 70) {
+    if (strategy === "scalp" && volSpike && Math.abs(change) > 0.4)
+      bias = change > 0 ? "CALL" : "PUT";
+
+    if (strategy === "momentum" && change > 0.7 && rsiVal < 70)
       bias = "CALL";
-      cls = "bullish";
-    }
-    if (change < -0.7 && rsiVal > 30) {
+
+    if (strategy === "reversal" && rsiVal > 75)
       bias = "PUT";
-      cls = "bearish";
-    }
+
+    if (bias === "CALL") cls = "bullish";
+    if (bias === "PUT") cls = "bearish";
+
+    const riskPerTrade = account * 0.01;
+    const contracts = Math.max(1, Math.floor(riskPerTrade / 150));
 
     if (bias !== "Neutral" && marketIsOpen()) {
-      const msg = `${ticker}: ${bias} signal`;
+      const msg = `${ticker}: ${bias} (${strategy})`;
       if (lastAlerts[ticker] !== msg) {
         lastAlerts[ticker] = msg;
         alert(msg);
-        if (Notification.permission === "granted") {
+        if (Notification.permission === "granted")
           new Notification("Trade Prompter", { body: msg });
-        }
       }
     }
 
@@ -104,35 +119,33 @@ async function analyzeTicker(ticker) {
         Price: $${current.toFixed(2)}<br>
         Change: ${change.toFixed(2)}%<br>
         RSI: ${rsiVal.toFixed(1)}<br>
-        <span class="${cls}"><strong>${bias}</strong></span>
+        Volume Spike: ${volSpike ? "Yes" : "No"}<br>
+        <span class="${cls}"><strong>${bias}</strong></span><br>
+        Suggested Contracts: ${contracts}
       </div>
     `;
   } catch {
-    return `
-      <div class="card">
-        <strong>${ticker}</strong><br>
-        Error loading data
-      </div>
-    `;
+    return `<div class="card"><strong>${ticker}</strong><br>Error</div>`;
   }
 }
 
-async function scan(auto = false) {
-  const input = document.getElementById("tickers").value;
-  if (!input) return;
-
-  const tickers = input.split(",").map(t => t.trim().toUpperCase());
+async function scan(auto=false) {
+  const tickers = document.getElementById("tickers").value
+    .split(",").map(t=>t.trim().toUpperCase());
+  const strategy = document.getElementById("strategy").value;
+  const account = Number(document.getElementById("account").value || 5000);
   const results = document.getElementById("results");
-  if (!auto) results.innerHTML = "Scanning...";
 
+  if (!auto) results.innerHTML = "Scanning...";
   let html = "";
-  for (const t of tickers) {
-    html += await analyzeTicker(t);
-  }
+
+  for (const t of tickers)
+    html += await analyzeTicker(t, strategy, account);
+
   results.innerHTML = html;
 }
 
-setInterval(() => scan(true), 120000);
+setInterval(()=>scan(true),120000);
 if ("Notification" in window) Notification.requestPermission();
 </script>
 
