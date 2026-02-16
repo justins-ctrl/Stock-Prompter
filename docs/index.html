@@ -3,6 +3,7 @@
 <head>
   <title>Trade Prompter</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -10,277 +11,214 @@
       color: #e6e6e6;
       padding: 20px;
     }
+
     h1 { text-align: center; }
+
     input, select, button {
       width: 100%;
       padding: 14px;
       margin-top: 10px;
-      border-radius: 8px;
+      border-radius: 10px;
       border: none;
       font-size: 16px;
     }
+
     input, select { background: #161b22; color: white; }
     button { background: #2563eb; color: white; font-weight: bold; }
+
     .card {
       background: #161b22;
       padding: 16px;
       margin-top: 15px;
-      border-radius: 12px;
+      border-radius: 14px;
     }
+
     .bullish { color: #22c55e; }
     .bearish { color: #ef4444; }
     .neutral { color: #9ca3af; }
-    small { color:#9ca3af; }
+
+    .status {
+      text-align: center;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .soft-alert {
+      background: #1f2937;
+      border-left: 5px solid #2563eb;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 8px;
+    }
+
+    small { color: #9ca3af; }
   </style>
 </head>
+
 <body>
 
 <h1>📈 Trade Prompter</h1>
 
+<div class="status" id="marketStatus"></div>
+
 <input id="tickers" placeholder="Tickers (SPY, AAPL, TSLA)" />
-<input id="watchlistName" placeholder="Watchlist name (e.g. Momentum)" />
+<input id="watchlistName" placeholder="Watchlist name" />
 <button onclick="saveWatchlist()">Save Watchlist</button>
+
 <select id="watchlists" onchange="loadWatchlist()"></select>
-  <select id="strategy">
+
+<select id="strategy">
   <option value="scalp">Scalp</option>
   <option value="momentum">Momentum</option>
   <option value="reversal">Reversal</option>
 </select>
+
 <input id="account" placeholder="Account size (e.g. 5000)" />
 <button onclick="scan()">Start Scanner</button>
+
 <label style="display:block;margin-top:10px;">
-  <input type="checkbox" id="alertsOn" checked />
-  Enable Alerts
+  <input type="checkbox" id="alertsOn" checked /> Enable Alerts
 </label>
 
-<input
-  id="minConfidence"
-  type="number"
-  value="70"
-  min="0"
-  max="100"
-  placeholder="Min alert confidence (%)"
-/>
-  
+<input id="minConfidence" type="number" value="70" min="0" max="100"
+  placeholder="Min alert confidence %" />
 
 <div id="results"></div>
+<div id="alerts"></div>
 <div id="log"></div>
 
 <script>
- function alertsEnabled() {
-  return document.getElementById("alertsOn")?.checked;
-}
-
-function minConf() {
-  return Number(document.getElementById("minConfidence")?.value || 70);
-} 
 let lastAlerts = {};
 let tradeLog = JSON.parse(localStorage.getItem("tradeLog") || "[]");
 let watchlists = JSON.parse(localStorage.getItem("watchlists") || "{}");
 
-function saveWatchlist() {
-  const name = watchlistName.value.trim();
-  if (!name) return alert("Name the watchlist");
-  watchlists[name] = tickers.value;
-  localStorage.setItem("watchlists", JSON.stringify(watchlists));
-  updateWatchlists();
-}
+const results = document.getElementById("results");
+const alertsBox = document.getElementById("alerts");
+const log = document.getElementById("log");
 
-function loadWatchlist() {
-  const name = watchlistsSelect.value;
-  tickers.value = watchlists[name] || "";
-}
-
-function updateWatchlists() {
-  watchlistsSelect.innerHTML = "";
-  for (const name in watchlists) {
-    const opt = document.createElement("option");
-    opt.textContent = name;
-    opt.value = name;
-    watchlistsSelect.appendChild(opt);
-  }
-}
-
-const watchlistsSelect = document.getElementById("watchlists");
-updateWatchlists();
-// ---------- UTIL ----------
-function saveSettings() {
-  localStorage.setItem("tickers", tickers.value);
-  localStorage.setItem("strategy", strategy.value);
-  localStorage.setItem("account", account.value);
-}
-function loadSettings() {
-  tickers.value = localStorage.getItem("tickers") || "";
-  strategy.value = localStorage.getItem("strategy") || "scalp";
-  account.value = localStorage.getItem("account") || "";
-}
 function marketIsOpen() {
   const d = new Date();
   const h = d.getUTCHours() - 5;
   const m = d.getUTCMinutes();
   return (h > 9 || (h === 9 && m >= 30)) && h < 16;
 }
-function rsi(prices, p=14) {
-  let g=0,l=0;
-  for (let i=prices.length-p;i<prices.length-1;i++) {
-    const d=prices[i+1]-prices[i];
-    d>=0?g+=d:l-=d;
-  }
-  const rs=g/(l||1);
-  return 100-(100/(1+rs));
+
+function updateMarketStatus() {
+  marketStatus.textContent = marketIsOpen()
+    ? "🟢 Market Open"
+    : "🔴 Market Closed / Pre-Market";
 }
 
-// ---------- CORE ----------
+function rsi(prices, p = 14) {
+  let g = 0, l = 0;
+  for (let i = prices.length - p; i < prices.length - 1; i++) {
+    const d = prices[i + 1] - prices[i];
+    d >= 0 ? g += d : l -= d;
+  }
+  return 100 - (100 / (1 + g / (l || 1)));
+}
+
+function alertsEnabled() {
+  return document.getElementById("alertsOn").checked;
+}
+
+function minConf() {
+  return Number(document.getElementById("minConfidence").value || 70);
+}
+
 async function analyzeTicker(ticker, strategy, account) {
   try {
-    const url=`https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=5m`;
-    const r=await fetch(url);
-    const d=await r.json();
-    const q=d.chart.result[0].indicators.quote[0];
-    const prices=q.close.filter(Boolean);
-    const vols=q.volume.filter(Boolean);
+    const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=5m`;
+    const r = await fetch(url);
+    const d = await r.json();
 
-    const current=prices.at(-1);
-    const open=prices[0];
-    const change=((current-open)/open)*100;
-    const rsiVal=rsi(prices);
+    const q = d.chart.result[0].indicators.quote[0];
+    const prices = q.close.filter(Boolean);
+    const vols = q.volume.filter(Boolean);
 
-    const avgVol=vols.slice(0,-1).reduce((a,b)=>a+b,0)/(vols.length-1);
-    const volSpike=vols.at(-1)>avgVol*1.5;
+    const current = prices.at(-1);
+    const open = prices[0];
+    const change = ((current - open) / open) * 100;
+    const rsiVal = rsi(prices);
 
-    let bias="Neutral", cls="neutral";
-    if (strategy==="scalp" && volSpike && Math.abs(change)>0.4)
-      bias=change>0?"CALL":"PUT";
-    if (strategy==="momentum" && change>0.7 && rsiVal<70)
-      bias="CALL";
-    if (strategy==="reversal" && rsiVal>75)
-      bias="PUT";
+    let bias = "Neutral", cls = "neutral";
 
-    if (bias==="CALL") cls="bullish";
-    if (bias==="PUT") cls="bearish";
+    if (strategy === "scalp" && Math.abs(change) > 0.4)
+      bias = change > 0 ? "CALL" : "PUT";
 
-    const confidence=Math.min(100,Math.abs(change)*40+(volSpike?20:0)+(50-Math.abs(50-rsiVal)));
-    const contracts=Math.max(1,Math.floor((account*0.01)/150));
-let action = "WAIT";
-if (confidence > 70) action = "ENTER";
-if (confidence < 40) action = "AVOID";
-    if (
-  bias !== "Neutral" &&
-  confidence >= minConf() &&
-  alertsEnabled() &&
-  (marketIsOpen() || preMarketAllowed)
-) {
-      const msg=`${ticker}: ${bias}`;
-      if (lastAlerts[ticker]!==msg) {
-        lastAlerts[ticker]=msg;
-        tradeLog.unshift({ time:new Date().toLocaleTimeString(), ticker, bias, strategy, confidence:confidence.toFixed(0) });
-        tradeLog=tradeLog.slice(0,20);
-        localStorage.setItem("tradeLog",JSON.stringify(tradeLog));
-        alert(msg);
-        if (Notification.permission==="granted")
-          new Notification("Trade Prompter",{ body:msg });
+    if (strategy === "momentum" && change > 0.7 && rsiVal < 70)
+      bias = "CALL";
+
+    if (strategy === "reversal" && rsiVal > 75)
+      bias = "PUT";
+
+    if (bias === "CALL") cls = "bullish";
+    if (bias === "PUT") cls = "bearish";
+
+    const confidence = Math.min(100, Math.abs(change) * 40 + (50 - Math.abs(50 - rsiVal)));
+
+    if (bias !== "Neutral" && confidence >= minConf() && alertsEnabled()) {
+      if (!lastAlerts[ticker]) {
+        lastAlerts[ticker] = true;
+        alertsBox.innerHTML += `
+          <div class="soft-alert">
+            <strong>${ticker}</strong> → ${bias} (${confidence.toFixed(0)}%)
+          </div>
+        `;
       }
     }
 
     return `
-  <div class="card">
-    <strong>${ticker}</strong><br>
-    $${current.toFixed(2)} | ${change.toFixed(2)}%<br>
-    RSI ${rsiVal.toFixed(1)} | Volume Spike: ${volSpike ? "Yes" : "No"}<br>
-    <span class="${cls}"><strong>${bias}</strong></span><br>
-    Action: <strong>${action}</strong><br>
-    Confidence: ${confidence.toFixed(0)}/100<br>
-    Suggested Contracts: ${contracts}
-  </div>
-`;
+      <div class="card">
+        <strong>${ticker}</strong><br>
+        $${current.toFixed(2)} | ${change.toFixed(2)}%<br>
+        RSI ${rsiVal.toFixed(1)}<br>
+        <span class="${cls}"><strong>${bias}</strong></span><br>
+        Confidence: ${confidence.toFixed(0)}%
+      </div>
+    `;
   } catch {
-    return `<div class="card"><strong>${ticker}</strong><br>Error</div>`;
+    return `<div class="card">${ticker} — Error</div>`;
   }
 }
-async function scan(auto = false) {
-  saveSettings();
-  const list = tickers.value
-    .split(",")
-    .map(t => t.trim().toUpperCase())
-    .filter(Boolean);
 
-  const strat = strategy.value;
-  const acct = Number(account.value || 5000);
+async function scan() {
+  updateMarketStatus();
+  alertsBox.innerHTML = "";
+  results.innerHTML = "Scanning…";
 
-  const now = new Date();
-  const hour = now.getHours();
-  preMarketAllowed = hour >= 4 && hour < 9;
-
-  if (!auto) results.innerHTML = "Scanning…";
-
+  const list = tickers.value.split(",").map(t => t.trim().toUpperCase()).filter(Boolean);
   let html = "";
 
-  for (const t of list) {
-    if (preMarketAllowed && !marketIsOpen()) {
-      const gap = await preMarketScan(t);
-      if (gap) {
-        html += `
-          <div class="card">
-            <strong>${t}</strong><br>
-            Pre-Market Gap: ${gap.gap}%<br>
-            Bias: <strong>${gap.bias}</strong>
-          </div>
-        `;
-        if (alertsEnabled()) alert(`${t} pre-market gap ${gap.gap}%`);
-      }
-    }
-    html += await analyzeTicker(t, strat, acct);
-  }
+  for (const t of list)
+    html += await analyzeTicker(t, strategy.value, Number(account.value || 5000));
 
   results.innerHTML = html;
-  renderLog();
 }
 
-
-function renderLog() {
-  log.innerHTML =
-    dailySummary() +
-    `
-    <div class="card">
-      <strong>Recent Signals</strong><br>
-      ${
-        tradeLog.length
-          ? tradeLog
-              .map(
-                l =>
-                  `<small>${l.time} — ${l.ticker} ${l.bias} (${l.strategy}) ${l.confidence}%</small>`
-              )
-              .join("<br>")
-          : "<small>No signals yet</small>"
-      }
-    </div>
-  `;
+function saveWatchlist() {
+  if (!watchlistName.value) return;
+  watchlists[watchlistName.value] = tickers.value;
+  localStorage.setItem("watchlists", JSON.stringify(watchlists));
+  updateWatchlists();
 }
-  
 
-loadSettings();
-renderLog();
-setInterval(()=>scan(true),120000);
-if ("Notification" in window) Notification.requestPermission();
-function dailySummary() {
-  const today = new Date().toLocaleDateString();
-  const todays = tradeLog.filter(t => t.time.includes(":"));
-  const calls = todays.filter(t => t.bias === "CALL").length;
-  const puts = todays.filter(t => t.bias === "PUT").length;
-  const avg = todays.length
-    ? (todays.reduce((a,b)=>a+Number(b.confidence),0)/todays.length).toFixed(0)
-    : 0;
-
-  return `
-    <div class="card">
-      <strong>Today’s Summary</strong><br>
-      CALL signals: ${calls}<br>
-      PUT signals: ${puts}<br>
-      Avg confidence: ${avg}%
-    </div>
-  `;
+function loadWatchlist() {
+  tickers.value = watchlists[watchlistsSelect.value] || "";
 }
-  
+
+function updateWatchlists() {
+  watchlistsSelect.innerHTML = "";
+  for (const n in watchlists) {
+    const o = document.createElement("option");
+    o.textContent = n;
+    watchlistsSelect.appendChild(o);
+  }
+}
+
+updateWatchlists();
+updateMarketStatus();
+setInterval(scan, 120000);
 </script>
 
 </body>
