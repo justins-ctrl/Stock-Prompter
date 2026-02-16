@@ -38,7 +38,10 @@
 <h1>📈 Trade Prompter</h1>
 
 <input id="tickers" placeholder="Tickers (SPY, AAPL, TSLA)" />
-<select id="strategy">
+<input id="watchlistName" placeholder="Watchlist name (e.g. Momentum)" />
+<button onclick="saveWatchlist()">Save Watchlist</button>
+<select id="watchlists" onchange="loadWatchlist()"></select>
+  <select id="strategy">
   <option value="scalp">Scalp</option>
   <option value="momentum">Momentum</option>
   <option value="reversal">Reversal</option>
@@ -52,7 +55,33 @@
 <script>
 let lastAlerts = {};
 let tradeLog = JSON.parse(localStorage.getItem("tradeLog") || "[]");
+let watchlists = JSON.parse(localStorage.getItem("watchlists") || "{}");
 
+function saveWatchlist() {
+  const name = watchlistName.value.trim();
+  if (!name) return alert("Name the watchlist");
+  watchlists[name] = tickers.value;
+  localStorage.setItem("watchlists", JSON.stringify(watchlists));
+  updateWatchlists();
+}
+
+function loadWatchlist() {
+  const name = watchlistsSelect.value;
+  tickers.value = watchlists[name] || "";
+}
+
+function updateWatchlists() {
+  watchlistsSelect.innerHTML = "";
+  for (const name in watchlists) {
+    const opt = document.createElement("option");
+    opt.textContent = name;
+    opt.value = name;
+    watchlistsSelect.appendChild(opt);
+  }
+}
+
+const watchlistsSelect = document.getElementById("watchlists");
+updateWatchlists();
 // ---------- UTIL ----------
 function saveSettings() {
   localStorage.setItem("tickers", tickers.value);
@@ -111,7 +140,9 @@ async function analyzeTicker(ticker, strategy, account) {
 
     const confidence=Math.min(100,Math.abs(change)*40+(volSpike?20:0)+(50-Math.abs(50-rsiVal)));
     const contracts=Math.max(1,Math.floor((account*0.01)/150));
-
+let action = "WAIT";
+if (confidence > 70) action = "ENTER";
+if (confidence < 40) action = "AVOID";
     if (bias!=="Neutral" && marketIsOpen()) {
       const msg=`${ticker}: ${bias}`;
       if (lastAlerts[ticker]!==msg) {
@@ -154,18 +185,39 @@ async function scan(auto=false) {
 }
 
 function renderLog() {
-  log.innerHTML = `
-    <div class="card">
-      <strong>Recent Signals</strong><br>
-      ${tradeLog.map(l=>`<small>${l.time} — ${l.ticker} ${l.bias} (${l.strategy}) ${l.confidence}%</small>`).join("<br>")}
-    </div>
-  `;
-}
+  log.innerHTML = log.innerHTML = dailySummary() + `
+  <div class="card">
+    <strong>Recent Signals</strong><br>
+    ${tradeLog.map(l =>
+      `<small>${l.time} — ${l.ticker} ${l.bias} (${l.strategy}) ${l.confidence}%</small>`
+    ).join("<br>")}
+  </div>
+`;
+  
 
 loadSettings();
 renderLog();
 setInterval(()=>scan(true),120000);
 if ("Notification" in window) Notification.requestPermission();
+function dailySummary() {
+  const today = new Date().toLocaleDateString();
+  const todays = tradeLog.filter(t => t.time.includes(":"));
+  const calls = todays.filter(t => t.bias === "CALL").length;
+  const puts = todays.filter(t => t.bias === "PUT").length;
+  const avg = todays.length
+    ? (todays.reduce((a,b)=>a+Number(b.confidence),0)/todays.length).toFixed(0)
+    : 0;
+
+  return `
+    <div class="card">
+      <strong>Today’s Summary</strong><br>
+      CALL signals: ${calls}<br>
+      PUT signals: ${puts}<br>
+      Avg confidence: ${avg}%
+    </div>
+  `;
+}
+  Action: <strong>${action}</strong><br>
 </script>
 
 </body>
