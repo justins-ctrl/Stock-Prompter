@@ -31,7 +31,7 @@
     }
     .bullish { color: #22c55e; }
     .bearish { color: #ef4444; }
-    .neutral { color: #e6e6e6; }
+    canvas { margin-top: 20px; }
   </style>
 </head>
 <body>
@@ -39,19 +39,32 @@
 <h1>📈 Trade Prompter</h1>
 
 <input id="ticker" placeholder="Enter ticker (AAPL, SPY, TSLA)" />
-<button onclick="analyze()">Analyze</button>
+<button onclick="analyze()">Analyze / Watch</button>
 
 <div id="output"></div>
 <canvas id="chart"></canvas>
+<div id="news"></div>
 
 <script>
 let lastAlert = "";
+let chart;
 
 function marketIsOpen() {
   const now = new Date();
-  const hours = now.getUTCHours() - 5; // EST
-  const minutes = now.getUTCMinutes();
-  return (hours > 9 || (hours === 9 && minutes >= 30)) && hours < 16;
+  const h = now.getUTCHours() - 5;
+  const m = now.getUTCMinutes();
+  return (h > 9 || (h === 9 && m >= 30)) && h < 16;
+}
+
+function rsi(prices, period = 14) {
+  let gains = 0, losses = 0;
+  for (let i = prices.length - period; i < prices.length - 1; i++) {
+    const diff = prices[i + 1] - prices[i];
+    if (diff >= 0) gains += diff;
+    else losses -= diff;
+  }
+  const rs = gains / (losses || 1);
+  return 100 - (100 / (1 + rs));
 }
 
 async function analyze(auto = false) {
@@ -62,37 +75,66 @@ async function analyze(auto = false) {
   if (!auto) output.innerHTML = "Loading...";
 
   try {
-    const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=7d&interval=30m`;
+    const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=5m`;
     const res = await fetch(url);
     const data = await res.json();
 
-    const prices = data.chart.result[0].indicators.quote[0].close.filter(p => p);
+    const prices = data.chart.result[0].indicators.quote[0].close.filter(Boolean);
+    const times = data.chart.result[0].timestamp.map(t => new Date(t * 1000).toLocaleTimeString());
+
     const current = prices.at(-1);
     const start = prices[0];
     const change = ((current - start) / start * 100);
+    const rsiVal = rsi(prices);
 
-    let bias = "";
-    if (change > 1.5) bias = "CALL";
-    if (change < -1.5) bias = "PUT";
+    let bias = "Neutral";
+    let cls = "";
 
-    if (bias && marketIsOpen()) {
-      const message = `${ticker}: ${bias} bias (${change.toFixed(2)}%)`;
-      if (message !== lastAlert) {
-        lastAlert = message;
-        alert(message);
-
-        if (Notification.permission === "granted") {
-          new Notification("Trade Prompter Alert", { body: message });
-        }
-      }
-    }
+    if (change > 0.7 && rsiVal < 70) { bias = "CALL"; cls = "bullish"; }
+    if (change < -0.7 && rsiVal > 30) { bias = "PUT"; cls = "bearish"; }
 
     output.innerHTML = `
       <div class="card">
         <h2>${ticker}</h2>
         <p>Price: $${current.toFixed(2)}</p>
-        <p>7-Day Change: ${change.toFixed(2)}%</p>
-        <p><strong>${bias || "Neutral"}</strong></p>
+        <p>Intraday Change: ${change.toFixed(2)}%</p>
+        <p>RSI: ${rsiVal.toFixed(1)}</p>
+        <p class="${cls}"><strong>${bias}</strong></p>
+      </div>
+    `;
+
+    if (bias !== "Neutral" && marketIsOpen()) {
+      const msg = `${ticker}: ${bias} signal`;
+      if (msg !== lastAlert) {
+        lastAlert = msg;
+        alert(msg);
+        if (Notification.permission === "granted") {
+          new Notification("Trade Prompter", { body: msg });
+        }
+      }
+    }
+
+    if (chart) chart.destroy();
+    chart = new Chart(document.getElementById("chart"), {
+      type: 'line',
+      data: {
+        labels: times,
+        datasets: [{
+          data: prices,
+          borderColor: '#2563eb',
+          borderWidth: 2,
+          pointRadius: 0
+        }]
+      },
+      options: { plugins: { legend: { display: false } } }
+    });
+
+    document.getElementById("news").innerHTML = `
+      <div class="card">
+        <strong>Latest News</strong>
+        <p><a style="color:#60a5fa" target="_blank"
+        href="https://news.google.com/search?q=${ticker}+stock">
+        View headlines</a></p>
       </div>
     `;
 
@@ -101,11 +143,9 @@ async function analyze(auto = false) {
   }
 }
 
-// Auto-scan every 2 minutes
 setInterval(() => analyze(true), 120000);
-
-// Ask for notification permission
-if ("Notification" in window) {
-  Notification.requestPermission();
-}
+if ("Notification" in window) Notification.requestPermission();
 </script>
+
+</body>
+</html>
