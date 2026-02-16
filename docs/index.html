@@ -45,12 +45,21 @@
 <canvas id="chart"></canvas>
 
 <script>
-async function analyze() {
+let lastAlert = "";
+
+function marketIsOpen() {
+  const now = new Date();
+  const hours = now.getUTCHours() - 5; // EST
+  const minutes = now.getUTCMinutes();
+  return (hours > 9 || (hours === 9 && minutes >= 30)) && hours < 16;
+}
+
+async function analyze(auto = false) {
   const ticker = document.getElementById("ticker").value.toUpperCase();
   if (!ticker) return;
 
   const output = document.getElementById("output");
-  output.innerHTML = "Loading...";
+  if (!auto) output.innerHTML = "Loading...";
 
   try {
     const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=7d&interval=30m`;
@@ -58,62 +67,45 @@ async function analyze() {
     const data = await res.json();
 
     const prices = data.chart.result[0].indicators.quote[0].close.filter(p => p);
-    const times = data.chart.result[0].timestamp.map(t => new Date(t*1000).toLocaleString());
-
-    const current = prices[prices.length - 1];
+    const current = prices.at(-1);
     const start = prices[0];
-    const change = ((current - start) / start * 100).toFixed(2);
+    const change = ((current - start) / start * 100);
 
-    let bias = "No Trade";
-    let cls = "neutral";
-    let confidence = Math.abs(change) * 10;
+    let bias = "";
+    if (change > 1.5) bias = "CALL";
+    if (change < -1.5) bias = "PUT";
 
-    if (change > 1.5) {
-      bias = "📈 CALL Bias";
-      cls = "bullish";
-    } else if (change < -1.5) {
-      bias = "📉 PUT Bias";
-      cls = "bearish";
+    if (bias && marketIsOpen()) {
+      const message = `${ticker}: ${bias} bias (${change.toFixed(2)}%)`;
+      if (message !== lastAlert) {
+        lastAlert = message;
+        alert(message);
+
+        if (Notification.permission === "granted") {
+          new Notification("Trade Prompter Alert", { body: message });
+        }
+      }
     }
 
     output.innerHTML = `
       <div class="card">
         <h2>${ticker}</h2>
         <p>Price: $${current.toFixed(2)}</p>
-        <p>7-Day Change: ${change}%</p>
-        <p class="${cls}"><strong>${bias}</strong></p>
-        <p>Confidence Score: ${confidence.toFixed(0)} / 100</p>
+        <p>7-Day Change: ${change.toFixed(2)}%</p>
+        <p><strong>${bias || "Neutral"}</strong></p>
       </div>
     `;
 
-    new Chart(document.getElementById("chart"), {
-      type: 'line',
-      data: {
-        labels: times,
-        datasets: [{
-          label: ticker,
-          data: prices,
-          borderColor: '#2563eb',
-          borderWidth: 2,
-          pointRadius: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { x: { display: false } }
-      }
-    });
-
-    if (confidence > 40) {
-      alert(`${ticker}: ${bias}`);
-    }
-
   } catch {
-    output.innerHTML = "Error loading data.";
+    if (!auto) output.innerHTML = "Error loading data.";
   }
 }
-</script>
 
-</body>
-</html>
+// Auto-scan every 2 minutes
+setInterval(() => analyze(true), 120000);
+
+// Ask for notification permission
+if ("Notification" in window) {
+  Notification.requestPermission();
+}
+</script>
