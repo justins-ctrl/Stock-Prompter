@@ -48,11 +48,24 @@
 </select>
 <input id="account" placeholder="Account size (e.g. 5000)" />
 <button onclick="scan()">Start Scanner</button>
+<label>
+  <input type="checkbox" id="alertsOn" checked />
+  Enable Alerts
+</label>
 
+<input id="minConfidence" type="number" value="70" min="0" max="100"
+  placeholder="Min alert confidence %" />
 <div id="results"></div>
 <div id="log"></div>
 
 <script>
+ function alertsEnabled() {
+  return document.getElementById("alertsOn")?.checked;
+}
+
+function minConf() {
+  return Number(document.getElementById("minConfidence")?.value || 70);
+} 
 let lastAlerts = {};
 let tradeLog = JSON.parse(localStorage.getItem("tradeLog") || "[]");
 let watchlists = JSON.parse(localStorage.getItem("watchlists") || "{}");
@@ -143,7 +156,12 @@ async function analyzeTicker(ticker, strategy, account) {
 let action = "WAIT";
 if (confidence > 70) action = "ENTER";
 if (confidence < 40) action = "AVOID";
-    if (bias!=="Neutral" && marketIsOpen()) {
+    if (
+  bias !== "Neutral" &&
+  confidence >= minConf() &&
+  alertsEnabled() &&
+  (marketIsOpen() || preMarketAllowed)
+) {
       const msg=`${ticker}: ${bias}`;
       if (lastAlerts[ticker]!==msg) {
         lastAlerts[ticker]=msg;
@@ -171,19 +189,45 @@ if (confidence < 40) action = "AVOID";
     return `<div class="card"><strong>${ticker}</strong><br>Error</div>`;
   }
 }
-
-async function scan(auto=false) {
+async function scan(auto = false) {
   saveSettings();
-  const list=tickers.value.split(",").map(t=>t.trim().toUpperCase()).filter(Boolean);
-  const strat=strategy.value;
-  const acct=Number(account.value||5000);
-  if (!auto) results.innerHTML="Scanning…";
-  let html="";
-  for (const t of list)
-    html+=await analyzeTicker(t,strat,acct);
-  results.innerHTML=html;
+  const list = tickers.value
+    .split(",")
+    .map(t => t.trim().toUpperCase())
+    .filter(Boolean);
+
+  const strat = strategy.value;
+  const acct = Number(account.value || 5000);
+
+  const now = new Date();
+  const hour = now.getHours();
+  preMarketAllowed = hour >= 4 && hour < 9;
+
+  if (!auto) results.innerHTML = "Scanning…";
+
+  let html = "";
+
+  for (const t of list) {
+    if (preMarketAllowed && !marketIsOpen()) {
+      const gap = await preMarketScan(t);
+      if (gap) {
+        html += `
+          <div class="card">
+            <strong>${t}</strong><br>
+            Pre-Market Gap: ${gap.gap}%<br>
+            Bias: <strong>${gap.bias}</strong>
+          </div>
+        `;
+        if (alertsEnabled()) alert(`${t} pre-market gap ${gap.gap}%`);
+      }
+    }
+    html += await analyzeTicker(t, strat, acct);
+  }
+
+  results.innerHTML = html;
   renderLog();
 }
+
 
 function renderLog() {
   log.innerHTML =
