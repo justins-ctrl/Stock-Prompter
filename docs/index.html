@@ -3,6 +3,7 @@
 <head>
   <title>Trade Prompter</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       margin: 0;
@@ -11,9 +12,7 @@
       color: #e6e6e6;
       padding: 20px;
     }
-    h1 {
-      text-align: center;
-    }
+    h1 { text-align: center; }
     input, button {
       width: 100%;
       padding: 14px;
@@ -22,15 +21,8 @@
       border: none;
       font-size: 16px;
     }
-    input {
-      background: #161b22;
-      color: white;
-    }
-    button {
-      background: #2563eb;
-      color: white;
-      font-weight: bold;
-    }
+    input { background: #161b22; color: white; }
+    button { background: #2563eb; color: white; font-weight: bold; }
     .card {
       background: #161b22;
       padding: 16px;
@@ -46,10 +38,11 @@
 
 <h1>📈 Trade Prompter</h1>
 
-<input id="ticker" placeholder="Enter ticker (AAPL, TSLA, SPY)" />
+<input id="ticker" placeholder="Enter ticker (AAPL, SPY, TSLA)" />
 <button onclick="analyze()">Analyze</button>
 
 <div id="output"></div>
+<canvas id="chart"></canvas>
 
 <script>
 async function analyze() {
@@ -60,35 +53,63 @@ async function analyze() {
   output.innerHTML = "Loading...";
 
   try {
-    const res = await fetch(
-  `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=7d&interval=30m`
-);
+    const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=7d&interval=30m`;
+    const res = await fetch(url);
     const data = await res.json();
+
     const prices = data.chart.result[0].indicators.quote[0].close.filter(p => p);
+    const times = data.chart.result[0].timestamp.map(t => new Date(t*1000).toLocaleString());
+
     const current = prices[prices.length - 1];
     const start = prices[0];
     const change = ((current - start) / start * 100).toFixed(2);
 
     let bias = "No Trade";
     let cls = "neutral";
+    let confidence = Math.abs(change) * 10;
 
-    if (change > 2) {
-      bias = "📈 Bullish — CALL bias";
+    if (change > 1.5) {
+      bias = "📈 CALL Bias";
       cls = "bullish";
-    } else if (change < -2) {
-      bias = "📉 Bearish — PUT bias";
+    } else if (change < -1.5) {
+      bias = "📉 PUT Bias";
       cls = "bearish";
     }
 
     output.innerHTML = `
       <div class="card">
         <h2>${ticker}</h2>
-        <p>Current Price: $${current.toFixed(2)}</p>
+        <p>Price: $${current.toFixed(2)}</p>
         <p>7-Day Change: ${change}%</p>
         <p class="${cls}"><strong>${bias}</strong></p>
+        <p>Confidence Score: ${confidence.toFixed(0)} / 100</p>
       </div>
     `;
-  } catch (e) {
+
+    new Chart(document.getElementById("chart"), {
+      type: 'line',
+      data: {
+        labels: times,
+        datasets: [{
+          label: ticker,
+          data: prices,
+          borderColor: '#2563eb',
+          borderWidth: 2,
+          pointRadius: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { x: { display: false } }
+      }
+    });
+
+    if (confidence > 40) {
+      alert(`${ticker}: ${bias}`);
+    }
+
+  } catch {
     output.innerHTML = "Error loading data.";
   }
 }
