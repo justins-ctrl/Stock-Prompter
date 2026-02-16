@@ -9,24 +9,90 @@
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
       background: #0e1117;
       color: #e6e6e6;
-      text-align: center;
-      padding-top: 40px;
-    }
-    .box {
-      background: #161b22;
-      margin: 20px;
       padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    input, button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+    }
+    input {
+      background: #161b22;
+      color: white;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      font-weight: bold;
+    }
+    .card {
+      background: #161b22;
+      padding: 16px;
+      margin-top: 20px;
       border-radius: 12px;
     }
+    .bullish { color: #22c55e; }
+    .bearish { color: #ef4444; }
+    .neutral { color: #e6e6e6; }
   </style>
 </head>
 <body>
 
 <h1>📈 Trade Prompter</h1>
 
-<div class="box">
-  <p>If you can see this page, your site is LIVE again.</p>
-</div>
+<input id="ticker" placeholder="Enter ticker (AAPL, TSLA, SPY)" />
+<button onclick="analyze()">Analyze</button>
+
+<div id="output"></div>
+
+<script>
+async function analyze() {
+  const ticker = document.getElementById("ticker").value.toUpperCase();
+  if (!ticker) return;
+
+  const output = document.getElementById("output");
+  output.innerHTML = "Loading...";
+
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=7d&interval=30m`
+    );
+    const data = await res.json();
+    const prices = data.chart.result[0].indicators.quote[0].close.filter(p => p);
+    const current = prices[prices.length - 1];
+    const start = prices[0];
+    const change = ((current - start) / start * 100).toFixed(2);
+
+    let bias = "No Trade";
+    let cls = "neutral";
+
+    if (change > 2) {
+      bias = "📈 Bullish — CALL bias";
+      cls = "bullish";
+    } else if (change < -2) {
+      bias = "📉 Bearish — PUT bias";
+      cls = "bearish";
+    }
+
+    output.innerHTML = `
+      <div class="card">
+        <h2>${ticker}</h2>
+        <p>Current Price: $${current.toFixed(2)}</p>
+        <p>7-Day Change: ${change}%</p>
+        <p class="${cls}"><strong>${bias}</strong></p>
+      </div>
+    `;
+  } catch (e) {
+    output.innerHTML = "Error loading data.";
+  }
+}
+</script>
 
 </body>
 </html>
