@@ -48,7 +48,19 @@
 </select>
 <input id="account" placeholder="Account size (e.g. 5000)" />
 <button onclick="scan()">Start Scanner</button>
-<label>
+<label style="display:block;margin-top:10px;">
+  <input type="checkbox" id="alertsOn" checked />
+  Enable Alerts
+</label>
+
+<input
+  id="minConfidence"
+  type="number"
+  value="70"
+  min="0"
+  max="100"
+  placeholder="Min alert confidence (%)"
+/>
   <input type="checkbox" id="alertsOn" checked />
   Enable Alerts
 </label>
