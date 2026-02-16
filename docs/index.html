@@ -157,15 +157,16 @@ if (confidence < 40) action = "AVOID";
     }
 
     return `
-      <div class="card">
-        <strong>${ticker}</strong><br>
-        $${current.toFixed(2)} | ${change.toFixed(2)}%<br>
-        RSI ${rsiVal.toFixed(1)} | Volume Spike: ${volSpike?"Yes":"No"}<br>
-        <span class="${cls}"><strong>${bias}</strong></span><br>
-        Confidence: ${confidence.toFixed(0)}/100<br>
-        Suggested Contracts: ${contracts}
-      </div>
-    `;
+  <div class="card">
+    <strong>${ticker}</strong><br>
+    $${current.toFixed(2)} | ${change.toFixed(2)}%<br>
+    RSI ${rsiVal.toFixed(1)} | Volume Spike: ${volSpike ? "Yes" : "No"}<br>
+    <span class="${cls}"><strong>${bias}</strong></span><br>
+    Action: <strong>${action}</strong><br>
+    Confidence: ${confidence.toFixed(0)}/100<br>
+    Suggested Contracts: ${contracts}
+  </div>
+`;
   } catch {
     return `<div class="card"><strong>${ticker}</strong><br>Error</div>`;
   }
@@ -185,14 +186,24 @@ async function scan(auto=false) {
 }
 
 function renderLog() {
-  log.innerHTML = log.innerHTML = dailySummary() + `
-  <div class="card">
-    <strong>Recent Signals</strong><br>
-    ${tradeLog.map(l =>
-      `<small>${l.time} — ${l.ticker} ${l.bias} (${l.strategy}) ${l.confidence}%</small>`
-    ).join("<br>")}
-  </div>
-`;
+  log.innerHTML =
+    dailySummary() +
+    `
+    <div class="card">
+      <strong>Recent Signals</strong><br>
+      ${
+        tradeLog.length
+          ? tradeLog
+              .map(
+                l =>
+                  `<small>${l.time} — ${l.ticker} ${l.bias} (${l.strategy}) ${l.confidence}%</small>`
+              )
+              .join("<br>")
+          : "<small>No signals yet</small>"
+      }
+    </div>
+  `;
+}
   
 
 loadSettings();
@@ -217,7 +228,7 @@ function dailySummary() {
     </div>
   `;
 }
-  Action: <strong>${action}</strong><br>
+  
 </script>
 
 </body>
