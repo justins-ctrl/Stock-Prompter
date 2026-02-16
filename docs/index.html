@@ -3,7 +3,6 @@
 <head>
   <title>Trade Prompter</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       margin: 0;
@@ -26,28 +25,25 @@
     .card {
       background: #161b22;
       padding: 16px;
-      margin-top: 20px;
+      margin-top: 15px;
       border-radius: 12px;
     }
     .bullish { color: #22c55e; }
     .bearish { color: #ef4444; }
-    canvas { margin-top: 20px; }
+    .neutral { color: #9ca3af; }
   </style>
 </head>
 <body>
 
 <h1>📈 Trade Prompter</h1>
 
-<input id="ticker" placeholder="Enter ticker (AAPL, SPY, TSLA)" />
-<button onclick="analyze()">Analyze / Watch</button>
+<input id="tickers" placeholder="Enter tickers (SPY, AAPL, TSLA)" />
+<button onclick="scan()">Start Watchlist Scan</button>
 
-<div id="output"></div>
-<canvas id="chart"></canvas>
-<div id="news"></div>
+<div id="results"></div>
 
 <script>
-let lastAlert = "";
-let chart;
+let lastAlerts = {};
 
 function marketIsOpen() {
   const now = new Date();
@@ -67,46 +63,34 @@ function rsi(prices, period = 14) {
   return 100 - (100 / (1 + rs));
 }
 
-async function analyze(auto = false) {
-  const ticker = document.getElementById("ticker").value.toUpperCase();
-  if (!ticker) return;
-
-  const output = document.getElementById("output");
-  if (!auto) output.innerHTML = "Loading...";
-
+async function analyzeTicker(ticker) {
   try {
     const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=5m`;
     const res = await fetch(url);
     const data = await res.json();
 
     const prices = data.chart.result[0].indicators.quote[0].close.filter(Boolean);
-    const times = data.chart.result[0].timestamp.map(t => new Date(t * 1000).toLocaleTimeString());
-
     const current = prices.at(-1);
     const start = prices[0];
     const change = ((current - start) / start * 100);
     const rsiVal = rsi(prices);
 
     let bias = "Neutral";
-    let cls = "";
+    let cls = "neutral";
 
-    if (change > 0.7 && rsiVal < 70) { bias = "CALL"; cls = "bullish"; }
-    if (change < -0.7 && rsiVal > 30) { bias = "PUT"; cls = "bearish"; }
-
-    output.innerHTML = `
-      <div class="card">
-        <h2>${ticker}</h2>
-        <p>Price: $${current.toFixed(2)}</p>
-        <p>Intraday Change: ${change.toFixed(2)}%</p>
-        <p>RSI: ${rsiVal.toFixed(1)}</p>
-        <p class="${cls}"><strong>${bias}</strong></p>
-      </div>
-    `;
+    if (change > 0.7 && rsiVal < 70) {
+      bias = "CALL";
+      cls = "bullish";
+    }
+    if (change < -0.7 && rsiVal > 30) {
+      bias = "PUT";
+      cls = "bearish";
+    }
 
     if (bias !== "Neutral" && marketIsOpen()) {
       const msg = `${ticker}: ${bias} signal`;
-      if (msg !== lastAlert) {
-        lastAlert = msg;
+      if (lastAlerts[ticker] !== msg) {
+        lastAlerts[ticker] = msg;
         alert(msg);
         if (Notification.permission === "granted") {
           new Notification("Trade Prompter", { body: msg });
@@ -114,36 +98,41 @@ async function analyze(auto = false) {
       }
     }
 
-    if (chart) chart.destroy();
-    chart = new Chart(document.getElementById("chart"), {
-      type: 'line',
-      data: {
-        labels: times,
-        datasets: [{
-          data: prices,
-          borderColor: '#2563eb',
-          borderWidth: 2,
-          pointRadius: 0
-        }]
-      },
-      options: { plugins: { legend: { display: false } } }
-    });
-
-    document.getElementById("news").innerHTML = `
+    return `
       <div class="card">
-        <strong>Latest News</strong>
-        <p><a style="color:#60a5fa" target="_blank"
-        href="https://news.google.com/search?q=${ticker}+stock">
-        View headlines</a></p>
+        <strong>${ticker}</strong><br>
+        Price: $${current.toFixed(2)}<br>
+        Change: ${change.toFixed(2)}%<br>
+        RSI: ${rsiVal.toFixed(1)}<br>
+        <span class="${cls}"><strong>${bias}</strong></span>
       </div>
     `;
-
   } catch {
-    if (!auto) output.innerHTML = "Error loading data.";
+    return `
+      <div class="card">
+        <strong>${ticker}</strong><br>
+        Error loading data
+      </div>
+    `;
   }
 }
 
-setInterval(() => analyze(true), 120000);
+async function scan(auto = false) {
+  const input = document.getElementById("tickers").value;
+  if (!input) return;
+
+  const tickers = input.split(",").map(t => t.trim().toUpperCase());
+  const results = document.getElementById("results");
+  if (!auto) results.innerHTML = "Scanning...";
+
+  let html = "";
+  for (const t of tickers) {
+    html += await analyzeTicker(t);
+  }
+  results.innerHTML = html;
+}
+
+setInterval(() => scan(true), 120000);
 if ("Notification" in window) Notification.requestPermission();
 </script>
 
