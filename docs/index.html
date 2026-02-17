@@ -1,96 +1,130 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
   <title>Trade Prompter</title>
-
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#0e1117">
-
-  <link rel="manifest" href="manifest.json">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
-      margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0e1117;
-      color: #e6e6e6;
-      text-align: center;
+      background:#0e1117;
+      color:#e6e6e6;
+      padding:20px;
     }
-    header {
-      padding: 20px;
-      font-size: 22px;
-      font-weight: 600;
+    h1{text-align:center}
+    input,select,button{
+      width:100%;
+      padding:14px;
+      margin-top:10px;
+      border-radius:10px;
+      border:none;
+      font-size:16px;
     }
-    input, button {
-      padding: 12px;
-      font-size: 16px;
-      margin: 6px;
-      border-radius: 6px;
-      border: none;
+    input,select{background:#161b22;color:white}
+    button{background:#2563eb;color:white;font-weight:bold}
+    .card{
+      background:#161b22;
+      padding:16px;
+      margin-top:15px;
+      border-radius:14px;
     }
-    input {
-      width: 160px;
-      text-transform: uppercase;
-    }
-    button {
-      background: #1f6feb;
-      color: white;
-      cursor: pointer;
-    }
-    .box {
-      background: #161b22;
-      margin: 15px;
-      padding: 15px;
-      border-radius: 8px;
-    }
-    .alert {
-      font-weight: bold;
-      font-size: 18px;
-      margin-top: 10px;
-    }
+    .bullish{color:#22c55e}
+    .bearish{color:#ef4444}
+    small{color:#9ca3af}
   </style>
 </head>
 
 <body>
 
-<header>📈 Trade Prompter</header>
+<h1>📈 Trade Prompter</h1>
 
-<div class="box">
-  <input id="ticker" placeholder="Ticker (AAPL)" />
-  <button onclick="analyze()">Analyze</button>
-</div>
+<input id="tickers" placeholder="Tickers (AAPL, TSLA, SPY)" />
+<select id="strategy">
+  <option value="scalp">Scalp</option>
+  <option value="momentum">Momentum</option>
+</select>
 
-<div class="box" id="output">
-  Waiting for input…
-</div>
+<select id="expiration">
+  <option value="weekly">Weekly Only</option>
+  <option value="biweekly">Bi-Weekly Only</option>
+  <option value="both">Weekly + Bi-Weekly</option>
+</select>
+
+<input id="account" placeholder="Account size ($)" />
+<input id="minConf" type="number" value="65" placeholder="Min confidence %" />
+
+<label>
+  <input type="checkbox" id="alertsOn" checked /> Enable Alerts
+</label>
+
+<button onclick="scan()">Start Scanner</button>
+
+<div id="results"></div>
 
 <script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js");
+let lastAlert = {};
+function alertsOn(){return document.getElementById("alertsOn").checked}
+function minConf(){return Number(document.getElementById("minConf").value||65)}
+
+function marketOpen(){
+  const h=new Date().getHours();
+  return h>=9 && h<16;
 }
 
-function analyze() {
-  const ticker = document.getElementById("ticker").value.toUpperCase();
-  if (!ticker) return;
-
-  document.getElementById("output").innerHTML = `
-    <div>🔍 Scanning ${ticker}...</div>
-    <div class="alert">📊 ENTER CALL (Weekly)</div>
-    <div>Confidence: 74%</div>
-    <div>Suggested Risk: Small</div>
-  `;
-
-  notify(`Trade Alert: ${ticker}`, "ENTER CALL • Weekly expiration • 74% confidence");
-}
-
-function notify(title, body) {
-  if (Notification.permission === "granted") {
-    new Notification(title, { body });
-  } else if (Notification.permission !== "denied") {
-    Notification.requestPermission();
+function fakeOption(account,exp){
+  const risk=account<2000?"Small":account<5000?"Medium":"Aggressive";
+  return {
+    exp:exp==="weekly"?"Weekly":"Bi-Weekly",
+    risk
   }
 }
+
+async function analyze(ticker){
+  try{
+    const url=`https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=5m`;
+    const r=await fetch(url);
+    const d=await r.json();
+    const p=d.chart.result[0].indicators.quote[0].close.filter(Boolean);
+    const change=((p.at(-1)-p[0])/p[0])*100;
+
+    let bias="WAIT";
+    if(change>0.4) bias="CALL";
+    if(change<-0.4) bias="PUT";
+
+    const confidence=Math.min(95,Math.abs(change)*60+30);
+
+    if(bias!=="WAIT" && confidence>=minConf() && alertsOn() && marketOpen()){
+      if(!lastAlert[ticker]){
+        lastAlert[ticker]=true;
+        alert(`${ticker} ${bias} (${confidence.toFixed(0)}%)`);
+      }
+    }
+
+    const exp=document.getElementById("expiration").value;
+    const opt=fakeOption(Number(account.value||3000),exp);
+
+    return `
+      <div class="card">
+        <strong>${ticker}</strong><br>
+        Bias: <span class="${bias==="CALL"?"bullish":"bearish"}">${bias}</span><br>
+        Confidence: ${confidence.toFixed(0)}%<br>
+        Expiration: ${opt.exp}<br>
+        Suggested Risk: ${opt.risk}
+      </div>
+    `;
+  }catch{
+    return `<div class="card">${ticker}: Error</div>`;
+  }
+}
+
+async function scan(){
+  const list=tickers.value.split(",").map(t=>t.trim().toUpperCase()).filter(Boolean);
+  results.innerHTML="Scanning...";
+  let out="";
+  for(const t of list) out+=await analyze(t);
+  results.innerHTML=out;
+}
+
+setInterval(()=>scan(),120000);
 </script>
 
 </body>
