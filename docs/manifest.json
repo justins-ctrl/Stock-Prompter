@@ -1,0 +1,8 @@
+{
+  "name": "Trade Prompter",
+  "short_name": "TradePrompter",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0e1117",
+  "theme_color": "#0e1117"
+}
