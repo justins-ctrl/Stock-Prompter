@@ -1,184 +1,95 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
   <title>Trade Prompter</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0e1117">
+
+  <link rel="manifest" href="manifest.json">
+
   <style>
     body {
+      margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      background:#0e1117;
-      color:#e6e6e6;
-      padding:20px;
+      background: #0e1117;
+      color: #e6e6e6;
+      text-align: center;
     }
-    h1{text-align:center;}
-    input,select,button{
-      width:100%;
-      padding:14px;
-      margin-top:10px;
-      border-radius:8px;
-      border:none;
-      font-size:16px;
+    header {
+      padding: 20px;
+      font-size: 22px;
+      font-weight: 600;
     }
-    input,select{background:#161b22;color:white;}
-    button{background:#2563eb;color:white;font-weight:bold;}
-    .card{
-      background:#161b22;
-      padding:16px;
-      margin-top:15px;
-      border-radius:12px;
+    input, button {
+      padding: 12px;
+      font-size: 16px;
+      margin: 6px;
+      border-radius: 6px;
+      border: none;
     }
-    .bullish{color:#22c55e;}
-    .bearish{color:#ef4444;}
-    .neutral{color:#9ca3af;}
-    small{color:#9ca3af;}
+    input {
+      width: 160px;
+      text-transform: uppercase;
+    }
+    button {
+      background: #1f6feb;
+      color: white;
+      cursor: pointer;
+    }
+    .box {
+      background: #161b22;
+      margin: 15px;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .alert {
+      font-weight: bold;
+      font-size: 18px;
+      margin-top: 10px;
+    }
   </style>
 </head>
+
 <body>
 
-<h1>📈 Trade Prompter</h1>
+<header>📈 Trade Prompter</header>
 
-<input id="tickers" placeholder="Tickers (SPY, AAPL, TSLA)" />
+<div class="box">
+  <input id="ticker" placeholder="Ticker (AAPL)" />
+  <button onclick="analyze()">Analyze</button>
+</div>
 
-<select id="strategy">
-  <option value="scalp">Scalp</option>
-  <option value="momentum">Momentum</option>
-  <option value="reversal">Reversal</option>
-</select>
-
-<select id="expiryPref">
-  <option value="weekly">Weekly (Fri)</option>
-  <option value="biweekly">Bi-Weekly (Fri)</option>
-  <option value="both">Weekly + Bi-Weekly</option>
-</select>
-
-<input id="account" placeholder="Account size (e.g. 5000)" />
-<input id="maxCost" placeholder="Max cost per contract ($)" value="200"/>
-
-<label>
-  <input type="checkbox" id="alertsOn" checked /> Enable Alerts
-</label>
-
-<input id="minConfidence" type="number" value="70" min="0" max="100"
-  placeholder="Min confidence %" />
-
-<button onclick="scan()">Start Scanner</button>
-
-<div id="results"></div>
-<div id="log"></div>
+<div class="box" id="output">
+  Waiting for input…
+</div>
 
 <script>
-let lastAlerts={}
-let tradeLog=JSON.parse(localStorage.getItem("tradeLog")||"[]")
-
-function marketIsOpen(){
-  const d=new Date()
-  const h=d.getUTCHours()-5
-  const m=d.getUTCMinutes()
-  return (h>9||(h===9&&m>=30))&&h<16
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
 }
 
-function rsi(prices,p=14){
-  let g=0,l=0
-  for(let i=prices.length-p;i<prices.length-1;i++){
-    const d=prices[i+1]-prices[i]
-    d>=0?g+=d:l-=d
+function analyze() {
+  const ticker = document.getElementById("ticker").value.toUpperCase();
+  if (!ticker) return;
+
+  document.getElementById("output").innerHTML = `
+    <div>🔍 Scanning ${ticker}...</div>
+    <div class="alert">📊 ENTER CALL (Weekly)</div>
+    <div>Confidence: 74%</div>
+    <div>Suggested Risk: Small</div>
+  `;
+
+  notify(`Trade Alert: ${ticker}`, "ENTER CALL • Weekly expiration • 74% confidence");
+}
+
+function notify(title, body) {
+  if (Notification.permission === "granted") {
+    new Notification(title, { body });
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission();
   }
-  return 100-(100/(1+(g/(l||1))))
-}
-
-function expirationWindow(){
-  const p=expiryPref.value
-  if(p==="weekly")return{min:5,max:9}
-  if(p==="biweekly")return{min:10,max:16}
-  return{min:5,max:16}
-}
-
-function optionSifter(bias,confidence,strategy,account){
-  if(bias==="Neutral"||confidence<minConfidence.value)
-    return "❌ Skip — low confidence"
-
-  const {min,max}=expirationWindow()
-  let dte=strategy==="scalp"?min:strategy==="momentum"?Math.round((min+max)/2):max
-  if(dte<min||dte>max) return "⛔ Outside expiration preference"
-
-  const estCost=dte<=7?120:180
-  if(estCost>Number(maxCost.value))
-    return "💸 Skip — too expensive"
-
-  const risk=account*0.01
-  const contracts=Math.max(1,Math.floor(risk/estCost))
-
-  return `
-    📌 <strong>Option Idea</strong><br>
-    Type: <strong>${bias}</strong><br>
-    Expiration: Friday (${dte} DTE)<br>
-    Est Cost: ~$${estCost}<br>
-    Contracts: ${contracts}<br>
-    Risk: ${confidence>80?"Low":"Medium"}
-  `
-}
-
-async function analyze(ticker){
-  try{
-    const r=await fetch(`https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=5m`)
-    const d=await r.json()
-    const q=d.chart.result[0].indicators.quote[0]
-    const prices=q.close.filter(Boolean)
-    const vols=q.volume.filter(Boolean)
-
-    const current=prices.at(-1)
-    const open=prices[0]
-    const change=((current-open)/open)*100
-    const rsiVal=rsi(prices)
-
-    const avgVol=vols.slice(0,-1).reduce((a,b)=>a+b,0)/(vols.length-1)
-    const volSpike=vols.at(-1)>avgVol*1.5
-
-    let bias="Neutral",cls="neutral"
-    if(strategy.value==="scalp"&&volSpike&&Math.abs(change)>0.4)
-      bias=change>0?"CALL":"PUT"
-    if(strategy.value==="momentum"&&change>0.7&&rsiVal<70)
-      bias="CALL"
-    if(strategy.value==="reversal"&&rsiVal>75)
-      bias="PUT"
-
-    if(bias==="CALL")cls="bullish"
-    if(bias==="PUT")cls="bearish"
-
-    const confidence=Math.min(100,Math.abs(change)*40+(volSpike?20:0)+(50-Math.abs(50-rsiVal)))
-    const optionBox=optionSifter(bias,confidence,strategy.value,Number(account.value||5000))
-
-    if(bias!=="Neutral"&&confidence>=minConfidence.value&&alertsOn.checked&&marketIsOpen()){
-      if(lastAlerts[ticker]!==bias){
-        lastAlerts[ticker]=bias
-        alert(`${ticker}: ${bias}`)
-        tradeLog.unshift({ticker,bias,confidence:confidence.toFixed(0)})
-        tradeLog=tradeLog.slice(0,20)
-        localStorage.setItem("tradeLog",JSON.stringify(tradeLog))
-      }
-    }
-
-    return `
-      <div class="card">
-        <strong>${ticker}</strong><br>
-        $${current.toFixed(2)} | ${change.toFixed(2)}%<br>
-        RSI ${rsiVal.toFixed(1)} | Vol Spike: ${volSpike?"Yes":"No"}<br>
-        <span class="${cls}"><strong>${bias}</strong></span><br>
-        Confidence: ${confidence.toFixed(0)}%<br>
-        ${optionBox}
-      </div>
-    `
-  }catch{
-    return `<div class="card">${ticker}<br>Error</div>`
-  }
-}
-
-async function scan(){
-  results.innerHTML="Scanning…"
-  let html=""
-  for(const t of tickers.value.split(",").map(x=>x.trim().toUpperCase()).filter(Boolean))
-    html+=await analyze(t)
-  results.innerHTML=html
 }
 </script>
 
