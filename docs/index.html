@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Trade Prompter Pro</title>
+  <title>Trade Prompter Elite</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
@@ -31,32 +31,44 @@
     .bearish { color: #ef4444; }
     .neutral { color: #9ca3af; }
     .warn { color: #facc15; }
+    .good { color: #22c55e; }
+    .bad { color: #ef4444; }
+    .bar {
+      height: 10px;
+      background: #374151;
+      border-radius: 6px;
+      margin: 6px 0;
+      position: relative;
+    }
+    .zone {
+      position: absolute;
+      height: 100%;
+      border-radius: 6px;
+    }
+    .balanced { background: #22c55e; }
+    .aggressive { background: #facc15; }
     small { color:#9ca3af; }
   </style>
 </head>
 <body>
 
-<h1>📈 Trade Prompter Pro</h1>
+<h1>📊 Trade Prompter Elite</h1>
 
 <input id="tickers" placeholder="Tickers (SPY, AAPL, TSLA)" />
 <select id="expiration">
   <option value="weekly">Weekly Only</option>
   <option value="biweekly">Weekly + Bi-Weekly</option>
 </select>
-<select id="strategy">
-  <option value="momentum">Momentum</option>
-  <option value="reversal">Reversal</option>
-</select>
 <input id="account" placeholder="Account size (e.g. 5000)" />
-<button onclick="scan()">Scan & Select</button>
-
-<label style="display:block;margin-top:10px;">
-  <input type="checkbox" id="alertsOn" checked /> Enable Alerts
-</label>
+<button onclick="scan()">Scan Smart</button>
 
 <div id="results"></div>
+<div id="stats"></div>
 
 <script>
+let stats = JSON.parse(localStorage.getItem("stats") || 
+  '{"signals":0,"calls":0,"puts":0,"avgConf":0}');
+
 function rsi(prices, p = 14) {
   let g = 0, l = 0;
   for (let i = prices.length - p; i < prices.length - 1; i++) {
@@ -65,6 +77,26 @@ function rsi(prices, p = 14) {
   }
   const rs = g / (l || 1);
   return 100 - (100 / (1 + rs));
+}
+
+function updateStats(conf, bias) {
+  stats.signals++;
+  if (bias === "CALL") stats.calls++;
+  if (bias === "PUT") stats.puts++;
+  stats.avgConf =
+    ((stats.avgConf * (stats.signals - 1)) + conf) / stats.signals;
+  localStorage.setItem("stats", JSON.stringify(stats));
+}
+
+function renderStats() {
+  statsDiv.innerHTML = `
+    <div class="card">
+      <strong>📈 Signal Quality Summary</strong><br>
+      Total signals: ${stats.signals}<br>
+      CALLs: ${stats.calls} | PUTs: ${stats.puts}<br>
+      Avg confidence: ${stats.avgConf.toFixed(0)}%
+    </div>
+  `;
 }
 
 async function analyzeTicker(ticker) {
@@ -81,35 +113,22 @@ async function analyzeTicker(ticker) {
 
     let bias = "WAIT";
     let cls = "neutral";
-
     if (change > 0.6 && rsiVal < 70) { bias = "CALL"; cls = "bullish"; }
     if (change < -0.6 && rsiVal > 30) { bias = "PUT"; cls = "bearish"; }
 
     const expectedMove = Math.abs(change) * current / 100;
-    const acct = Number(account.value || 5000);
-    const maxPremium = acct * 0.01;
+    const confidence = Math.min(
+      100,
+      Math.abs(change) * 40 + (50 - Math.abs(50 - rsiVal))
+    );
 
-    const balancedLow = bias === "CALL"
-      ? current + expectedMove * 0.3
-      : current - expectedMove * 0.7;
+    const actionable = confidence >= 65 && bias !== "WAIT";
+    if (actionable) updateStats(confidence, bias);
 
-    const balancedHigh = bias === "CALL"
-      ? current + expectedMove * 0.7
-      : current - expectedMove * 0.3;
-
-    const aggressiveLow = bias === "CALL"
-      ? balancedHigh
-      : balancedLow - expectedMove * 0.3;
-
-    const aggressiveHigh = bias === "CALL"
-      ? balancedHigh + expectedMove * 0.4
-      : balancedLow;
-
-    let warnings = [];
-    if (expectedMove < current * 0.004)
-      warnings.push("Low expected move → limited payoff");
-    if (aggressiveHigh - current > expectedMove * 1.5)
-      warnings.push("Aggressive strikes likely to decay fast");
+    const balancedLow = current - expectedMove * 0.4;
+    const balancedHigh = current + expectedMove * 0.4;
+    const aggressiveLow = current - expectedMove;
+    const aggressiveHigh = current + expectedMove;
 
     return `
       <div class="card">
@@ -117,34 +136,32 @@ async function analyzeTicker(ticker) {
         $${current.toFixed(2)} | ${change.toFixed(2)}%<br>
         RSI ${rsiVal.toFixed(1)}<br><br>
 
-        Bias: <span class="${cls}"><strong>${bias}</strong></span><br><br>
+        Bias: <span class="${cls}"><strong>${bias}</strong></span><br>
+        Confidence: <strong class="${actionable ? "good" : "bad"}">
+          ${confidence.toFixed(0)}%
+        </strong><br>
+        Status: <strong>${actionable ? "ACTIONABLE" : "NO TRADE"}</strong><br><br>
 
-        🎯 <strong>Strike Selection (Dollar Ranges)</strong><br>
+        🎯 <strong>Strike Heatmap</strong>
+        <div class="bar">
+          <div class="zone balanced" style="left:30%;width:40%"></div>
+          <div class="zone aggressive" style="left:15%;width:70%"></div>
+        </div>
 
-        🟢 Balanced (Best R/R):<br>
-        $${balancedLow.toFixed(2)} – $${balancedHigh.toFixed(2)}<br><br>
-
-        🟡 Aggressive (Higher payout, higher decay):<br>
-        $${aggressiveLow.toFixed(2)} – $${aggressiveHigh.toFixed(2)}<br><br>
-
-        💵 Suggested Max Premium per Contract:<br>
-        $${maxPremium.toFixed(0)}<br><br>
-
-        ${
-          warnings.length
-            ? `<span class="warn">⚠️ ${warnings.join(" • ")}</span><br>`
-            : ""
-        }
+        🟢 Balanced Zone: $${balancedLow.toFixed(2)} – $${balancedHigh.toFixed(2)}<br>
+        🟡 Aggressive Zone: $${aggressiveLow.toFixed(2)} – $${aggressiveHigh.toFixed(2)}<br>
 
         <small>
-          Designed for ${
-            expiration.value === "weekly" ? "weeklies only" : "weekly + bi-weekly"
-          }. Avoids lotto strikes and overpay traps.
+          ${
+            actionable
+              ? "Aligned move + confidence → acceptable risk"
+              : "Filtered out to protect capital"
+          }
         </small>
       </div>
     `;
   } catch {
-    return `<div class="card">${ticker}: Error loading data</div>`;
+    return `<div class="card">${ticker}: Error</div>`;
   }
 }
 
@@ -154,18 +171,18 @@ async function scan() {
     .map(t => t.trim().toUpperCase())
     .filter(Boolean);
 
-  results.innerHTML = "Scanning…";
-
+  results.innerHTML = "Scanning intelligently…";
   let html = "";
+
   for (const t of list) {
     html += await analyzeTicker(t);
   }
   results.innerHTML = html;
-
-  if (alertsOn.checked && "Notification" in window) {
-    Notification.requestPermission();
-  }
+  renderStats();
 }
+
+const statsDiv = document.getElementById("stats");
+renderStats();
 </script>
 
 </body>
