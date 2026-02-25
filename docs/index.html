@@ -47,12 +47,13 @@ button {
   padding: 25px;
   background: #1a1a1a;
   border-radius: 10px;
+  font-size: 18px;
 }
 
-.warning { color: orange; font-weight: bold; }
-.danger { color: red; font-weight: bold; }
 .bullish { color: lime; font-weight: bold; }
 .bearish { color: red; font-weight: bold; }
+.warning { color: orange; font-weight: bold; }
+.strong { color: #00ffcc; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -113,7 +114,6 @@ async function analyze() {
   result.innerHTML = "Fetching price...";
 
   let price = await getPrice(ticker);
-
   if (!price) {
     price = simulatePrice();
     result.innerHTML = "<p class='warning'>Live data unavailable. Using simulator.</p>";
@@ -121,25 +121,76 @@ async function analyze() {
 
   const movePercent = expiry === "weekly" ? 0.04 : 0.07;
   const expectedMove = price * movePercent;
+
   const upperRange = price + expectedMove;
   const lowerRange = price - expectedMove;
 
-  const suggestedStrike = price + 2;
+  // Basic directional bias (placeholder logic)
+  const bias = price % 2 === 0 ? "CALL" : "PUT";
+
+  const strike = bias === "CALL" ? price + 2 : price - 2;
   const optionCost = price * 0.05;
-  const breakeven = suggestedStrike + optionCost;
-  const percentMoveNeeded = ((breakeven - price) / price) * 100;
+
+  const breakeven = bias === "CALL"
+      ? strike + optionCost
+      : strike - optionCost;
+
+  const percentMoveNeeded = Math.abs((breakeven - price) / price * 100);
+
+  const positionSize = optionCost * 100;
+  const riskPercent = (positionSize / account) * 100;
+
+  // ----- SCORING ENGINE -----
+
+  let score = 100;
+
+  if (percentMoveNeeded > movePercent * 100) score -= 30;
+  if (riskPercent > 10) score -= 20;
+  if (Math.abs(strike - price) > expectedMove) score -= 15;
+
+  if (score < 0) score = 0;
+
+  let confidence;
+  if (score >= 80) confidence = "High";
+  else if (score >= 60) confidence = "Moderate";
+  else if (score >= 40) confidence = "Low";
+  else confidence = "Very Low";
+
+  let recommendation;
+  if (score >= 75)
+      recommendation = `Strong ${bias}`;
+  else if (score >= 55)
+      recommendation = `${bias} — Acceptable`;
+  else
+      recommendation = "Wait for Better Setup";
 
   result.innerHTML += `
       <h2>${ticker}</h2>
       <p>Price: $${price.toFixed(2)}</p>
+
       <hr>
-      <p>Expected Move: ±$${expectedMove.toFixed(2)}</p>
-      <p>Projected Range: $${lowerRange.toFixed(2)} - $${upperRange.toFixed(2)}</p>
+
+      <p><b>Expected Move:</b> ±$${expectedMove.toFixed(2)}</p>
+      <p>Range: $${lowerRange.toFixed(2)} - $${upperRange.toFixed(2)}</p>
+
       <hr>
-      <p>Suggested Strike (ATM +1/2 OTM): $${suggestedStrike.toFixed(2)}</p>
-      <p>Estimated Option Cost: $${optionCost.toFixed(2)}</p>
-      <p>Breakeven: $${breakeven.toFixed(2)}</p>
-      <p>% Move Required: ${percentMoveNeeded.toFixed(2)}%</p>
+
+      <p><b>Trade Type:</b> 
+        <span class="${bias === "CALL" ? "bullish" : "bearish"}">
+        ${bias}
+        </span>
+      </p>
+
+      <p><b>Suggested Strike:</b> $${strike.toFixed(2)}</p>
+      <p><b>Breakeven:</b> $${breakeven.toFixed(2)}</p>
+      <p><b>% Move Required:</b> ${percentMoveNeeded.toFixed(2)}%</p>
+      <p><b>Account Risk:</b> ${riskPercent.toFixed(2)}%</p>
+
+      <hr>
+
+      <p><b>Trade Quality Score:</b> ${score}/100</p>
+      <p><b>Confidence Level:</b> ${confidence}</p>
+      <p class="strong"><b>Recommendation:</b> ${recommendation}</p>
   `;
 }
 
