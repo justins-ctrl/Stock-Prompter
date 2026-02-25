@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <title>Trade Prompter Pro</title>
-  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { font-family: Arial; padding: 40px; }
+    input { padding: 8px; font-size: 16px; }
+    button { padding: 8px 12px; font-size: 16px; cursor: pointer; }
+    #result { margin-top: 20px; }
+  </style>
 </head>
 <body>
 
@@ -15,8 +20,6 @@
 <div id="result"></div>
 
 <script>
-
-const WORKER_URL = "https://patient-boat-e680.mftgngkpk4.workers.dev/";
 
 async function analyzeStock() {
 
@@ -32,58 +35,47 @@ async function analyzeStock() {
 
   try {
 
-    // 1️⃣ Fetch LIVE stock data directly from Yahoo (browser side)
-    const stockResponse = await fetch(
+    // Fetch live stock data
+    const response = await fetch(
       `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`
     );
 
-    const stockData = await stockResponse.json();
+    const data = await response.json();
 
-    if (!stockData.quoteResponse ||
-        !stockData.quoteResponse.result ||
-        stockData.quoteResponse.result.length === 0) {
+    if (!data.quoteResponse || 
+        !data.quoteResponse.result || 
+        data.quoteResponse.result.length === 0) {
 
       resultDiv.innerHTML = "Invalid ticker.";
       return;
     }
 
-    const stock = stockData.quoteResponse.result[0];
+    const stock = data.quoteResponse.result[0];
 
     const price = stock.regularMarketPrice;
     const change = stock.regularMarketChangePercent;
 
-    // 2️⃣ Send to your Worker for bias logic
-    const workerResponse = await fetch(WORKER_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        symbol: ticker,
-        price: price,
-        change: change
-      })
-    });
-
-    const workerData = await workerResponse.json();
+    let bias = "Neutral";
+    if (change > 1.5) bias = "Bullish";
+    if (change < -1.5) bias = "Bearish";
 
     let biasColor = "gray";
-    if (workerData.bias === "Bullish") biasColor = "green";
-    if (workerData.bias === "Bearish") biasColor = "red";
+    if (bias === "Bullish") biasColor = "green";
+    if (bias === "Bearish") biasColor = "red";
 
     resultDiv.innerHTML = `
       <h2>${ticker}</h2>
       <p><b>Price:</b> $${price.toFixed(2)}</p>
       <p><b>Change:</b> ${change.toFixed(2)}%</p>
       <p style="color:${biasColor}; font-weight:bold;">
-        Bias: ${workerData.bias}
+        Bias: ${bias}
       </p>
       <hr>
       <p><b>Options Direction:</b></p>
       <p>
-        ${workerData.bias === "Bullish" ?
+        ${bias === "Bullish" ?
           "Consider Weekly Call slightly OTM" :
-          workerData.bias === "Bearish" ?
+          bias === "Bearish" ?
           "Consider Weekly Put slightly OTM" :
           "Wait for stronger move before entry"}
       </p>
