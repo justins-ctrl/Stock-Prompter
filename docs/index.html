@@ -20,45 +20,77 @@ const WORKER_URL = "https://patient-boat-e680.mftgngkpk4.workers.dev/";
 
 async function analyzeStock() {
 
-  const ticker = document.getElementById("tickerInput").value.toUpperCase();
+  const ticker = document.getElementById("tickerInput").value.trim().toUpperCase();
   const resultDiv = document.getElementById("result");
 
-  resultDiv.innerHTML = "Scanning...";
+  if (!ticker) {
+    resultDiv.innerHTML = "Enter a ticker.";
+    return;
+  }
+
+  resultDiv.innerHTML = "Fetching live data...";
 
   try {
 
-    const response = await fetch(`${WORKER_URL}?symbol=${ticker}`);
-    const data = await response.json();
+    // 1️⃣ Fetch LIVE stock data directly from Yahoo (browser side)
+    const stockResponse = await fetch(
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`
+    );
 
-    if (data.error) {
-      resultDiv.innerHTML = "Error: " + data.error;
+    const stockData = await stockResponse.json();
+
+    if (!stockData.quoteResponse ||
+        !stockData.quoteResponse.result ||
+        stockData.quoteResponse.result.length === 0) {
+
+      resultDiv.innerHTML = "Invalid ticker.";
       return;
     }
 
+    const stock = stockData.quoteResponse.result[0];
+
+    const price = stock.regularMarketPrice;
+    const change = stock.regularMarketChangePercent;
+
+    // 2️⃣ Send to your Worker for bias logic
+    const workerResponse = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        symbol: ticker,
+        price: price,
+        change: change
+      })
+    });
+
+    const workerData = await workerResponse.json();
+
     let biasColor = "gray";
-    if (data.bias === "Bullish") biasColor = "green";
-    if (data.bias === "Bearish") biasColor = "red";
+    if (workerData.bias === "Bullish") biasColor = "green";
+    if (workerData.bias === "Bearish") biasColor = "red";
 
     resultDiv.innerHTML = `
-      <h2>${data.symbol}</h2>
-      <p>Price: $${data.price}</p>
-      <p>Change: ${data.change.toFixed(2)}%</p>
+      <h2>${ticker}</h2>
+      <p><b>Price:</b> $${price.toFixed(2)}</p>
+      <p><b>Change:</b> ${change.toFixed(2)}%</p>
       <p style="color:${biasColor}; font-weight:bold;">
-        Bias: ${data.bias}
+        Bias: ${workerData.bias}
       </p>
       <hr>
-      <p><b>Options Suggestion:</b></p>
+      <p><b>Options Direction:</b></p>
       <p>
-        ${data.bias === "Bullish" ? 
+        ${workerData.bias === "Bullish" ?
           "Consider Weekly Call slightly OTM" :
-          data.bias === "Bearish" ?
+          workerData.bias === "Bearish" ?
           "Consider Weekly Put slightly OTM" :
           "Wait for stronger move before entry"}
       </p>
     `;
 
-  } catch (err) {
-    resultDiv.innerHTML = "Connection error.";
+  } catch (error) {
+    resultDiv.innerHTML = "Connection issue.";
   }
 }
 
