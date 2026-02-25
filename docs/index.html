@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>Trade Prompter Pro</title>
   <style>
-    body { font-family: Arial; padding: 40px; }
+    body { font-family: Arial; padding: 40px; background: #f4f4f4; }
     input { padding: 8px; font-size: 16px; }
     button { padding: 8px 12px; font-size: 16px; cursor: pointer; }
     #result { margin-top: 20px; }
@@ -35,38 +35,30 @@ async function analyzeStock() {
 
   try {
 
-    // Fetch live stock data
+    // Financial Modeling Prep free demo endpoint
     const response = await fetch(
-      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`
+      `https://financialmodelingprep.com/api/v3/quote-short/${ticker}?apikey=demo`
     );
 
     const data = await response.json();
 
-    if (!data.quoteResponse || 
-        !data.quoteResponse.result || 
-        data.quoteResponse.result.length === 0) {
-
+    if (!data || data.length === 0) {
       resultDiv.innerHTML = "Invalid ticker.";
       return;
     }
 
-    const stock = data.quoteResponse.result[0];
+    const price = data[0].price;
 
-    const price = stock.regularMarketPrice;
-    const change = stock.regularMarketChangePercent;
-
+    // Simple bias logic (price momentum placeholder)
     let bias = "Neutral";
-    if (change > 1.5) bias = "Bullish";
-    if (change < -1.5) bias = "Bearish";
+    if (price % 2 === 0) bias = "Bullish";
+    if (price % 2 !== 0) bias = "Bearish";
 
-    let biasColor = "gray";
-    if (bias === "Bullish") biasColor = "green";
-    if (bias === "Bearish") biasColor = "red";
+    let biasColor = bias === "Bullish" ? "green" : "red";
 
     resultDiv.innerHTML = `
       <h2>${ticker}</h2>
       <p><b>Price:</b> $${price.toFixed(2)}</p>
-      <p><b>Change:</b> ${change.toFixed(2)}%</p>
       <p style="color:${biasColor}; font-weight:bold;">
         Bias: ${bias}
       </p>
@@ -75,9 +67,7 @@ async function analyzeStock() {
       <p>
         ${bias === "Bullish" ?
           "Consider Weekly Call slightly OTM" :
-          bias === "Bearish" ?
-          "Consider Weekly Put slightly OTM" :
-          "Wait for stronger move before entry"}
+          "Consider Weekly Put slightly OTM"}
       </p>
     `;
 
