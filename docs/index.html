@@ -37,30 +37,32 @@ button {
   border-radius: 8px;
 }
 
-.warning {
-  color: orange;
-  font-weight: bold;
-}
+.warning { color: orange; font-weight: bold; }
+.danger { color: red; font-weight: bold; }
+.bullish { color: lime; font-weight: bold; }
+.bearish { color: red; font-weight: bold; }
 
-.danger {
-  color: red;
-  font-weight: bold;
-}
-
-.bullish {
-  color: lime;
-  font-weight: bold;
-}
-
-.bearish {
-  color: red;
-  font-weight: bold;
+.mode {
+  margin-bottom: 15px;
+  padding: 8px;
+  background: #222;
+  display: inline-block;
 }
 </style>
 </head>
 <body>
 
 <h1>Trade Prompter Pro</h1>
+
+<div class="mode">
+Mode:
+<select id="mode">
+  <option value="live">Live Market</option>
+  <option value="sim">Simulator</option>
+</select>
+</div>
+
+<br><br>
 
 <label>Ticker:</label>
 <input id="ticker" placeholder="AAPL" />
@@ -86,11 +88,31 @@ button {
 
 <script>
 
-function analyze() {
+async function getLivePrice(ticker) {
+  try {
+    const response = await fetch(
+      `https://financialmodelingprep.com/api/v3/quote/${ticker}?apikey=demo`
+    );
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return data[0].price;
+    }
+  } catch (e) {
+    return null;
+  }
+  return null;
+}
+
+function simulatePrice() {
+  return 100 + Math.random() * 50;
+}
+
+async function analyze() {
 
   const ticker = document.getElementById("ticker").value.toUpperCase();
   const account = parseFloat(document.getElementById("accountSize").value);
   const expiry = document.getElementById("expiry").value;
+  const mode = document.getElementById("mode").value;
   const result = document.getElementById("result");
 
   if (!ticker || !account) {
@@ -98,35 +120,35 @@ function analyze() {
     return;
   }
 
-  // Simulated Stock Price (Stable — No API)
-  const price = 100 + Math.random() * 50;
+  let price = null;
 
-  // Expected Move %
+  if (mode === "live") {
+    price = await getLivePrice(ticker);
+  }
+
+  if (!price) {
+    price = simulatePrice();
+    result.innerHTML = "<p class='warning'>Live data unavailable. Using simulator.</p>";
+  }
+
   const movePercent = expiry === "weekly" ? 0.04 : 0.07;
-
   const expectedMove = price * movePercent;
   const upperRange = price + expectedMove;
   const lowerRange = price - expectedMove;
 
-  // Bias Simulation
   const bias = price % 2 === 0 ? "Bullish" : "Bearish";
 
-  // Strike suggestion (1–2 strikes OTM style)
   const suggestedStrike = bias === "Bullish"
       ? price + 2
       : price - 2;
 
-  // Option pricing simulation
   const optionCost = price * 0.05;
 
-  // Breakeven
   const breakeven = bias === "Bullish"
       ? suggestedStrike + optionCost
       : suggestedStrike - optionCost;
 
   const percentMoveNeeded = Math.abs((breakeven - price) / price * 100);
-
-  // Risk sizing
   const maxRisk = account * 0.10;
 
   let riskWarning = "";
@@ -136,17 +158,15 @@ function analyze() {
 
   let strikeWarning = "";
   if (bias === "Bullish" && suggestedStrike > upperRange) {
-      strikeWarning = "<p class='warning'>⚠ Strike outside expected move range.</p>";
+      strikeWarning = "<p class='warning'>⚠ Strike outside expected move.</p>";
   }
-
   if (bias === "Bearish" && suggestedStrike < lowerRange) {
-      strikeWarning = "<p class='warning'>⚠ Strike outside expected move range.</p>";
+      strikeWarning = "<p class='warning'>⚠ Strike outside expected move.</p>";
   }
 
-  result.innerHTML = `
+  result.innerHTML += `
       <h2>${ticker}</h2>
-
-      <p>Current Price: $${price.toFixed(2)}</p>
+      <p>Price: $${price.toFixed(2)}</p>
       <p>Bias: <span class="${bias === "Bullish" ? "bullish" : "bearish"}">${bias}</span></p>
 
       <hr>
@@ -157,7 +177,7 @@ function analyze() {
       <hr>
 
       <p><b>Suggested Strike:</b> $${suggestedStrike.toFixed(2)}</p>
-      <p><b>Estimated Option Cost:</b> $${optionCost.toFixed(2)}</p>
+      <p><b>Est. Option Cost:</b> $${optionCost.toFixed(2)}</p>
       <p><b>Breakeven:</b> $${breakeven.toFixed(2)}</p>
       <p><b>% Move Required:</b> ${percentMoveNeeded.toFixed(2)}%</p>
 
