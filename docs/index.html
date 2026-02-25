@@ -1,81 +1,188 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Trade Prompter Pro</title>
+  <title>Trade Prompter Elite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: Arial; padding: 40px; background: #f4f4f4; }
-    input { padding: 8px; font-size: 16px; }
-    button { padding: 8px 12px; font-size: 16px; cursor: pointer; }
-    #result { margin-top: 20px; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0e1117;
+      color: #e6e6e6;
+      padding: 20px;
+    }
+    h1 { text-align: center; }
+    input, select, button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 10px;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+    }
+    input, select { background: #161b22; color: white; }
+    button { background: #2563eb; color: white; font-weight: bold; }
+    .card {
+      background: #161b22;
+      padding: 16px;
+      margin-top: 15px;
+      border-radius: 12px;
+    }
+    .bullish { color: #22c55e; }
+    .bearish { color: #ef4444; }
+    .neutral { color: #9ca3af; }
+    .warn { color: #facc15; }
+    .good { color: #22c55e; }
+    .bad { color: #ef4444; }
+    .bar {
+      height: 10px;
+      background: #374151;
+      border-radius: 6px;
+      margin: 6px 0;
+      position: relative;
+    }
+    .zone {
+      position: absolute;
+      height: 100%;
+      border-radius: 6px;
+    }
+    .balanced { background: #22c55e; }
+    .aggressive { background: #facc15; }
+    small { color:#9ca3af; }
   </style>
 </head>
 <body>
 
-<h1>Trade Prompter Pro</h1>
+<h1>📊 Trade Prompter Elite</h1>
 
-<input id="tickerInput" placeholder="Enter Ticker (ex: AAPL)" />
-<button onclick="analyzeStock()">Analyze</button>
+<input id="tickers" placeholder="Tickers (SPY, AAPL, TSLA)" />
+<select id="expiration">
+  <option value="weekly">Weekly Only</option>
+  <option value="biweekly">Weekly + Bi-Weekly</option>
+</select>
+<input id="account" placeholder="Account size (e.g. 5000)" />
+<button onclick="scan()">Scan Smart</button>
 
-<div id="result"></div>
+<div id="results"></div>
+<div id="stats"></div>
 
 <script>
+let stats = JSON.parse(localStorage.getItem("stats") || 
+  '{"signals":0,"calls":0,"puts":0,"avgConf":0}');
 
-async function analyzeStock() {
-
-  const ticker = document.getElementById("tickerInput").value.trim().toUpperCase();
-  const resultDiv = document.getElementById("result");
-
-  if (!ticker) {
-    resultDiv.innerHTML = "Enter a ticker.";
-    return;
+function rsi(prices, p = 14) {
+  let g = 0, l = 0;
+  for (let i = prices.length - p; i < prices.length - 1; i++) {
+    const d = prices[i + 1] - prices[i];
+    d >= 0 ? g += d : l -= d;
   }
+  const rs = g / (l || 1);
+  return 100 - (100 / (1 + rs));
+}
 
-  resultDiv.innerHTML = "Fetching live data...";
+function updateStats(conf, bias) {
+  stats.signals++;
+  if (bias === "CALL") stats.calls++;
+  if (bias === "PUT") stats.puts++;
+  stats.avgConf =
+    ((stats.avgConf * (stats.signals - 1)) + conf) / stats.signals;
+  localStorage.setItem("stats", JSON.stringify(stats));
+}
 
+function renderStats() {
+  statsDiv.innerHTML = `
+    <div class="card">
+      <strong>📈 Signal Quality Summary</strong><br>
+      Total signals: ${stats.signals}<br>
+      CALLs: ${stats.calls} | PUTs: ${stats.puts}<br>
+      Avg confidence: ${stats.avgConf.toFixed(0)}%
+    </div>
+  `;
+}
+
+async function analyzeTicker(ticker) {
   try {
+    const url = `https://corsproxy.io/?https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=1d&interval=5m`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const q = d.chart.result[0].indicators.quote[0];
+    const prices = q.close.filter(Boolean);
+    const current = prices.at(-1);
+    const open = prices[0];
+    const change = ((current - open) / open) * 100;
+    const rsiVal = rsi(prices);
 
-    // Financial Modeling Prep free demo endpoint
-    const response = await fetch(
-      `https://financialmodelingprep.com/api/v3/quote-short/${ticker}?apikey=demo`
+    let bias = "WAIT";
+    let cls = "neutral";
+    if (change > 0.6 && rsiVal < 70) { bias = "CALL"; cls = "bullish"; }
+    if (change < -0.6 && rsiVal > 30) { bias = "PUT"; cls = "bearish"; }
+
+    const expectedMove = Math.abs(change) * current / 100;
+    const confidence = Math.min(
+      100,
+      Math.abs(change) * 40 + (50 - Math.abs(50 - rsiVal))
     );
 
-    const data = await response.json();
+    const actionable = confidence >= 65 && bias !== "WAIT";
+    if (actionable) updateStats(confidence, bias);
 
-    if (!data || data.length === 0) {
-      resultDiv.innerHTML = "Invalid ticker.";
-      return;
-    }
+    const balancedLow = current - expectedMove * 0.4;
+    const balancedHigh = current + expectedMove * 0.4;
+    const aggressiveLow = current - expectedMove;
+    const aggressiveHigh = current + expectedMove;
 
-    const price = data[0].price;
+    return `
+      <div class="card">
+        <strong>${ticker}</strong><br>
+        $${current.toFixed(2)} | ${change.toFixed(2)}%<br>
+        RSI ${rsiVal.toFixed(1)}<br><br>
 
-    // Simple bias logic (price momentum placeholder)
-    let bias = "Neutral";
-    if (price % 2 === 0) bias = "Bullish";
-    if (price % 2 !== 0) bias = "Bearish";
+        Bias: <span class="${cls}"><strong>${bias}</strong></span><br>
+        Confidence: <strong class="${actionable ? "good" : "bad"}">
+          ${confidence.toFixed(0)}%
+        </strong><br>
+        Status: <strong>${actionable ? "ACTIONABLE" : "NO TRADE"}</strong><br><br>
 
-    let biasColor = bias === "Bullish" ? "green" : "red";
+        🎯 <strong>Strike Heatmap</strong>
+        <div class="bar">
+          <div class="zone balanced" style="left:30%;width:40%"></div>
+          <div class="zone aggressive" style="left:15%;width:70%"></div>
+        </div>
 
-    resultDiv.innerHTML = `
-      <h2>${ticker}</h2>
-      <p><b>Price:</b> $${price.toFixed(2)}</p>
-      <p style="color:${biasColor}; font-weight:bold;">
-        Bias: ${bias}
-      </p>
-      <hr>
-      <p><b>Options Direction:</b></p>
-      <p>
-        ${bias === "Bullish" ?
-          "Consider Weekly Call slightly OTM" :
-          "Consider Weekly Put slightly OTM"}
-      </p>
+        🟢 Balanced Zone: $${balancedLow.toFixed(2)} – $${balancedHigh.toFixed(2)}<br>
+        🟡 Aggressive Zone: $${aggressiveLow.toFixed(2)} – $${aggressiveHigh.toFixed(2)}<br>
+
+        <small>
+          ${
+            actionable
+              ? "Aligned move + confidence → acceptable risk"
+              : "Filtered out to protect capital"
+          }
+        </small>
+      </div>
     `;
-
-  } catch (error) {
-    resultDiv.innerHTML = "Connection issue.";
+  } catch {
+    return `<div class="card">${ticker}: Error</div>`;
   }
 }
 
+async function scan() {
+  const list = tickers.value
+    .split(",")
+    .map(t => t.trim().toUpperCase())
+    .filter(Boolean);
+
+  results.innerHTML = "Scanning intelligently…";
+  let html = "";
+
+  for (const t of list) {
+    html += await analyzeTicker(t);
+  }
+  results.innerHTML = html;
+  renderStats();
+}
+
+const statsDiv = document.getElementById("stats");
+renderStats();
 </script>
 
 </body>
