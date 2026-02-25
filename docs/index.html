@@ -23,7 +23,7 @@ input, select {
 }
 
 button {
-  padding: 8px 12px;
+  padding: 10px 14px;
   background: #00ffcc;
   border: none;
   cursor: pointer;
@@ -31,27 +31,54 @@ button {
 }
 
 #result {
-  margin-top: 20px;
-  padding: 15px;
+  margin-top: 25px;
+  padding: 20px;
   background: #1a1a1a;
+  border-radius: 8px;
+}
+
+.warning {
+  color: orange;
+  font-weight: bold;
+}
+
+.danger {
+  color: red;
+  font-weight: bold;
+}
+
+.bullish {
+  color: lime;
+  font-weight: bold;
+}
+
+.bearish {
+  color: red;
+  font-weight: bold;
 }
 </style>
 </head>
 <body>
 
-<h1>Trade Prompter</h1>
+<h1>Trade Prompter Pro</h1>
 
 <label>Ticker:</label>
 <input id="ticker" placeholder="AAPL" />
 
+<br><br>
+
 <label>Account Size ($):</label>
 <input id="accountSize" type="number" placeholder="1000" />
+
+<br><br>
 
 <label>Expiration Preference:</label>
 <select id="expiry">
   <option value="weekly">Weekly (0-7 days)</option>
   <option value="biweekly">Bi-Weekly (7-14 days)</option>
 </select>
+
+<br><br>
 
 <button onclick="analyze()">Analyze Trade</button>
 
@@ -64,39 +91,78 @@ function analyze() {
   const ticker = document.getElementById("ticker").value.toUpperCase();
   const account = parseFloat(document.getElementById("accountSize").value);
   const expiry = document.getElementById("expiry").value;
-
   const result = document.getElementById("result");
 
   if (!ticker || !account) {
-    result.innerHTML = "Enter ticker and account size.";
+    result.innerHTML = "Please enter ticker and account size.";
     return;
   }
 
-  // Simulated pricing model (stable — no APIs)
-  const simulatedPrice = 100 + Math.random() * 50;
-  const optionCost = simulatedPrice * 0.05;
+  // Simulated Stock Price (Stable — No API)
+  const price = 100 + Math.random() * 50;
 
+  // Expected Move %
+  const movePercent = expiry === "weekly" ? 0.04 : 0.07;
+
+  const expectedMove = price * movePercent;
+  const upperRange = price + expectedMove;
+  const lowerRange = price - expectedMove;
+
+  // Bias Simulation
+  const bias = price % 2 === 0 ? "Bullish" : "Bearish";
+
+  // Strike suggestion (1–2 strikes OTM style)
+  const suggestedStrike = bias === "Bullish"
+      ? price + 2
+      : price - 2;
+
+  // Option pricing simulation
+  const optionCost = price * 0.05;
+
+  // Breakeven
+  const breakeven = bias === "Bullish"
+      ? suggestedStrike + optionCost
+      : suggestedStrike - optionCost;
+
+  const percentMoveNeeded = Math.abs((breakeven - price) / price * 100);
+
+  // Risk sizing
   const maxRisk = account * 0.10;
 
-  let bias = simulatedPrice % 2 === 0 ? "Bullish" : "Bearish";
-
-  let strikeSuggestion = bias === "Bullish"
-    ? (simulatedPrice + 2).toFixed(2)
-    : (simulatedPrice - 2).toFixed(2);
-
-  let warning = "";
-
+  let riskWarning = "";
   if (optionCost > maxRisk) {
-    warning = "<p style='color:red;'>⚠️ Position too large for account size.</p>";
+      riskWarning = "<p class='danger'>⚠ Position exceeds 10% account risk.</p>";
+  }
+
+  let strikeWarning = "";
+  if (bias === "Bullish" && suggestedStrike > upperRange) {
+      strikeWarning = "<p class='warning'>⚠ Strike outside expected move range.</p>";
+  }
+
+  if (bias === "Bearish" && suggestedStrike < lowerRange) {
+      strikeWarning = "<p class='warning'>⚠ Strike outside expected move range.</p>";
   }
 
   result.innerHTML = `
-    <h2>${ticker}</h2>
-    <p>Simulated Price: $${simulatedPrice.toFixed(2)}</p>
-    <p>Bias: <b style="color:${bias === "Bullish" ? "lime" : "red"}">${bias}</b></p>
-    <p>Suggested ${expiry} Strike: $${strikeSuggestion}</p>
-    <p>Estimated Option Cost: $${optionCost.toFixed(2)}</p>
-    ${warning}
+      <h2>${ticker}</h2>
+
+      <p>Current Price: $${price.toFixed(2)}</p>
+      <p>Bias: <span class="${bias === "Bullish" ? "bullish" : "bearish"}">${bias}</span></p>
+
+      <hr>
+
+      <p><b>Expected Move (${expiry}):</b> ±$${expectedMove.toFixed(2)}</p>
+      <p>Projected Range: $${lowerRange.toFixed(2)} - $${upperRange.toFixed(2)}</p>
+
+      <hr>
+
+      <p><b>Suggested Strike:</b> $${suggestedStrike.toFixed(2)}</p>
+      <p><b>Estimated Option Cost:</b> $${optionCost.toFixed(2)}</p>
+      <p><b>Breakeven:</b> $${breakeven.toFixed(2)}</p>
+      <p><b>% Move Required:</b> ${percentMoveNeeded.toFixed(2)}%</p>
+
+      ${strikeWarning}
+      ${riskWarning}
   `;
 }
 
