@@ -91,6 +91,24 @@ async function getHistorical(ticker) {
   return data["Time Series (Daily)"];
 }
 
+function calculateRSI(closes, period = 14) {
+  let gains = 0, losses = 0;
+
+  for (let i = 1; i <= period; i++) {
+    const diff = closes[i-1] - closes[i];
+    if (diff > 0) gains += diff;
+    else losses -= diff;
+  }
+
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+
+  if (avgLoss === 0) return 100;
+
+  const rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
 async function analyze() {
 
   const ticker = document.getElementById("ticker").value.toUpperCase();
@@ -114,38 +132,50 @@ async function analyze() {
 
   const dates = Object.keys(rawData).slice(0, 30);
   const closes = dates.map(date => parseFloat(rawData[date]["4. close"]));
+  const highs = dates.map(date => parseFloat(rawData[date]["2. high"]));
+  const lows = dates.map(date => parseFloat(rawData[date]["3. low"]));
 
   const currentPrice = closes[0];
   const ma20 = closes.slice(0, 20).reduce((a,b)=>a+b,0) / 20;
   const momentum5 = ((closes[0] - closes[5]) / closes[5]) * 100;
+  const rsi = calculateRSI(closes);
+
+  const avgRange = highs.slice(0, 14).reduce((sum, h, i) => sum + (h - lows[i]), 0) / 14;
+  const volatilityPercent = (avgRange / currentPrice) * 100;
+
+  const choppy = Math.abs(momentum5) < 1 && Math.abs(currentPrice - ma20) < (avgRange * 0.5);
 
   let score = 50;
   let bias = "WAIT";
 
-  if (currentPrice > ma20 && momentum5 > 0) {
-    bias = "CALL";
-    score += 30;
-  }
+  if (!choppy) {
 
-  if (currentPrice < ma20 && momentum5 < 0) {
-    bias = "PUT";
-    score += 30;
-  }
+    if (currentPrice > ma20 && momentum5 > 0 && rsi < 70) {
+      bias = "CALL";
+      score += 30;
+    }
 
-  if (Math.abs(momentum5) > 2) score += 15;
+    if (currentPrice < ma20 && momentum5 < 0 && rsi > 30) {
+      bias = "PUT";
+      score += 30;
+    }
+
+    if (Math.abs(momentum5) > 2) score += 10;
+    if (volatilityPercent > 2) score += 10;
+  }
 
   if (score > 100) score = 100;
 
   let confidence;
-  if (score >= 80) confidence = "High";
-  else if (score >= 65) confidence = "Moderate";
-  else if (score >= 50) confidence = "Low";
+  if (score >= 85) confidence = "High";
+  else if (score >= 70) confidence = "Moderate";
+  else if (score >= 55) confidence = "Low";
   else confidence = "Very Low";
 
   let recommendation;
-  if (score >= 80)
+  if (score >= 85)
       recommendation = `Strong ${bias}`;
-  else if (score >= 65)
+  else if (score >= 70)
       recommendation = `${bias} — Acceptable`;
   else
       recommendation = "Wait for Better Setup";
@@ -153,9 +183,10 @@ async function analyze() {
   const movePercent = expiry === "weekly" ? 0.04 : 0.07;
   const expectedMove = currentPrice * movePercent;
 
+  const strikeDistance = avgRange;
   const strike = bias === "CALL"
-      ? currentPrice + 2
-      : currentPrice - 2;
+      ? currentPrice + strikeDistance
+      : currentPrice - strikeDistance;
 
   result.innerHTML = `
       <h2>${ticker}</h2>
@@ -163,13 +194,15 @@ async function analyze() {
       <hr>
       <p>20 Day MA: $${ma20.toFixed(2)}</p>
       <p>5 Day Momentum: ${momentum5.toFixed(2)}%</p>
+      <p>RSI: ${rsi.toFixed(1)}</p>
+      <p>Volatility: ${volatilityPercent.toFixed(2)}%</p>
       <hr>
       <p><b>Bias:</b> 
         <span class="${bias === "CALL" ? "bullish" : bias === "PUT" ? "bearish" : "warning"}">
         ${bias}
         </span>
       </p>
-      <p><b>Suggested Strike (ATM + 1-2 OTM):</b> $${strike.toFixed(2)}</p>
+      <p><b>Suggested Strike (Volatility Based):</b> $${strike.toFixed(2)}</p>
       <p><b>Expected Move:</b> ±$${expectedMove.toFixed(2)}</p>
       <hr>
       <p><b>Trade Score:</b> ${score}/100</p>
