@@ -3,94 +3,63 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Trade Prompter Pro Elite</title>
+<title>Trade Prompter Elite</title>
 
 <style>
-body {
-  background: #111;
-  color: #fff;
-  font-family: Arial, sans-serif;
-  margin: 0;
-  display: flex;
-  justify-content: center;
-}
-
-.container {
-  width: 95%;
-  max-width: 850px;
-  padding: 30px;
-}
-
+body { background:#111; color:#fff; font-family:Arial; margin:0; display:flex; justify-content:center; }
+.container { width:95%; max-width:900px; padding:25px; }
 h1 { text-align:center; color:#00ffcc; }
-
 input, select, button {
-  width:100%;
-  padding:16px;
-  margin:12px 0;
-  font-size:18px;
-  border-radius:8px;
-  border:none;
-  box-sizing:border-box;
+  width:100%; padding:15px; margin:10px 0;
+  font-size:18px; border-radius:8px; border:none; box-sizing:border-box;
 }
-
 button { background:#00ffcc; font-weight:bold; cursor:pointer; }
-
-#result {
-  margin-top:25px;
-  padding:20px;
-  background:#1a1a1a;
-  border-radius:10px;
-  font-size:18px;
+#result, #stats {
+  margin-top:20px; padding:20px;
+  background:#1a1a1a; border-radius:10px;
 }
-
-.bullish { color:lime; font-weight:bold; }
-.bearish { color:red; font-weight:bold; }
-.warning { color:orange; font-weight:bold; }
-.block { color:#ff4444; font-weight:bold; }
-.strong { color:#00ffcc; font-weight:bold; }
+.bullish{color:lime;font-weight:bold;}
+.bearish{color:red;font-weight:bold;}
+.warning{color:orange;font-weight:bold;}
+.strong{color:#00ffcc;font-weight:bold;}
+.aplus{color:#ffd700;font-weight:bold;}
 </style>
 </head>
 <body>
 
 <div class="container">
-<h1>Trade Prompter Pro Elite</h1>
 
-<label>Ticker Symbol:</label>
-<input id="ticker" placeholder="AAPL" />
+<h1>Trade Prompter Elite</h1>
 
-<label>Account Size ($):</label>
-<input id="accountSize" type="number" placeholder="1000" />
-
-<label>Expiration:</label>
+<input id="ticker" placeholder="Ticker (AAPL)">
+<input id="accountSize" type="number" placeholder="Account Size ($)">
 <select id="expiry">
   <option value="weekly">Weekly</option>
   <option value="biweekly">Bi-Weekly</option>
 </select>
 
 <button onclick="analyze()">Analyze Trade</button>
+
 <div id="result"></div>
+<div id="stats"></div>
+
 </div>
 
 <script>
 
 const API_KEY = "OHCJWFQEFSXI8IJ3.";
 
-async function getDaily(ticker) {
-  const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${API_KEY}`;
-  const response = await fetch(url);
-  const data = await response.json();
+let lastTrade = null;
+
+async function getDaily(ticker){
+  const url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${API_KEY}`;
+  const res=await fetch(url);
+  const data=await res.json();
   return data["Time Series (Daily)"];
 }
 
-async function getEarnings(ticker) {
-  const url = `https://www.alphavantage.co/query?function=EARNINGS&symbol=${ticker}&apikey=${API_KEY}`;
-  const response = await fetch(url);
-  const data = await response.json();
-  return data.annualEarnings;
-}
-
-function calculateRSI(closes, period=14) {
-  let gains=0, losses=0;
+function calculateRSI(closes,period=14){
+  let gains=0,losses=0;
   for(let i=1;i<=period;i++){
     const diff=closes[i-1]-closes[i];
     if(diff>0) gains+=diff; else losses-=diff;
@@ -109,18 +78,12 @@ async function analyze(){
   const expiry=document.getElementById("expiry").value;
   const result=document.getElementById("result");
 
-  if(!ticker||!account){
-    result.innerHTML="Enter ticker and account size.";
-    return;
-  }
+  if(!ticker||!account){ result.innerHTML="Enter ticker and account size."; return; }
 
-  result.innerHTML="Analyzing discipline model...";
+  result.innerHTML="Analyzing...";
 
   const raw=await getDaily(ticker);
-  if(!raw){
-    result.innerHTML="<span class='warning'>Invalid symbol or API limit reached.</span>";
-    return;
-  }
+  if(!raw){ result.innerHTML="<span class='warning'>Invalid symbol or API limit.</span>"; return; }
 
   const dates=Object.keys(raw).slice(0,30);
   const closes=dates.map(d=>parseFloat(raw[d]["4. close"]));
@@ -128,86 +91,104 @@ async function analyze(){
   const lows=dates.map(d=>parseFloat(raw[d]["3. low"]));
   const opens=dates.map(d=>parseFloat(raw[d]["1. open"]));
 
-  const currentPrice=closes[0];
+  const price=closes[0];
   const ma20=closes.slice(0,20).reduce((a,b)=>a+b,0)/20;
   const momentum5=((closes[0]-closes[5])/closes[5])*100;
   const rsi=calculateRSI(closes);
 
   const avgRange=highs.slice(0,14).reduce((s,h,i)=>s+(h-lows[i]),0)/14;
-  const volatilityPercent=(avgRange/currentPrice)*100;
-
-  const gapPercent=((opens[0]-closes[1])/closes[1])*100;
+  const volatility=(avgRange/price)*100;
+  const gap=((opens[0]-closes[1])/closes[1])*100;
 
   let score=0;
   let bias="WAIT";
-  let blocked=false;
+  let aPlus=false;
 
-  if(Math.abs(gapPercent)>2){
-    blocked=true;
-  }
+  if(Math.abs(gap)>2){ score=0; bias="NO TRADE"; }
 
-  if(currentPrice>ma20) score+=20;
-  if(currentPrice<ma20) score+=20;
+  if(price>ma20) score+=20;
+  if(price<ma20) score+=20;
 
   if(momentum5>0) score+=20;
   if(momentum5<0) score+=20;
 
   if(rsi>40&&rsi<65) score+=15;
-  if(rsi<60&&rsi>35) score+=15;
+  if(volatility>2) score+=10;
 
-  if(volatilityPercent>2) score+=10;
+  if(price>ma20&&momentum5>0&&rsi<70) bias="CALL";
+  if(price<ma20&&momentum5<0&&rsi>30) bias="PUT";
 
-  if(currentPrice>ma20&&momentum5>0&&rsi<70) bias="CALL";
-  if(currentPrice<ma20&&momentum5<0&&rsi>30) bias="PUT";
-
-  if(blocked) {
-    bias="NO TRADE";
-    score=0;
+  if(score>=85 && bias!=="WAIT" && bias!=="NO TRADE"){
+    aPlus=true;
   }
+
+  const risk=account*0.05;
+  const estCost=avgRange*100;
+  const contracts=Math.floor(risk/estCost);
 
   if(score>100) score=100;
 
-  const riskPerTrade=account*0.05;
-  const optionEstimatedCost=avgRange*100;
-  const maxContracts=Math.floor(riskPerTrade/optionEstimatedCost);
-
-  let confidence;
+  let confidence="Low";
   if(score>=80) confidence="High";
   else if(score>=65) confidence="Moderate";
-  else if(score>=50) confidence="Low";
-  else confidence="Very Low";
 
-  let recommendation;
-  if(blocked) recommendation="Gap Detected — Stand Aside";
-  else if(score>=85) recommendation=`Strong ${bias}`;
-  else if(score>=70) recommendation=`${bias} — Acceptable`;
-  else recommendation="Wait For Cleaner Structure";
-
-  const movePercent=expiry==="weekly"?0.04:0.07;
-  const expectedMove=currentPrice*movePercent;
-  const strikeDistance=avgRange;
-  const strike=bias==="CALL"?currentPrice+strikeDistance:currentPrice-strikeDistance;
+  lastTrade = { ticker, bias, score, aPlus };
 
   result.innerHTML=`
     <h2>${ticker}</h2>
-    <p>Price: $${currentPrice.toFixed(2)}</p>
+    <p>Price: $${price.toFixed(2)}</p>
     <hr>
     <p>MA20: $${ma20.toFixed(2)}</p>
-    <p>Momentum 5D: ${momentum5.toFixed(2)}%</p>
+    <p>Momentum: ${momentum5.toFixed(2)}%</p>
     <p>RSI: ${rsi.toFixed(1)}</p>
-    <p>Volatility: ${volatilityPercent.toFixed(2)}%</p>
-    <p>Gap: ${gapPercent.toFixed(2)}%</p>
+    <p>Volatility: ${volatility.toFixed(2)}%</p>
+    <p>Gap: ${gap.toFixed(2)}%</p>
     <hr>
     <p><b>Bias:</b> <span class="${bias==="CALL"?"bullish":bias==="PUT"?"bearish":"warning"}">${bias}</span></p>
-    <p><b>Suggested Strike:</b> $${strike.toFixed(2)}</p>
-    <p><b>Expected Move:</b> ±$${expectedMove.toFixed(2)}</p>
-    <hr>
-    <p><b>Trade Score:</b> ${score}/100</p>
+    ${aPlus ? "<p class='aplus'>🏆 A+ Setup Detected</p>" : ""}
+    <p><b>Score:</b> ${score}/100</p>
     <p><b>Confidence:</b> ${confidence}</p>
-    <p><b>Max Contracts (5% risk):</b> ${maxContracts}</p>
-    <p class="strong"><b>Recommendation:</b> ${recommendation}</p>
+    <p><b>Max Contracts (5% risk):</b> ${contracts}</p>
+    <hr>
+    <button onclick="logTrade(true)">Log Win</button>
+    <button onclick="logTrade(false)">Log Loss</button>
+  `;
+
+  updateStats();
+}
+
+function logTrade(win){
+  if(!lastTrade) return;
+
+  let trades=JSON.parse(localStorage.getItem("trades"))||[];
+  trades.push({
+    ...lastTrade,
+    win:win
+  });
+  localStorage.setItem("trades",JSON.stringify(trades));
+  updateStats();
+}
+
+function updateStats(){
+  let trades=JSON.parse(localStorage.getItem("trades"))||[];
+  let total=trades.length;
+  let wins=trades.filter(t=>t.win).length;
+  let aPlusTrades=trades.filter(t=>t.aPlus);
+  let aPlusWins=aPlusTrades.filter(t=>t.win).length;
+
+  let winRate=total?((wins/total)*100).toFixed(1):0;
+  let aPlusRate=aPlusTrades.length?((aPlusWins/aPlusTrades.length)*100).toFixed(1):0;
+
+  document.getElementById("stats").innerHTML=`
+    <h3>Performance Stats</h3>
+    <p>Total Trades: ${total}</p>
+    <p>Win Rate: ${winRate}%</p>
+    <p>A+ Trades: ${aPlusTrades.length}</p>
+    <p>A+ Win Rate: ${aPlusRate}%</p>
   `;
 }
+
+updateStats();
 
 </script>
 </body>
