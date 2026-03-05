@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -37,34 +38,17 @@ font-weight:bold;
 }
 
 #result{
-
 margin-top:20px;
 padding:20px;
 background:#1a1a1a;
 border-radius:10px;
-
+text-align:left;
 }
 
-.bullish{
-color:lime;
-font-weight:bold;
-}
-
-.bearish{
-color:red;
-font-weight:bold;
-}
-
-.warning{
-color:orange;
-font-weight:bold;
-}
-
-.strong{
-color:#00ffcc;
-font-weight:bold;
-font-size:20px;
-}
+.bullish{color:lime;font-weight:bold;}
+.bearish{color:red;font-weight:bold;}
+.warning{color:orange;font-weight:bold;}
+.strong{color:#00ffcc;font-weight:bold;}
 
 </style>
 
@@ -81,10 +65,8 @@ font-size:20px;
 <input id="accountSize" type="number" placeholder="Account Size">
 
 <select id="expiry">
-
 <option value="weekly">Weekly</option>
 <option value="biweekly">Bi-Weekly</option>
-
 </select>
 
 <button onclick="analyze()">Analyze Trade</button>
@@ -99,13 +81,27 @@ const API_KEY="OHCJWFQEFSXI8IJ3";
 
 async function getDaily(ticker){
 
-const url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${API_KEY}`;
+const url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&outputsize=full&apikey=${API_KEY}`;
 
 const res=await fetch(url);
 
 const data=await res.json();
 
 return data["Time Series (Daily)"];
+
+}
+
+function movingAverage(data,period){
+
+let sum=0;
+
+for(let i=0;i<period;i++){
+
+sum+=data[i];
+
+}
+
+return sum/period;
 
 }
 
@@ -135,12 +131,14 @@ return 100-(100/(1+rs));
 async function analyze(){
 
 const ticker=document.getElementById("ticker").value.toUpperCase();
+
 const account=document.getElementById("accountSize").value;
+
 const expiry=document.getElementById("expiry").value;
 
 const result=document.getElementById("result");
 
-result.innerHTML="Analyzing...";
+result.innerHTML="Analyzing market conditions...";
 
 const daily=await getDaily(ticker);
 
@@ -154,89 +152,97 @@ return;
 
 const dates=Object.keys(daily);
 
-const closes=dates.slice(0,30).map(d=>parseFloat(daily[d]["4. close"]));
+const closes=dates.slice(0,250).map(d=>parseFloat(daily[d]["4. close"]));
 
 const price=closes[0];
 
 const rsi=calculateRSI(closes);
 
-let direction="";
-let confidence=50;
-let strike="";
-let entrySignal="Wait";
+const ma50=movingAverage(closes,50);
 
-if(rsi<35){
+const ma200=movingAverage(closes,200);
+
+let trend="Neutral";
+
+if(ma50>ma200) trend="Bullish";
+
+if(ma50<ma200) trend="Bearish";
+
+let direction="WAIT";
+let strike=0;
+let probability=50;
+let rating="B";
+let entry="Wait";
+
+if(rsi<35 && trend==="Bullish"){
 
 direction="CALL";
-confidence=72;
-strike=(price*1.01).toFixed(2);
-entrySignal="Strong Setup";
+strike=(price*1.02).toFixed(2);
+probability=78;
+rating="A+";
+entry="Momentum Reversal";
 
 }
 
-else if(rsi>65){
+else if(rsi>65 && trend==="Bearish"){
 
 direction="PUT";
-confidence=72;
+strike=(price*0.98).toFixed(2);
+probability=78;
+rating="A+";
+entry="Momentum Reversal";
+
+}
+
+else if(rsi<40){
+
+direction="CALL";
+strike=(price*1.01).toFixed(2);
+probability=65;
+rating="B+";
+entry="Possible Bounce";
+
+}
+
+else if(rsi>60){
+
+direction="PUT";
 strike=(price*0.99).toFixed(2);
-entrySignal="Strong Setup";
+probability=65;
+rating="B+";
+entry="Possible Reversal";
 
 }
 
-else{
+let positionSize=(account*0.02).toFixed(0);
 
-direction="WAIT";
-confidence=40;
+result.innerHTML=
 
-}
+`
+<div class="strong">Market Analysis</div>
 
-if(direction==="WAIT"){
-
-result.innerHTML=`
-
-<div class="warning">
-
-Market Neutral<br><br>
-
-Price: $${price.toFixed(2)}<br>
-
-RSI: ${rsi.toFixed(1)}<br><br>
-
-Best Action: WAIT
-
-</div>
-
-`;
-
-return;
-
-}
-
-result.innerHTML=`
-
-<div class="strong">
-
-Price: $${price.toFixed(2)}
-
-</div>
-
-<br>
+Price: $${price.toFixed(2)} <br>
+RSI: ${rsi.toFixed(1)} <br>
+Trend: ${trend} <br>
+50MA: ${ma50.toFixed(2)} <br>
+200MA: ${ma200.toFixed(2)} <br><br>
 
 <div class="${direction==="CALL"?"bullish":"bearish"}">
 
-Direction: ${direction}
+Trade Direction: ${direction}
 
 </div>
 
 <br>
 
-Suggested Strike: $${strike}<br><br>
+Suggested Strike: $${strike} <br>
+Expiration: ${expiry} <br><br>
 
-Expiration: ${expiry}<br><br>
+Probability: ${probability}% <br>
+Trade Rating: ${rating} <br>
+Entry Signal: ${entry} <br><br>
 
-Confidence: ${confidence}%<br><br>
-
-Entry Signal: ${entrySignal}
+Suggested Position Size: $${positionSize}
 
 `;
 
