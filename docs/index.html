@@ -1,30 +1,75 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Trade Prompter Elite</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body { background:#111; color:#fff; font-family:Arial; margin:0; display:flex; justify-content:center; }
-.container { width:95%; max-width:900px; padding:25px; }
-h1 { text-align:center; color:#00ffcc; }
-input, select, button {
-  width:100%; padding:15px; margin:10px 0;
-  font-size:18px; border-radius:8px; border:none; box-sizing:border-box;
+
+body{
+background:#111;
+color:white;
+font-family:Arial;
+text-align:center;
+padding:20px;
 }
-button { background:#00ffcc; font-weight:bold; cursor:pointer; }
-#result, #stats {
-  margin-top:20px; padding:20px;
-  background:#1a1a1a; border-radius:10px;
+
+.container{
+max-width:500px;
+margin:auto;
 }
-.bullish{color:lime;font-weight:bold;}
-.bearish{color:red;font-weight:bold;}
-.warning{color:orange;font-weight:bold;}
-.strong{color:#00ffcc;font-weight:bold;}
-.aplus{color:#ffd700;font-weight:bold;}
+
+input,select,button{
+
+width:100%;
+padding:14px;
+margin:10px 0;
+border-radius:8px;
+border:none;
+font-size:16px;
+
+}
+
+button{
+background:#00c896;
+color:white;
+font-weight:bold;
+}
+
+#result{
+
+margin-top:20px;
+padding:20px;
+background:#1a1a1a;
+border-radius:10px;
+
+}
+
+.bullish{
+color:lime;
+font-weight:bold;
+}
+
+.bearish{
+color:red;
+font-weight:bold;
+}
+
+.warning{
+color:orange;
+font-weight:bold;
+}
+
+.strong{
+color:#00ffcc;
+font-weight:bold;
+font-size:20px;
+}
+
 </style>
+
 </head>
+
 <body>
 
 <div class="container">
@@ -32,164 +77,173 @@ button { background:#00ffcc; font-weight:bold; cursor:pointer; }
 <h1>Trade Prompter Elite</h1>
 
 <input id="ticker" placeholder="Ticker (AAPL)">
-<input id="accountSize" type="number" placeholder="Account Size ($)">
+
+<input id="accountSize" type="number" placeholder="Account Size">
+
 <select id="expiry">
-  <option value="weekly">Weekly</option>
-  <option value="biweekly">Bi-Weekly</option>
+
+<option value="weekly">Weekly</option>
+<option value="biweekly">Bi-Weekly</option>
+
 </select>
 
 <button onclick="analyze()">Analyze Trade</button>
 
 <div id="result"></div>
-<div id="stats"></div>
 
 </div>
 
 <script>
 
-const API_KEY = "OHCJWFQEFSXI8IJ3";
-
-let lastTrade = null;
+const API_KEY="PASTE_YOUR_ALPHA_KEY_HERE";
 
 async function getDaily(ticker){
-  const url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${API_KEY}`;
-  const res=await fetch(url);
-  const data=await res.json();
-  return data["Time Series (Daily)"];
+
+const url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${API_KEY}`;
+
+const res=await fetch(url);
+
+const data=await res.json();
+
+return data["Time Series (Daily)"];
+
 }
 
 function calculateRSI(closes,period=14){
-  let gains=0,losses=0;
-  for(let i=1;i<=period;i++){
-    const diff=closes[i-1]-closes[i];
-    if(diff>0) gains+=diff; else losses-=diff;
-  }
-  const avgGain=gains/period;
-  const avgLoss=losses/period;
-  if(avgLoss===0) return 100;
-  const rs=avgGain/avgLoss;
-  return 100-(100/(1+rs));
+
+let gains=0;
+let losses=0;
+
+for(let i=1;i<=period;i++){
+
+const diff=closes[i-1]-closes[i];
+
+if(diff>0) gains+=diff;
+else losses-=diff;
+
+}
+
+const avgGain=gains/period;
+const avgLoss=losses/period;
+
+const rs=avgGain/avgLoss;
+
+return 100-(100/(1+rs));
+
 }
 
 async function analyze(){
 
-  const ticker=document.getElementById("ticker").value.toUpperCase();
-  const account=parseFloat(document.getElementById("accountSize").value);
-  const expiry=document.getElementById("expiry").value;
-  const result=document.getElementById("result");
+const ticker=document.getElementById("ticker").value.toUpperCase();
+const account=document.getElementById("accountSize").value;
+const expiry=document.getElementById("expiry").value;
 
-  if(!ticker||!account){ result.innerHTML="Enter ticker and account size."; return; }
+const result=document.getElementById("result");
 
-  result.innerHTML="Analyzing...";
+result.innerHTML="Analyzing...";
 
-  const raw=await getDaily(ticker);
-  if(!raw){ result.innerHTML="<span class='warning'>Invalid symbol or API limit.</span>"; return; }
+const daily=await getDaily(ticker);
 
-  const dates=Object.keys(raw).slice(0,30);
-  const closes=dates.map(d=>parseFloat(raw[d]["4. close"]));
-  const highs=dates.map(d=>parseFloat(raw[d]["2. high"]));
-  const lows=dates.map(d=>parseFloat(raw[d]["3. low"]));
-  const opens=dates.map(d=>parseFloat(raw[d]["1. open"]));
+if(!daily){
 
-  const price=closes[0];
-  const ma20=closes.slice(0,20).reduce((a,b)=>a+b,0)/20;
-  const momentum5=((closes[0]-closes[5])/closes[5])*100;
-  const rsi=calculateRSI(closes);
+result.innerHTML="<span class='warning'>Invalid symbol or API limit.</span>";
 
-  const avgRange=highs.slice(0,14).reduce((s,h,i)=>s+(h-lows[i]),0)/14;
-  const volatility=(avgRange/price)*100;
-  const gap=((opens[0]-closes[1])/closes[1])*100;
+return;
 
-  let score=0;
-  let bias="WAIT";
-  let aPlus=false;
-
-  if(Math.abs(gap)>2){ score=0; bias="NO TRADE"; }
-
-  if(price>ma20) score+=20;
-  if(price<ma20) score+=20;
-
-  if(momentum5>0) score+=20;
-  if(momentum5<0) score+=20;
-
-  if(rsi>40&&rsi<65) score+=15;
-  if(volatility>2) score+=10;
-
-  if(price>ma20&&momentum5>0&&rsi<70) bias="CALL";
-  if(price<ma20&&momentum5<0&&rsi>30) bias="PUT";
-
-  if(score>=85 && bias!=="WAIT" && bias!=="NO TRADE"){
-    aPlus=true;
-  }
-
-  const risk=account*0.05;
-  const estCost=avgRange*100;
-  const contracts=Math.floor(risk/estCost);
-
-  if(score>100) score=100;
-
-  let confidence="Low";
-  if(score>=80) confidence="High";
-  else if(score>=65) confidence="Moderate";
-
-  lastTrade = { ticker, bias, score, aPlus };
-
-  result.innerHTML=`
-    <h2>${ticker}</h2>
-    <p>Price: $${price.toFixed(2)}</p>
-    <hr>
-    <p>MA20: $${ma20.toFixed(2)}</p>
-    <p>Momentum: ${momentum5.toFixed(2)}%</p>
-    <p>RSI: ${rsi.toFixed(1)}</p>
-    <p>Volatility: ${volatility.toFixed(2)}%</p>
-    <p>Gap: ${gap.toFixed(2)}%</p>
-    <hr>
-    <p><b>Bias:</b> <span class="${bias==="CALL"?"bullish":bias==="PUT"?"bearish":"warning"}">${bias}</span></p>
-    ${aPlus ? "<p class='aplus'>🏆 A+ Setup Detected</p>" : ""}
-    <p><b>Score:</b> ${score}/100</p>
-    <p><b>Confidence:</b> ${confidence}</p>
-    <p><b>Max Contracts (5% risk):</b> ${contracts}</p>
-    <hr>
-    <button onclick="logTrade(true)">Log Win</button>
-    <button onclick="logTrade(false)">Log Loss</button>
-  `;
-
-  updateStats();
 }
 
-function logTrade(win){
-  if(!lastTrade) return;
+const dates=Object.keys(daily);
 
-  let trades=JSON.parse(localStorage.getItem("trades"))||[];
-  trades.push({
-    ...lastTrade,
-    win:win
-  });
-  localStorage.setItem("trades",JSON.stringify(trades));
-  updateStats();
+const closes=dates.slice(0,30).map(d=>parseFloat(daily[d]["4. close"]));
+
+const price=closes[0];
+
+const rsi=calculateRSI(closes);
+
+let direction="";
+let confidence=50;
+let strike="";
+let entrySignal="Wait";
+
+if(rsi<35){
+
+direction="CALL";
+confidence=72;
+strike=(price*1.01).toFixed(2);
+entrySignal="Strong Setup";
+
 }
 
-function updateStats(){
-  let trades=JSON.parse(localStorage.getItem("trades"))||[];
-  let total=trades.length;
-  let wins=trades.filter(t=>t.win).length;
-  let aPlusTrades=trades.filter(t=>t.aPlus);
-  let aPlusWins=aPlusTrades.filter(t=>t.win).length;
+else if(rsi>65){
 
-  let winRate=total?((wins/total)*100).toFixed(1):0;
-  let aPlusRate=aPlusTrades.length?((aPlusWins/aPlusTrades.length)*100).toFixed(1):0;
+direction="PUT";
+confidence=72;
+strike=(price*0.99).toFixed(2);
+entrySignal="Strong Setup";
 
-  document.getElementById("stats").innerHTML=`
-    <h3>Performance Stats</h3>
-    <p>Total Trades: ${total}</p>
-    <p>Win Rate: ${winRate}%</p>
-    <p>A+ Trades: ${aPlusTrades.length}</p>
-    <p>A+ Win Rate: ${aPlusRate}%</p>
-  `;
 }
 
-updateStats();
+else{
+
+direction="WAIT";
+confidence=40;
+
+}
+
+if(direction==="WAIT"){
+
+result.innerHTML=`
+
+<div class="warning">
+
+Market Neutral<br><br>
+
+Price: $${price.toFixed(2)}<br>
+
+RSI: ${rsi.toFixed(1)}<br><br>
+
+Best Action: WAIT
+
+</div>
+
+`;
+
+return;
+
+}
+
+result.innerHTML=`
+
+<div class="strong">
+
+Price: $${price.toFixed(2)}
+
+</div>
+
+<br>
+
+<div class="${direction==="CALL"?"bullish":"bearish"}">
+
+Direction: ${direction}
+
+</div>
+
+<br>
+
+Suggested Strike: $${strike}<br><br>
+
+Expiration: ${expiry}<br><br>
+
+Confidence: ${confidence}%<br><br>
+
+Entry Signal: ${entrySignal}
+
+`;
+
+}
 
 </script>
+
 </body>
+
 </html>
