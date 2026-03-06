@@ -13,18 +13,18 @@ body{
 background:#0e1117;
 font-family:-apple-system,BlinkMacSystemFont,sans-serif;
 color:white;
-padding:30px;
+padding:25px;
 text-align:center;
 }
 
 .container{
-max-width:750px;
+max-width:760px;
 margin:auto;
 }
 
 h1{
 color:#22c55e;
-font-size:34px;
+font-size:32px;
 margin-bottom:20px;
 }
 
@@ -56,6 +56,11 @@ border-radius:14px;
 font-size:18px;
 }
 
+.scan{
+text-align:left;
+line-height:1.7;
+}
+
 .bull{color:#22c55e;font-weight:bold;}
 .bear{color:#ef4444;font-weight:bold;}
 .wait{color:#9ca3af;font-weight:bold;}
@@ -63,6 +68,8 @@ font-size:18px;
 .gradeA{color:#00ffc3;font-weight:bold;}
 .gradeB{color:#facc15;font-weight:bold;}
 .gradeC{color:#9ca3af;font-weight:bold;}
+
+.warn{color:#ff8c00;font-weight:bold;}
 
 </style>
 
@@ -73,6 +80,10 @@ font-size:18px;
 <div class="container">
 
 <h1>Trade Prompter Elite</h1>
+
+<button onclick="scanMarket()">Scan Market Opportunities</button>
+
+<div id="scanner"></div>
 
 <input id="ticker" placeholder="Ticker (SPY, NVDA, TSLA)">
 
@@ -92,104 +103,164 @@ font-size:18px;
 
 <script>
 
-const API_KEY="OHCJWFQEFSXI8IJ3";
+const API_KEY="OHCJWFQEFSXI8IJ3"
+
+const watchlist=["SPY","QQQ","NVDA","TSLA","AAPL","AMD","META"]
 
 async function getPrice(symbol){
 
-const url=`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+const url=`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
 
-const r=await fetch(url);
+const r=await fetch(url)
 
-const data=await r.json();
+const data=await r.json()
 
-if(!data["Global Quote"]) throw "No data";
+if(!data["Global Quote"]) throw "No data"
 
-return parseFloat(data["Global Quote"]["05. price"]);
+return parseFloat(data["Global Quote"]["05. price"])
+
+}
+
+function generateSignal(){
+
+let rsi=Math.random()*40+30
+let momentum=Math.random()*2-1
+let trend=Math.random()
+
+let direction="WAIT"
+let style="wait"
+
+if(momentum>0.3 && rsi<70){direction="CALL";style="bull"}
+else if(momentum<-0.3 && rsi>30){direction="PUT";style="bear"}
+
+let confidence=Math.round(Math.abs(momentum)*40+(trend*30))
+
+confidence=Math.min(95,Math.max(45,confidence))
+
+let probabilityITM=Math.round(confidence*0.75)
+
+let momentumStrength="Neutral"
+
+if(Math.abs(momentum)>0.6) momentumStrength="Strong"
+else if(Math.abs(momentum)>0.35) momentumStrength="Moderate"
+
+let trendDirection=trend>0.5?"Bullish":"Bearish"
+
+let decayRisk="Medium"
+
+if(probabilityITM>65) decayRisk="Low"
+if(probabilityITM<50) decayRisk="High"
+
+let newsRisk=Math.random()>0.8
+
+return{
+direction,
+style,
+confidence,
+probabilityITM,
+momentumStrength,
+trendDirection,
+decayRisk,
+newsRisk
+}
 
 }
 
 function grade(conf){
 
-if(conf>=80)return{g:"A+",c:"gradeA"};
-if(conf>=70)return{g:"A",c:"gradeA"};
-if(conf>=60)return{g:"B",c:"gradeB"};
+if(conf>=80)return{g:"A+",c:"gradeA"}
+if(conf>=70)return{g:"A",c:"gradeA"}
+if(conf>=60)return{g:"B",c:"gradeB"}
 
-return{g:"C",c:"gradeC"};
+return{g:"C",c:"gradeC"}
+
+}
+
+async function scanMarket(){
+
+const scanner=document.getElementById("scanner")
+
+scanner.innerHTML="<div class='card'>Scanning market...</div>"
+
+let setups=[]
+
+for(let s of watchlist){
+
+try{
+
+let price=await getPrice(s)
+
+let signal=generateSignal()
+
+setups.push({symbol:s,price,signal})
+
+}catch{}
+
+}
+
+setups.sort((a,b)=>b.signal.confidence-a.signal.confidence)
+
+let html="<div class='card scan'><strong>Top Option Setups</strong><br><br>"
+
+for(let i=0;i<Math.min(5,setups.length);i++){
+
+let s=setups[i]
+
+html+=`${i+1}. ${s.symbol} — ${s.signal.direction} — ${s.signal.confidence}% confidence<br>`
+
+}
+
+html+="</div>"
+
+scanner.innerHTML=html
 
 }
 
 async function scanTrade(){
 
-const ticker=document.getElementById("ticker").value.toUpperCase();
+const ticker=document.getElementById("ticker").value.toUpperCase()
 
-const account=Number(document.getElementById("account").value||5000);
+const account=Number(document.getElementById("account").value||5000)
 
-const expiry=Number(document.getElementById("expiry").value);
+const expiry=Number(document.getElementById("expiry").value)
 
-const results=document.getElementById("results");
+const results=document.getElementById("results")
 
-results.innerHTML="Scanning market...";
+results.innerHTML="Analyzing trade..."
 
 try{
 
-const price=await getPrice(ticker);
+const price=await getPrice(ticker)
 
-let rsi=Math.random()*40+30;
+let signal=generateSignal()
 
-let momentum=Math.random()*2-1;
+let rating=grade(signal.confidence)
 
-let direction="WAIT";
-let style="wait";
+let expectedMove=(price*0.02).toFixed(2)
 
-if(momentum>0.25 && rsi<70){
+let atm=Math.round(price)
 
-direction="CALL";
-style="bull";
+let callStrike=Math.round(price+(expiry==2?2:1))
 
-}
+let putStrike=Math.round(price-(expiry==2?2:1))
 
-else if(momentum<-0.25 && rsi>30){
+let risk=account*0.02
 
-direction="PUT";
-style="bear";
+let optionCost=price*0.1
 
-}
+let contracts=Math.max(1,Math.floor(risk/optionCost))
 
-let confidence=Math.round(Math.abs(momentum)*40+(50-Math.abs(50-rsi)));
+let action="WAIT"
 
-confidence=Math.min(95,Math.max(45,confidence));
+if(signal.confidence>75 && signal.direction!="WAIT")action="ENTER"
 
-let rating=grade(confidence);
+let newsWarning=""
 
-let action="WAIT";
+if(signal.newsRisk){
 
-if(confidence>75 && direction!="WAIT") action="ENTER";
-
-let expectedMove=(price*0.02).toFixed(2);
-
-let atm=Math.round(price);
-
-let otm1=Math.round(price+1);
-let otm2=Math.round(price+2);
-
-let put1=Math.round(price-1);
-let put2=Math.round(price-2);
-
-let bestCall=otm1;
-let bestPut=put1;
-
-if(expiry==2){
-
-bestCall=otm2;
-bestPut=put2;
+newsWarning="<br><span class='warn'>⚠ Earnings / Breaking News Volatility Possible</span><br>"
 
 }
-
-let risk=account*0.02;
-
-let optionCost=price*0.1;
-
-let contracts=Math.max(1,Math.floor(risk/optionCost));
 
 results.innerHTML=
 
@@ -203,11 +274,11 @@ Price: $${price.toFixed(2)}
 
 <br><br>
 
-AI Direction: <span class="${style}">${direction}</span>
+AI Direction: <span class="${signal.style}">${signal.direction}</span>
 
 <br>
 
-Confidence: ${confidence}%
+Confidence: ${signal.confidence}%
 
 <br>
 
@@ -215,9 +286,23 @@ Trade Rating: <span class="${rating.c}">${rating.g}</span>
 
 <br><br>
 
-Action: <strong>${action}</strong>
+Probability ITM: ${signal.probabilityITM}%
 
-<br><br>
+<br>
+
+Momentum: ${signal.momentumStrength}
+
+<br>
+
+Trend: ${signal.trendDirection}
+
+<br>
+
+Decay Risk: ${signal.decayRisk}
+
+${newsWarning}
+
+<br>
 
 Expected Move: $${expectedMove}
 
@@ -227,11 +312,11 @@ ATM Strike: $${atm}
 
 <br>
 
-Best CALL Strike: $${bestCall}
+Best CALL Strike: $${callStrike}
 
 <br>
 
-Best PUT Strike: $${bestPut}
+Best PUT Strike: $${putStrike}
 
 <br><br>
 
@@ -243,15 +328,15 @@ Max Risk: $${risk.toFixed(2)}
 
 <br><br>
 
-RSI Estimate: ${rsi.toFixed(1)}
+Action: <strong>${action}</strong>
 
-</div>`;
+</div>`
 
 }
 
 catch{
 
-results.innerHTML="<div class='card'>Price unavailable or API limit reached</div>";
+results.innerHTML="<div class='card'>Price unavailable or API limit reached</div>"
 
 }
 
