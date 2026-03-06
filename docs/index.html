@@ -2,11 +2,8 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Trade Prompter Elite</title>
-
 <style>
-
 body{
 background:#0b0b0b;
 font-family:Arial;
@@ -21,7 +18,7 @@ font-size:36px;
 }
 
 .container{
-max-width:500px;
+max-width:600px;
 margin:auto;
 }
 
@@ -46,49 +43,71 @@ border-radius:12px;
 margin-top:20px;
 }
 
-.bullish{color:lime;font-weight:bold;}
-.bearish{color:red;font-weight:bold;}
-.warning{color:orange;font-weight:bold;}
+.bullish{color:#22c55e;font-weight:bold;}
+.bearish{color:#ef4444;font-weight:bold;}
+.neutral{color:#9ca3af;font-weight:bold;}
 .strong{color:#00ffc3;font-weight:bold;}
 .aplus{color:#ffd700;font-weight:bold;}
-
+.warning{color:orange;}
 </style>
 </head>
-
 <body>
-
 <div class="container">
-
 <h1>Trade Prompter Elite</h1>
-
 <input id="ticker" placeholder="Ticker (AAPL)">
 <input id="accountSize" type="number" placeholder="Account Size ($)">
-
 <select id="expiry">
 <option value="0dte">0DTE</option>
 <option value="weekly">Weekly</option>
 <option value="biweekly">Bi-Weekly</option>
 </select>
-
-<button onclick="analyze()">Analyze Trade</button>
-
 <div id="result"></div>
-
 </div>
-
 <script>
 
-const API_KEY = "PASTE_YOUR_ALPHA_KEY_HERE";
+const API_KEY="PASTE_YOUR_ALPHA_KEY";
 
-async function getPrice(symbol){
+async function getData(symbol){
 
-const url =
-`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+const url=
+`https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=5min&apikey=${API_KEY}`;
 
-const res = await fetch(url);
-const data = await res.json();
+const res=await fetch(url);
+const data=await res.json();
 
-return parseFloat(data["Global Quote"]["05. price"]);
+const series=data["Time Series (5min)"];
+
+const prices=[];
+const volume=[];
+
+for(const t in series){
+
+prices.push(parseFloat(series[t]["4. close"]));
+volume.push(parseFloat(series[t]["5. volume"]));
+
+}
+
+return {prices,volume};
+
+}
+
+function calculateRSI(prices){
+
+let gains=0;
+let losses=0;
+
+for(let i=1;i<14;i++){
+
+const diff=prices[i]-prices[i-1];
+
+if(diff>0)gains+=diff;
+else losses+=Math.abs(diff);
+
+}
+
+const rs=gains/(losses||1);
+
+return 100-(100/(1+rs));
 
 }
 
@@ -109,56 +128,96 @@ const expiry=document.getElementById("expiry").value;
 
 const result=document.getElementById("result");
 
-result.innerHTML="Analyzing...";
+result.innerHTML="Scanning market...";
 
 try{
 
-const price=await getPrice(ticker);
+const {prices,volume}=await getData(ticker);
 
-if(!price){
-result.innerHTML="<div class='warning'>Invalid symbol or API limit</div>";
-return;
+const current=prices[0];
+const open=prices[prices.length-1];
+
+const change=((current-open)/open)*100;
+
+const rsi=calculateRSI(prices);
+
+const avgVol=volume.reduce((a,b)=>a+b)/volume.length;
+const volSpike=volume[0]>avgVol*1.5;
+
+let direction="NEUTRAL";
+let cls="neutral";
+
+if(change>0.4 && rsi<70){
+direction="CALL";
+cls="bullish";
 }
 
-const move=(price*0.02).toFixed(2);
+if(change<-0.4 && rsi>30){
+direction="PUT";
+cls="bearish";
+}
+
+let confidence=Math.abs(change)*40;
+
+if(volSpike)confidence+=20;
+
+confidence+=50-Math.abs(50-rsi);
+
+confidence=Math.min(100,Math.round(confidence));
+
+const rating=gradeTrade(confidence);
+
+let action="WAIT";
+
+if(confidence>75 && direction!=="NEUTRAL")action="ENTER";
+
+const move=(current*0.02).toFixed(2);
 
 let callStrike;
 let putStrike;
 
 if(expiry==="0dte"){
-callStrike=Math.round(price);
-putStrike=Math.round(price);
+callStrike=Math.round(current);
+putStrike=Math.round(current);
 }
 
 if(expiry==="weekly"){
-callStrike=Math.round(price+1);
-putStrike=Math.round(price-1);
+callStrike=Math.round(current+1);
+putStrike=Math.round(current-1);
 }
 
 if(expiry==="biweekly"){
-callStrike=Math.round(price+2);
-putStrike=Math.round(price-2);
+callStrike=Math.round(current+2);
+putStrike=Math.round(current-2);
 }
-
-const confidence=Math.floor(Math.random()*25)+60;
-
-const rating=gradeTrade(confidence);
-
-let entry="WAIT";
-
-if(confidence>75)entry="ENTER";
 
 const risk=account*0.02;
 
-const contracts=Math.floor(risk/(price*0.1));
+const contracts=Math.floor(risk/(current*0.1));
 
 result.innerHTML=
 
 `<div class="result">
 
-<h2>${ticker} Analysis</h2>
+<h2>${ticker}</h2>
 
-Price: $${price}
+Price: $${current.toFixed(2)}
+
+<br><br>
+
+AI Direction: <span class="${cls}">${direction}</span>
+
+<br>
+
+Confidence: ${confidence}%
+
+<br>
+
+Trade Rating: <span class="aplus">${rating}</span>
+
+<br><br>
+
+Action: <span class="strong">${action}</span>
 
 <br><br>
 
@@ -166,33 +225,11 @@ Expected Move: $${move}
 
 <br><br>
 
-<div class="bullish">
-
-CALL IDEA<br>
-Strike: $${callStrike}
-
-</div>
+CALL Strike: $${callStrike}
 
 <br>
 
-<div class="bearish">
-
-PUT IDEA<br>
-Strike: $${putStrike}
-
-</div>
-
-<br><br>
-
-Confidence: ${confidence}%
-
-<br>
-
-Rating: <span class="aplus">${rating}</span>
-
-<br><br>
-
-Entry Signal: <span class="strong">${entry}</span>
+PUT Strike: $${putStrike}
 
 <br><br>
 
@@ -202,19 +239,27 @@ Suggested Contracts: ${contracts}
 
 Risk Per Trade: $${risk.toFixed(2)}
 
+<br>
+
+RSI: ${rsi.toFixed(1)}
+
+<br>
+
+Volume Spike: ${volSpike ? "Yes" : "No"}
+
 </div>`;
 
 }
 
 catch{
 
-result.innerHTML="<div class='warning'>Data unavailable</div>";
+result.innerHTML="<div class='warning'>Data unavailable or API limit reached</div>";
 
 }
 
 }
 
 </script>
-
 </body>
 </html>
+:::
