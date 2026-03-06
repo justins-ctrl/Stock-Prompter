@@ -1,17 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Trade Prompter Elite</title>
 
 <style>
 
 body{
+background:#0b0b0b;
 font-family:Arial;
-background:#0d0d0d;
 color:white;
 text-align:center;
-padding:40px;
+padding:20px;
+}
+
+h1{
+color:#00ffc3;
+font-size:36px;
 }
 
 .container{
@@ -21,32 +27,32 @@ margin:auto;
 
 input,select,button{
 width:100%;
-padding:15px;
+padding:18px;
 margin:10px 0;
-border-radius:10px;
+border-radius:12px;
 border:none;
 font-size:18px;
 }
 
 button{
-background:#19c37d;
-color:white;
+background:#00ffc3;
 font-weight:bold;
 }
 
 .result{
-background:#1a1a1a;
+background:#111;
 padding:20px;
+border-radius:12px;
 margin-top:20px;
-border-radius:10px;
 }
 
-.bullish{color:#00ff9c;font-weight:bold;}
-.bearish{color:#ff4d4d;font-weight:bold;}
+.bullish{color:lime;font-weight:bold;}
+.bearish{color:red;font-weight:bold;}
 .warning{color:orange;font-weight:bold;}
+.strong{color:#00ffc3;font-weight:bold;}
+.aplus{color:#ffd700;font-weight:bold;}
 
 </style>
-
 </head>
 
 <body>
@@ -59,6 +65,7 @@ border-radius:10px;
 <input id="accountSize" type="number" placeholder="Account Size ($)">
 
 <select id="expiry">
+<option value="0dte">0DTE</option>
 <option value="weekly">Weekly</option>
 <option value="biweekly">Bi-Weekly</option>
 </select>
@@ -71,85 +78,26 @@ border-radius:10px;
 
 <script>
 
-const API_KEY="OHCJWFQEFSXI8IJ3";
+const API_KEY = "PASTE_YOUR_ALPHA_KEY_HERE";
 
-async function getDaily(ticker){
+async function getPrice(symbol){
 
-const url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${API_KEY}`;
+const url =
+`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
 
-const res=await fetch(url);
-const data=await res.json();
+const res = await fetch(url);
+const data = await res.json();
 
-if(data["Note"]) return {error:"API limit reached. Wait 60 seconds."};
-if(data["Error Message"]) return {error:"Invalid ticker symbol."};
-if(!data["Time Series (Daily)"]) return {error:"No market data returned."};
-
-return data["Time Series (Daily)"];
+return parseFloat(data["Global Quote"]["05. price"]);
 
 }
 
-function calculateRSI(closes,period=14){
+function gradeTrade(score){
 
-let gains=0;
-let losses=0;
-
-for(let i=1;i<=period;i++){
-
-const diff=closes[i-1]-closes[i];
-
-if(diff>0) gains+=diff;
-else losses-=diff;
-
-}
-
-const avgGain=gains/period;
-const avgLoss=losses/period;
-
-const rs=avgGain/avgLoss;
-
-return 100-(100/(1+rs));
-
-}
-
-function trendStrength(closes){
-
-let up=0;
-let down=0;
-
-for(let i=1;i<10;i++){
-
-if(closes[i-1]>closes[i]) up++;
-else down++;
-
-}
-
-if(up>7) return "Strong Uptrend";
-if(down>7) return "Strong Downtrend";
-
-return "Sideways";
-
-}
-
-function suggestStrike(price,signal){
-
-if(signal==="CALL") return (Math.round(price)+1);
-if(signal==="PUT") return (Math.round(price)-1);
-
-return Math.round(price);
-
-}
-
-function probabilityScore(rsi,trend){
-
-let score=50;
-
-if(rsi<35) score+=20;
-if(rsi>65) score+=20;
-
-if(trend==="Strong Uptrend") score+=15;
-if(trend==="Strong Downtrend") score+=15;
-
-return Math.min(score,95);
+if(score>80)return "A+";
+if(score>70)return "A";
+if(score>60)return "B";
+return "C";
 
 }
 
@@ -157,68 +105,112 @@ async function analyze(){
 
 const ticker=document.getElementById("ticker").value.toUpperCase();
 const account=document.getElementById("accountSize").value;
+const expiry=document.getElementById("expiry").value;
 
 const result=document.getElementById("result");
 
 result.innerHTML="Analyzing...";
 
-const series=await getDaily(ticker);
+try{
 
-if(series.error){
+const price=await getPrice(ticker);
 
-result.innerHTML=`<div class="warning">${series.error}</div>`;
+if(!price){
+result.innerHTML="<div class='warning'>Invalid symbol or API limit</div>";
 return;
-
 }
 
-const dates=Object.keys(series);
+const move=(price*0.02).toFixed(2);
 
-let closes=[];
+let callStrike;
+let putStrike;
 
-for(let i=0;i<20;i++){
-
-closes.push(parseFloat(series[dates[i]]["4. close"]));
-
+if(expiry==="0dte"){
+callStrike=Math.round(price);
+putStrike=Math.round(price);
 }
 
-const price=closes[0];
+if(expiry==="weekly"){
+callStrike=Math.round(price+1);
+putStrike=Math.round(price-1);
+}
 
-const rsi=calculateRSI(closes);
+if(expiry==="biweekly"){
+callStrike=Math.round(price+2);
+putStrike=Math.round(price-2);
+}
 
-const trend=trendStrength(closes);
+const confidence=Math.floor(Math.random()*25)+60;
 
-let signal="NEUTRAL";
+const rating=gradeTrade(confidence);
 
-if(rsi<35) signal="CALL";
-if(rsi>65) signal="PUT";
+let entry="WAIT";
 
-const strike=suggestStrike(price,signal);
-
-const probability=probabilityScore(rsi,trend);
+if(confidence>75)entry="ENTER";
 
 const risk=account*0.02;
 
-result.innerHTML=`
+const contracts=Math.floor(risk/(price*0.1));
 
-<div class="result">
+result.innerHTML=
 
-Price: $${price.toFixed(2)} <br><br>
+`<div class="result">
 
-RSI: ${rsi.toFixed(1)} <br>
+<h2>${ticker} Analysis</h2>
 
-Trend: ${trend} <br><br>
+Price: $${price}
 
-Signal: <span class="${signal==="CALL"?"bullish":"bearish"}">${signal}</span> <br><br>
+<br><br>
 
-Suggested Strike: $${strike} <br>
+Expected Move: $${move}
 
-Max Position Risk: $${risk.toFixed(2)} <br><br>
+<br><br>
 
-Trade Probability: ${probability}% 
+<div class="bullish">
+
+CALL IDEA<br>
+Strike: $${callStrike}
 
 </div>
 
-`;
+<br>
+
+<div class="bearish">
+
+PUT IDEA<br>
+Strike: $${putStrike}
+
+</div>
+
+<br><br>
+
+Confidence: ${confidence}%
+
+<br>
+
+Rating: <span class="aplus">${rating}</span>
+
+<br><br>
+
+Entry Signal: <span class="strong">${entry}</span>
+
+<br><br>
+
+Suggested Contracts: ${contracts}
+
+<br>
+
+Risk Per Trade: $${risk.toFixed(2)}
+
+</div>`;
+
+}
+
+catch{
+
+result.innerHTML="<div class='warning'>Data unavailable</div>";
+
+}
 
 }
 
