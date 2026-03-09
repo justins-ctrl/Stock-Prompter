@@ -65,8 +65,6 @@ font-size:18px;
 .gradeC{color:#9ca3af;font-weight:bold;}
 
 .entry{color:#60a5fa;font-weight:bold;}
-.warn{color:#ff8c00;font-weight:bold;}
-
 .scan{text-align:left;line-height:1.7}
 
 </style>
@@ -82,15 +80,12 @@ font-size:18px;
 <div id="tradeBoard"></div>
 
 <button onclick="scanMarket()">Scan Options Heatmap</button>
-
 <div id="scanner"></div>
 
 <button onclick="scanFlow()">Scan Options Flow</button>
-
 <div id="flow"></div>
 
 <input id="ticker" placeholder="Ticker (SPY, NVDA, TSLA)">
-
 <input id="account" type="number" placeholder="Account Size ($)">
 
 <select id="expiry">
@@ -132,78 +127,89 @@ return prices.slice(0,60)
 
 }
 
-function average(arr){
+function avg(arr){
 return arr.reduce((a,b)=>a+b)/arr.length
 }
 
-function stdDev(arr){
-
-let avg=average(arr)
-
-let squareDiffs=arr.map(v=>Math.pow(v-avg,2))
-
-return Math.sqrt(average(squareDiffs))
-
+function std(arr){
+let a=avg(arr)
+return Math.sqrt(arr.map(x=>(x-a)**2).reduce((a,b)=>a+b)/arr.length)
 }
 
 function grade(conf){
 
-if(conf>=80)return{g:"A+",c:"gradeA"}
-if(conf>=70)return{g:"A",c:"gradeA"}
-if(conf>=60)return{g:"B",c:"gradeB"}
+if(conf>=80)return["A+","gradeA"]
+if(conf>=70)return["A","gradeA"]
+if(conf>=60)return["B","gradeB"]
 
-return{g:"C",c:"gradeC"}
+return["C","gradeC"]
 
 }
 
-function tradeDecision(direction,confidence){
+function tradeDecision(dir,conf){
 
-if(confidence>75 && direction=="CALL") return "BUY CALL"
-if(confidence>75 && direction=="PUT") return "BUY PUT"
-if(confidence>60) return "WATCH"
+if(conf>75 && dir=="CALL") return "BUY CALL"
+if(conf>75 && dir=="PUT") return "BUY PUT"
+if(conf>60) return "WATCH"
 
 return "WAIT"
 
 }
 
-function randomFlow(){
+function flowSignal(){
 
-let strength=Math.floor(Math.random()*40)+60
+let types=["CALL SWEEP","PUT SWEEP","UNUSUAL CALL VOLUME","UNUSUAL PUT VOLUME"]
 
-let types=[
-"CALL SWEEP",
-"PUT SWEEP",
-"UNUSUAL CALL VOLUME",
-"UNUSUAL PUT VOLUME"
-]
+return{
+type:types[Math.floor(Math.random()*types.length)],
+strength:Math.floor(Math.random()*40)+60
+}
 
-let type=types[Math.floor(Math.random()*types.length)]
+}
 
-return {type,strength}
+function heatSignal(){
+
+return{
+type:Math.random()>0.5?"CALL FLOW":"PUT FLOW",
+strength:Math.floor(Math.random()*40)+60
+}
+
+}
+
+function optionChain(price,dir){
+
+let strike=dir=="CALL"?Math.round(price+1):Math.round(price-1)
+
+let delta=(Math.random()*0.2+0.35).toFixed(2)
+
+let expirations=["0DTE","Weekly","Bi-Weekly"]
+
+let oi=["Moderate","High","Very High"]
+
+return{
+strike,
+delta,
+expiration:expirations[Math.floor(Math.random()*3)],
+oi:oi[Math.floor(Math.random()*3)]
+}
 
 }
 
 async function scanFlow(){
 
-let alerts=[]
+let arr=[]
 
 for(let s of watchlist){
-
-let flow=randomFlow()
-
-alerts.push({symbol:s,flow})
-
+arr.push({symbol:s,flow:flowSignal()})
 }
 
-alerts.sort((a,b)=>b.flow.strength-a.flow.strength)
+arr.sort((a,b)=>b.flow.strength-a.flow.strength)
 
 let html="<div class='card scan'><strong>OPTIONS FLOW ALERTS</strong><br><br>"
 
 for(let i=0;i<5;i++){
 
-let a=alerts[i]
-
-html+=`${a.symbol} — ${a.flow.type} — ${a.flow.strength}%<br>`
+html+=`${arr[i].symbol} — ${arr[i].flow.type} — ${arr[i].flow.strength}%<br>`
 
 }
 
@@ -213,36 +219,21 @@ document.getElementById("flow").innerHTML=html
 
 }
 
-function generateHeatmap(){
-
-let strength=Math.floor(Math.random()*40)+60
-let type=Math.random()>0.5?"CALL FLOW":"PUT FLOW"
-
-return {type,strength}
-
-}
-
 async function scanMarket(){
 
-let setups=[]
+let arr=[]
 
 for(let s of watchlist){
-
-let flow=generateHeatmap()
-
-setups.push({symbol:s,flow})
-
+arr.push({symbol:s,flow:heatSignal()})
 }
 
-setups.sort((a,b)=>b.flow.strength-a.flow.strength)
+arr.sort((a,b)=>b.flow.strength-a.flow.strength)
 
 let html="<div class='card scan'><strong>OPTIONS HEATMAP</strong><br><br>"
 
 for(let i=0;i<5;i++){
 
-let s=setups[i]
-
-html+=`${i+1}. ${s.symbol} — ${s.flow.type} — ${s.flow.strength}%<br>`
+html+=`${arr[i].symbol} — ${arr[i].flow.type} — ${arr[i].flow.strength}%<br>`
 
 }
 
@@ -260,37 +251,35 @@ for(let s of watchlist){
 
 try{
 
-let prices=await getHistory(s)
+let p=await getHistory(s)
 
-let price=prices[0]
+let price=p[0]
 
-let ma20=average(prices.slice(0,20))
-let ma50=average(prices.slice(0,50))
+let ma20=avg(p.slice(0,20))
+let ma50=avg(p.slice(0,50))
 
-let direction="NEUTRAL"
+let dir="NEUTRAL"
 
-if(price>ma20 && ma20>ma50) direction="CALL"
-if(price<ma20 && ma20<ma50) direction="PUT"
+if(price>ma20 && ma20>ma50) dir="CALL"
+if(price<ma20 && ma20<ma50) dir="PUT"
 
 let momentum=Math.abs(price-ma20)
 
-let confidence=Math.min(95,Math.round(momentum/price*400+60))
+let conf=Math.min(95,Math.round(momentum/price*400+60))
 
-setups.push({symbol:s,direction,confidence})
+setups.push({symbol:s,dir,conf})
 
 }catch{}
 
 }
 
-setups.sort((a,b)=>b.confidence-a.confidence)
+setups.sort((a,b)=>b.conf-a.conf)
 
 let html="<div class='card scan'><strong>AI TOP TRADES TODAY</strong><br><br>"
 
 for(let i=0;i<5;i++){
 
-let s=setups[i]
-
-html+=`${i+1}. ${s.symbol} — ${s.direction} — ${s.confidence}%<br>`
+html+=`${i+1}. ${setups[i].symbol} — ${setups[i].dir} — ${setups[i].conf}%<br>`
 
 }
 
@@ -302,66 +291,52 @@ document.getElementById("tradeBoard").innerHTML=html
 
 async function scanTrade(){
 
-const ticker=document.getElementById("ticker").value.toUpperCase()
-const account=Number(document.getElementById("account").value||5000)
+let ticker=document.getElementById("ticker").value.toUpperCase()
+let account=Number(document.getElementById("account").value||5000)
 
-const results=document.getElementById("results")
+let res=document.getElementById("results")
 
-results.innerHTML="Analyzing trade..."
+res.innerHTML="Analyzing..."
 
 try{
 
-let prices=await getHistory(ticker)
+let p=await getHistory(ticker)
 
-let price=prices[0]
+let price=p[0]
 
-let ma20=average(prices.slice(0,20))
-let ma50=average(prices.slice(0,50))
+let ma20=avg(p.slice(0,20))
+let ma50=avg(p.slice(0,50))
 
-let direction="NEUTRAL"
+let dir="NEUTRAL"
 let style="neutral"
 
-if(price>ma20 && ma20>ma50){direction="CALL";style="bull"}
-if(price<ma20 && ma20<ma50){direction="PUT";style="bear"}
+if(price>ma20 && ma20>ma50){dir="CALL";style="bull"}
+if(price<ma20 && ma20<ma50){dir="PUT";style="bear"}
 
 let momentum=Math.abs(price-ma20)
 
-let confidence=Math.min(95,Math.round(momentum/price*400+60))
+let conf=Math.min(95,Math.round(momentum/price*400+60))
 
-let probabilityITM=Math.round(confidence*0.75)
+let prob=Math.round(conf*0.75)
 
-let momentumStrength=momentum>price*0.02?"Strong":"Moderate"
+let vol=std(p.slice(0,20))
 
-let trendDirection=ma20>ma50?"Bullish":"Bearish"
-
-let volatility=stdDev(prices.slice(0,20))
-
-let volState=volatility>price*0.02?"Expanding":"Stable"
-
-let gammaPressure=momentum>price*0.03?"High":"Normal"
-
-let premiumRisk=volatility>price*0.025?"High":"Medium"
-
-let expectedMove=(price*0.02).toFixed(2)
-
-let atm=Math.round(price)
-
-let callStrike=Math.round(price+1)
-let putStrike=Math.round(price-1)
+let expected=(price*0.02).toFixed(2)
 
 let risk=account*0.02
-let optionCost=price*0.1
+let contractCost=price*0.1
+let contracts=Math.max(1,Math.floor(risk/contractCost))
 
-let contracts=Math.max(1,Math.floor(risk/optionCost))
+let rating=grade(conf)
 
-let rating=grade(confidence)
+let decision=tradeDecision(dir,conf)
 
-let decision=tradeDecision(direction,confidence)
+let chain=optionChain(price,dir)
 
-let pullbackEntry=(price*0.995).toFixed(2)
-let breakoutEntry=(price*1.005).toFixed(2)
+let pull=(price*0.995).toFixed(2)
+let breakout=(price*1.005).toFixed(2)
 
-results.innerHTML=
+res.innerHTML=
 
 `<div class="card">
 
@@ -369,7 +344,7 @@ results.innerHTML=
 
 <br><br>
 
-Market Bias: <span class="${style}">${direction}</span>
+Market Bias: <span class="${style}">${dir}</span>
 
 <br>
 
@@ -377,51 +352,43 @@ Trade Decision: <strong>${decision}</strong>
 
 <br><br>
 
-Confidence: ${confidence}%
+Confidence: ${conf}%
 
 <br>
 
-Trade Rating: <span class="${rating.c}">${rating.g}</span>
+Trade Rating: <span class="${rating[1]}">${rating[0]}</span>
+
+<br>
+
+Probability ITM: ${prob}%
 
 <br><br>
 
-Probability ITM: ${probabilityITM}%
+Volatility: ${vol>price*0.02?"Expanding":"Stable"}
 
 <br>
 
-Momentum: ${momentumStrength}
-
-<br>
-
-Trend: ${trendDirection}
+Expected Move: $${expected}
 
 <br><br>
 
-Volatility: ${volState}
+Recommended Contract
 
 <br>
 
-Gamma Pressure: ${gammaPressure}
+Strike: ${chain.strike} ${dir}
 
 <br>
 
-Premium Risk: ${premiumRisk}
-
-<br><br>
-
-Expected Move: $${expectedMove}
-
-<br><br>
-
-ATM Strike: $${atm}
+Delta: ${chain.delta}
 
 <br>
 
-Best CALL Strike: $${callStrike}
+Expiration: ${chain.expiration}
 
 <br>
 
-Best PUT Strike: $${putStrike}
+Open Interest Strength: ${chain.oi}
 
 <br><br>
 
@@ -435,15 +402,11 @@ Max Risk: $${risk.toFixed(2)}
 
 <div class="entry">
 
-Entry Timing
+Pullback Entry: $${pull}
 
 <br>
 
-Pullback Entry: $${pullbackEntry}
-
-<br>
-
-Breakout Entry: $${breakoutEntry}
+Breakout Entry: $${breakout}
 
 </div>
 
@@ -453,7 +416,7 @@ Breakout Entry: $${breakoutEntry}
 
 catch{
 
-results.innerHTML="<div class='card'>API limit reached or ticker unavailable</div>"
+res.innerHTML="<div class='card'>API limit reached or ticker unavailable</div>"
 
 }
 
