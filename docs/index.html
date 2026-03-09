@@ -107,59 +107,32 @@ const API_KEY="OHCJWFQEFSXI8IJ3"
 
 const watchlist=["SPY","QQQ","NVDA","TSLA","AAPL","AMD","META"]
 
-async function getPrice(symbol){
+async function getHistory(symbol){
 
-const url=`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`
+const url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
 
 const r=await fetch(url)
-
 const data=await r.json()
 
-if(!data["Global Quote"]) throw "No data"
+const series=data["Time Series (Daily)"]
 
-return parseFloat(data["Global Quote"]["05. price"])
+if(!series) throw "no data"
+
+let prices=[]
+
+for(let d in series){
+
+prices.push(parseFloat(series[d]["4. close"]))
 
 }
 
-function generateSignal(){
+return prices.slice(0,60)
 
-let rsi=Math.random()*40+30
-let momentum=Math.random()*2-1
-let trend=Math.random()
-
-let direction="WAIT"
-let style="wait"
-
-if(momentum>0.3 && rsi<70){direction="CALL";style="bull"}
-else if(momentum<-0.3 && rsi>30){direction="PUT";style="bear"}
-
-let confidence=Math.round(Math.abs(momentum)*40+(trend*30))
-confidence=Math.min(95,Math.max(45,confidence))
-
-let probabilityITM=Math.round(confidence*0.75)
-
-let momentumStrength="Neutral"
-if(Math.abs(momentum)>0.6) momentumStrength="Strong"
-else if(Math.abs(momentum)>0.35) momentumStrength="Moderate"
-
-let trendDirection=trend>0.5?"Bullish":"Bearish"
-
-let decayRisk="Medium"
-if(probabilityITM>65) decayRisk="Low"
-if(probabilityITM<50) decayRisk="High"
-
-let newsRisk=Math.random()>0.8
-
-return{
-direction,
-style,
-confidence,
-probabilityITM,
-momentumStrength,
-trendDirection,
-decayRisk,
-newsRisk
 }
+
+function average(arr){
+
+return arr.reduce((a,b)=>a+b)/arr.length
 
 }
 
@@ -181,17 +154,30 @@ for(let s of watchlist){
 
 try{
 
-let price=await getPrice(s)
+let prices=await getHistory(s)
 
-let signal=generateSignal()
+let ma20=average(prices.slice(0,20))
+let ma50=average(prices.slice(0,50))
 
-setups.push({symbol:s,signal})
+let price=prices[0]
+
+let direction="WAIT"
+let style="wait"
+
+if(price>ma20 && ma20>ma50){direction="CALL";style="bull"}
+if(price<ma20 && ma20<ma50){direction="PUT";style="bear"}
+
+let momentum=Math.abs(price-ma20)
+
+let confidence=Math.min(95,Math.round(momentum/price*400+60))
+
+setups.push({symbol:s,direction,confidence})
 
 }catch{}
 
 }
 
-setups.sort((a,b)=>b.signal.confidence-a.signal.confidence)
+setups.sort((a,b)=>b.confidence-a.confidence)
 
 let html="<div class='card scan'><strong>AI TOP TRADES TODAY</strong><br><br>"
 
@@ -199,7 +185,7 @@ for(let i=0;i<Math.min(5,setups.length);i++){
 
 let s=setups[i]
 
-html+=`${i+1}. ${s.symbol} — ${s.signal.direction} — ${s.signal.confidence}% confidence<br>`
+html+=`${i+1}. ${s.symbol} — ${s.direction} — ${s.confidence}%<br>`
 
 }
 
@@ -229,8 +215,6 @@ let setups=[]
 for(let s of watchlist){
 
 try{
-
-let price=await getPrice(s)
 
 let flow=generateFlow()
 
@@ -270,33 +254,46 @@ results.innerHTML="Analyzing trade..."
 
 try{
 
-const price=await getPrice(ticker)
+let prices=await getHistory(ticker)
 
-let signal=generateSignal()
+let price=prices[0]
 
-let rating=grade(signal.confidence)
+let ma20=average(prices.slice(0,20))
+let ma50=average(prices.slice(0,50))
+
+let direction="WAIT"
+let style="wait"
+
+if(price>ma20 && ma20>ma50){direction="CALL";style="bull"}
+if(price<ma20 && ma20<ma50){direction="PUT";style="bear"}
+
+let momentum=Math.abs(price-ma20)
+
+let confidence=Math.min(95,Math.round(momentum/price*400+60))
+
+let probabilityITM=Math.round(confidence*0.75)
+
+let momentumStrength=momentum>price*0.02?"Strong":"Moderate"
+
+let trendDirection=ma20>ma50?"Bullish":"Bearish"
+
+let decayRisk=probabilityITM>65?"Low":"Medium"
 
 let expectedMove=(price*0.02).toFixed(2)
 
 let atm=Math.round(price)
 
-let callStrike=Math.round(price+(expiry==2?2:1))
-let putStrike=Math.round(price-(expiry==2?2:1))
+let callStrike=Math.round(price+1)
+let putStrike=Math.round(price-1)
 
 let risk=account*0.02
 let optionCost=price*0.1
 let contracts=Math.max(1,Math.floor(risk/optionCost))
 
-let action="WAIT"
-if(signal.confidence>75 && signal.direction!="WAIT")action="ENTER"
+let rating=grade(confidence)
 
 let pullbackEntry=(price*0.995).toFixed(2)
 let breakoutEntry=(price*1.005).toFixed(2)
-
-let newsWarning=""
-if(signal.newsRisk){
-newsWarning="<br><span class='warn'>⚠ Earnings / Breaking News Volatility Possible</span><br>"
-}
 
 results.innerHTML=
 
@@ -310,30 +307,34 @@ Price: $${price.toFixed(2)}
 
 <br>
 
-AI Direction: <span class="${signal.style}">${signal.direction}</span>
+AI Direction: <span class="${style}">${direction}</span>
 
 <br>
-Confidence: ${signal.confidence}%
+
+Confidence: ${confidence}%
 
 <br>
+
 Trade Rating: <span class="${rating.c}">${rating.g}</span>
 
 <br><br>
 
-Probability ITM: ${signal.probabilityITM}%
+Probability ITM: ${probabilityITM}%
 
 <br>
-Momentum: ${signal.momentumStrength}
+
+Momentum: ${momentumStrength}
 
 <br>
-Trend: ${signal.trendDirection}
+
+Trend: ${trendDirection}
 
 <br>
-Decay Risk: ${signal.decayRisk}
 
-${newsWarning}
+Decay Risk: ${decayRisk}
 
 <br>
+
 Expected Move: $${expectedMove}
 
 <br><br>
@@ -341,9 +342,11 @@ Expected Move: $${expectedMove}
 ATM Strike: $${atm}
 
 <br>
+
 Best CALL Strike: $${callStrike}
 
 <br>
+
 Best PUT Strike: $${putStrike}
 
 <br><br>
@@ -351,6 +354,7 @@ Best PUT Strike: $${putStrike}
 Suggested Contracts: ${contracts}
 
 <br>
+
 Max Risk: $${risk.toFixed(2)}
 
 <br><br>
@@ -360,16 +364,14 @@ Max Risk: $${risk.toFixed(2)}
 Entry Timing
 
 <br>
+
 Pullback Entry: $${pullbackEntry}
 
 <br>
+
 Breakout Entry: $${breakoutEntry}
 
 </div>
-
-<br>
-
-Action: <strong>${action}</strong>
 
 </div>`
 
@@ -377,7 +379,7 @@ Action: <strong>${action}</strong>
 
 catch{
 
-results.innerHTML="<div class='card'>Price unavailable or API limit reached</div>"
+results.innerHTML="<div class='card'>API limit reached or ticker unavailable</div>"
 
 }
 
