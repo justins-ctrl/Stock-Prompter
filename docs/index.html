@@ -58,7 +58,7 @@ font-size:18px;
 
 .bull{color:#22c55e;font-weight:bold;}
 .bear{color:#ef4444;font-weight:bold;}
-.wait{color:#9ca3af;font-weight:bold;}
+.neutral{color:#9ca3af;font-weight:bold;}
 
 .gradeA{color:#00ffc3;font-weight:bold;}
 .gradeB{color:#facc15;font-weight:bold;}
@@ -131,8 +131,16 @@ return prices.slice(0,60)
 }
 
 function average(arr){
-
 return arr.reduce((a,b)=>a+b)/arr.length
+}
+
+function stdDev(arr){
+
+let avg=average(arr)
+
+let squareDiffs=arr.map(v=>Math.pow(v-avg,2))
+
+return Math.sqrt(average(squareDiffs))
 
 }
 
@@ -146,6 +154,16 @@ return{g:"C",c:"gradeC"}
 
 }
 
+function tradeDecision(direction,confidence){
+
+if(confidence>75 && direction=="CALL") return "BUY CALL"
+if(confidence>75 && direction=="PUT") return "BUY PUT"
+if(confidence>60) return "WATCH"
+
+return "WAIT"
+
+}
+
 async function buildTradeBoard(){
 
 let setups=[]
@@ -156,16 +174,15 @@ try{
 
 let prices=await getHistory(s)
 
+let price=prices[0]
+
 let ma20=average(prices.slice(0,20))
 let ma50=average(prices.slice(0,50))
 
-let price=prices[0]
+let direction="NEUTRAL"
 
-let direction="WAIT"
-let style="wait"
-
-if(price>ma20 && ma20>ma50){direction="CALL";style="bull"}
-if(price<ma20 && ma20<ma50){direction="PUT";style="bear"}
+if(price>ma20 && ma20>ma50) direction="CALL"
+if(price<ma20 && ma20<ma50) direction="PUT"
 
 let momentum=Math.abs(price-ma20)
 
@@ -214,13 +231,9 @@ let setups=[]
 
 for(let s of watchlist){
 
-try{
-
 let flow=generateFlow()
 
 setups.push({symbol:s,flow})
-
-}catch{}
 
 }
 
@@ -246,7 +259,6 @@ async function scanTrade(){
 
 const ticker=document.getElementById("ticker").value.toUpperCase()
 const account=Number(document.getElementById("account").value||5000)
-const expiry=Number(document.getElementById("expiry").value)
 
 const results=document.getElementById("results")
 
@@ -261,8 +273,8 @@ let price=prices[0]
 let ma20=average(prices.slice(0,20))
 let ma50=average(prices.slice(0,50))
 
-let direction="WAIT"
-let style="wait"
+let direction="NEUTRAL"
+let style="neutral"
 
 if(price>ma20 && ma20>ma50){direction="CALL";style="bull"}
 if(price<ma20 && ma20<ma50){direction="PUT";style="bear"}
@@ -277,7 +289,13 @@ let momentumStrength=momentum>price*0.02?"Strong":"Moderate"
 
 let trendDirection=ma20>ma50?"Bullish":"Bearish"
 
-let decayRisk=probabilityITM>65?"Low":"Medium"
+let volatility=stdDev(prices.slice(0,20))
+
+let volState=volatility>price*0.02?"Expanding":"Stable"
+
+let gammaPressure=momentum>price*0.03?"High":"Normal"
+
+let premiumRisk=volatility>price*0.025?"High":"Medium"
 
 let expectedMove=(price*0.02).toFixed(2)
 
@@ -288,9 +306,12 @@ let putStrike=Math.round(price-1)
 
 let risk=account*0.02
 let optionCost=price*0.1
+
 let contracts=Math.max(1,Math.floor(risk/optionCost))
 
 let rating=grade(confidence)
+
+let decision=tradeDecision(direction,confidence)
 
 let pullbackEntry=(price*0.995).toFixed(2)
 let breakoutEntry=(price*1.005).toFixed(2)
@@ -303,13 +324,13 @@ results.innerHTML=
 
 <br><br>
 
-Price: $${price.toFixed(2)}
+Market Bias: <span class="${style}">${direction}</span>
 
 <br>
 
-AI Direction: <span class="${style}">${direction}</span>
+Trade Decision: <strong>${decision}</strong>
 
-<br>
+<br><br>
 
 Confidence: ${confidence}%
 
@@ -329,11 +350,19 @@ Momentum: ${momentumStrength}
 
 Trend: ${trendDirection}
 
+<br><br>
+
+Volatility: ${volState}
+
 <br>
 
-Decay Risk: ${decayRisk}
+Gamma Pressure: ${gammaPressure}
 
 <br>
+
+Premium Risk: ${premiumRisk}
+
+<br><br>
 
 Expected Move: $${expectedMove}
 
