@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<title>AI Options Terminal V11</title>
+<title>AI Options Terminal V12</title>
 
 <style>
 
@@ -14,7 +14,7 @@ padding:20px;
 }
 
 .container{
-max-width:600px;
+max-width:700px;
 margin:auto;
 }
 
@@ -44,7 +44,7 @@ background:#1c6fd1;
 
 #output{
 margin-top:20px;
-padding:10px;
+padding:15px;
 background:#121826;
 border-radius:8px;
 }
@@ -66,7 +66,7 @@ padding:6px;
 
 <div class="container">
 
-<h2>AI Options Terminal V11</h2>
+<h2>AI Options Terminal V12</h2>
 
 <input id="ticker" placeholder="Enter Ticker">
 
@@ -85,8 +85,11 @@ const API_KEY="OHCJWFQEFSXI8IJ3"
 let output=document.getElementById("output")
 
 const watchlist=[
-"SPY","QQQ","NVDA","TSLA",
-"AAPL","AMD","META","NFLX","COIN"
+"SPY","QQQ","NVDA","TSLA","AAPL",
+"AMD","META","NFLX","COIN","MSFT",
+"AMZN","GOOGL","SMCI","PLTR","INTC",
+"CRM","ORCL","BA","DIS","SHOP",
+"UBER","SNOW","ADBE","PYPL","SQ"
 ]
 
 async function getData(symbol){
@@ -94,7 +97,6 @@ async function getData(symbol){
 let url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
 
 let r=await fetch(url)
-
 let d=await r.json()
 
 let s=d["Time Series (Daily)"]
@@ -139,6 +141,25 @@ return sum/period
 
 }
 
+function macd(prices){
+
+let short=sma(prices,12)
+let long=sma(prices,26)
+
+return short-long
+
+}
+
+function vwap(prices){
+
+let sum=0
+
+for(let p of prices) sum+=p
+
+return sum/prices.length
+
+}
+
 function analyze(prices){
 
 let latest=prices[0]
@@ -147,17 +168,36 @@ let r=rsi(prices)
 
 let sma20=sma(prices,20)
 
+let m=macd(prices)
+
+let v=vwap(prices)
+
 let bias="Neutral"
 
-if(latest>sma20 && r>55) bias="Bullish"
+if(latest>sma20 && r>55 && m>0) bias="Bullish"
 
-if(latest<sma20 && r<45) bias="Bearish"
+if(latest<sma20 && r<45 && m<0) bias="Bearish"
 
 let signal="Wait"
 
 if(bias=="Bullish") signal="Buy Calls"
 
 if(bias=="Bearish") signal="Buy Puts"
+
+let score=50
+
+if(bias=="Bullish") score+=20
+if(bias=="Bearish") score+=20
+
+if(r>60 || r<40) score+=10
+if(m>0) score+=10
+
+let pop=Math.min(90,score)
+
+let confidence="Medium"
+
+if(score>80) confidence="High"
+if(score<60) confidence="Low"
 
 return{
 
@@ -167,9 +207,19 @@ rsi:r.toFixed(1),
 
 sma:sma20.toFixed(2),
 
+macd:m.toFixed(2),
+
+vwap:v.toFixed(2),
+
 bias:bias,
 
-signal:signal
+signal:signal,
+
+score:score,
+
+pop:pop,
+
+confidence:confidence
 
 }
 
@@ -179,7 +229,7 @@ async function scan(){
 
 let symbol=document.getElementById("ticker").value.toUpperCase()
 
-output.innerHTML="Scanning..."
+output.innerHTML="Running AI analysis..."
 
 let prices=await getData(symbol)
 
@@ -205,9 +255,19 @@ output.innerHTML=`
 
 <tr><td>SMA20</td><td>${a.sma}</td></tr>
 
+<tr><td>MACD</td><td>${a.macd}</td></tr>
+
+<tr><td>VWAP</td><td>${a.vwap}</td></tr>
+
 <tr><td>Bias</td><td>${a.bias}</td></tr>
 
-<tr><td>Signal</td><td>${a.signal}</td></tr>
+<tr><td>Options Signal</td><td>${a.signal}</td></tr>
+
+<tr><td>AI Trade Score</td><td>${a.score}/100</td></tr>
+
+<tr><td>Probability of Profit</td><td>${a.pop}%</td></tr>
+
+<tr><td>Confidence</td><td>${a.confidence}</td></tr>
 
 </table>
 
@@ -217,7 +277,7 @@ output.innerHTML=`
 
 async function marketScan(){
 
-output.innerHTML="Scanning watchlist..."
+output.innerHTML="AI scanning market..."
 
 let results=[]
 
@@ -233,18 +293,19 @@ results.push({symbol:s,...a})
 
 }
 
-let html=`<table>`
+results.sort((a,b)=>b.score-a.score)
 
-for(let r of results){
+let html=`<h3>Top AI Setups</h3><table>`
+
+for(let r of results.slice(0,10)){
 
 html+=`
 
 <tr>
 
 <td>${r.symbol}</td>
-
 <td>${r.signal}</td>
-
+<td>${r.score}</td>
 <td>${r.bias}</td>
 
 </tr>
@@ -262,5 +323,4 @@ output.innerHTML=html
 </script>
 
 </body>
-
 </html>
