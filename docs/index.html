@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>AI Options Terminal V10</title>
+<title>AI Options Terminal V11</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -57,7 +57,7 @@ padding:6px;
 
 <div class="container">
 
-<h2>AI Options Terminal V10</h2>
+<h2>AI Options Terminal V11</h2>
 
 <input id="ticker" placeholder="Enter Ticker">
 
@@ -89,7 +89,7 @@ let s=d["Time Series (Daily)"]
 if(!s) return null
 
 let closes=Object.values(s)
-.slice(0,50)
+.slice(0,60)
 .map(x=>parseFloat(x["4. close"]))
 
 let price=closes[0]
@@ -112,21 +112,42 @@ let confidence=Math.min(95,Math.abs(momentum*100)+50)
 
 let probITM=Math.min(80,Math.abs(momentum*120)+40)
 
-let pop=Math.min(85,probITM+5)
+let pop=Math.min(90,probITM+8)
 
 let volEngine=
-Math.abs(momentum)>0.035?"High IV":
-Math.abs(momentum)>0.02?"Rising IV":
+Math.abs(momentum)>0.04?"High IV":
+Math.abs(momentum)>0.025?"Rising IV":
 "Normal IV"
 
 let smartMoney=
-Math.abs(momentum)>0.04?
+Math.abs(momentum)>0.045?
 "Institutional Momentum Detected":
 "No unusual activity"
 
-let tradeScore=Math.min(100,
-confidence*0.6 +
-(probITM*0.4)
+let rsi = calcRSI(closes)
+
+let macd = calcMACD(closes)
+
+let atr = calcATR(closes)
+
+let regime="Choppy"
+
+if(momentum>0.03) regime="Trending Up"
+if(momentum<-0.03) regime="Trending Down"
+
+let gammaPressure =
+Math.abs(momentum)>0.05?
+"Possible Gamma Squeeze Zone":
+"Normal Dealer Positioning"
+
+let nextDayProb =
+50 + momentum*500
+
+let tradeScore = Math.min(100,
+(confidence*0.3) +
+(probITM*0.25) +
+(pop*0.25) +
+((rsi/100)*20)
 )
 
 return{
@@ -139,7 +160,13 @@ probITM,
 pop,
 volEngine,
 smartMoney,
-tradeScore
+tradeScore,
+rsi,
+macd,
+atr,
+regime,
+gammaPressure,
+nextDayProb
 }
 
 }
@@ -163,7 +190,9 @@ let otm2=d.direction=="CALL"?atm+4:atm-4
 output.innerHTML=`
 
 <div class="card">
+
 <b>${d.symbol}</b><br>
+
 Price: $${d.price.toFixed(2)}<br>
 
 Market Bias:
@@ -182,37 +211,71 @@ d.direction=="PUT"?"BUY PUT":"WAIT"}
 </b><br>
 
 Confidence: ${d.confidence.toFixed(0)}%<br>
+
 Probability ITM: ${d.probITM.toFixed(0)}%<br>
+
 Probability of Profit: ${d.pop.toFixed(0)}%
+
 </div>
 
 <div class="card">
+
 <b>AI Trade Score</b><br>
+
 ${d.tradeScore.toFixed(0)}/100
+
 </div>
 
 <div class="card">
-<b>Volatility Engine</b><br>
-${d.volEngine}
+
+<b>Indicator Engine</b><br>
+
+RSI: ${d.rsi.toFixed(0)}<br>
+MACD: ${d.macd}<br>
+ATR: ${d.atr.toFixed(2)}
+
 </div>
 
 <div class="card">
-<b>Smart Money Detection</b><br>
-${d.smartMoney}
+
+<b>Market Regime</b><br>
+
+${d.regime}
+
 </div>
 
 <div class="card">
+
+<b>Gamma Pressure</b><br>
+
+${d.gammaPressure}
+
+</div>
+
+<div class="card">
+
+<b>Next Day Direction Probability</b><br>
+
+${d.nextDayProb.toFixed(0)}%
+
+</div>
+
+<div class="card">
+
 Expected Move: ±$${(d.price*0.04).toFixed(2)}<br><br>
 
 Smart Strikes<br>
+
 ATM: ${atm}<br>
 1 OTM: ${otm1}<br>
 2 OTM: ${otm2}<br><br>
 
 Suggested Expiration: 7–14 Days
+
 </div>
 
 <div class="card">
+
 Execution Plan<br><br>
 
 Pullback Entry: $${(d.price*0.99).toFixed(2)}<br>
@@ -220,6 +283,7 @@ Breakout Entry: $${(d.price*1.01).toFixed(2)}<br><br>
 
 Profit Target: +50%<br>
 Stop Loss: -30%
+
 </div>
 
 `
@@ -284,6 +348,32 @@ output.innerHTML=table
 
 function avg(arr){
 return arr.reduce((a,b)=>a+b,0)/arr.length
+}
+
+function calcRSI(data){
+let gains=0
+let losses=0
+for(let i=1;i<14;i++){
+let diff=data[i-1]-data[i]
+if(diff>0) gains+=diff
+else losses+=Math.abs(diff)
+}
+let rs=gains/losses
+return 100-(100/(1+rs))
+}
+
+function calcMACD(data){
+let short=avg(data.slice(0,12))
+let long=avg(data.slice(0,26))
+return short>long?"Bullish":"Bearish"
+}
+
+function calcATR(data){
+let moves=[]
+for(let i=1;i<14;i++){
+moves.push(Math.abs(data[i]-data[i-1]))
+}
+return avg(moves)
 }
 
 </script>
