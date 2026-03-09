@@ -13,7 +13,7 @@ body{
 background:#0e1117;
 font-family:-apple-system,BlinkMacSystemFont,sans-serif;
 color:white;
-padding:25px;
+padding:20px;
 text-align:center;
 }
 
@@ -24,13 +24,13 @@ margin:auto;
 
 h1{
 color:#22c55e;
-font-size:32px;
+font-size:30px;
 margin-bottom:20px;
 }
 
 input,select,button{
 width:100%;
-padding:18px;
+padding:16px;
 margin-top:12px;
 border-radius:10px;
 border:none;
@@ -70,6 +70,8 @@ line-height:1.7;
 .gradeC{color:#9ca3af;font-weight:bold;}
 
 .warn{color:#ff8c00;font-weight:bold;}
+
+.entry{color:#60a5fa;font-weight:bold;}
 
 </style>
 
@@ -262,6 +264,10 @@ newsWarning="<br><span class='warn'>⚠ Earnings / Breaking News Volatility Poss
 
 }
 
+let pullbackEntry=(price*0.995).toFixed(2)
+
+let breakoutEntry=(price*1.005).toFixed(2)
+
 results.innerHTML=
 
 `<div class="card">
@@ -327,6 +333,22 @@ Suggested Contracts: ${contracts}
 Max Risk: $${risk.toFixed(2)}
 
 <br><br>
+
+<div class="entry">
+
+Entry Timing
+
+<br>
+
+Pullback Entry: $${pullbackEntry}
+
+<br>
+
+Breakout Entry: $${breakoutEntry}
+
+</div>
+
+<br>
 
 Action: <strong>${action}</strong>
 
