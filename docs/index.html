@@ -28,7 +28,7 @@ font-size:30px;
 margin-bottom:20px;
 }
 
-input,select,button{
+button,input,select{
 width:100%;
 padding:16px;
 margin-top:12px;
@@ -51,14 +51,9 @@ font-weight:bold;
 .card{
 background:#161b22;
 padding:22px;
-margin-top:25px;
+margin-top:20px;
 border-radius:14px;
 font-size:18px;
-}
-
-.scan{
-text-align:left;
-line-height:1.7;
 }
 
 .bull{color:#22c55e;font-weight:bold;}
@@ -69,8 +64,10 @@ line-height:1.7;
 .gradeB{color:#facc15;font-weight:bold;}
 .gradeC{color:#9ca3af;font-weight:bold;}
 
-.warn{color:#ff8c00;font-weight:bold;}
 .entry{color:#60a5fa;font-weight:bold;}
+.warn{color:#ff8c00;font-weight:bold;}
+
+.scan{text-align:left;line-height:1.7}
 
 </style>
 
@@ -82,7 +79,9 @@ line-height:1.7;
 
 <h1>Trade Prompter Elite</h1>
 
-<button onclick="scanMarket()">Scan Market Opportunities</button>
+<div id="tradeBoard"></div>
+
+<button onclick="scanMarket()">Scan Options Heatmap</button>
 
 <div id="scanner"></div>
 
@@ -164,15 +163,6 @@ newsRisk
 
 }
 
-function generateFlow(){
-
-let strength=Math.floor(Math.random()*40)+60
-let type=Math.random()>0.5?"CALL FLOW":"PUT FLOW"
-
-return {type,strength}
-
-}
-
 function grade(conf){
 
 if(conf>=80)return{g:"A+",c:"gradeA"}
@@ -180,6 +170,51 @@ if(conf>=70)return{g:"A",c:"gradeA"}
 if(conf>=60)return{g:"B",c:"gradeB"}
 
 return{g:"C",c:"gradeC"}
+
+}
+
+async function buildTradeBoard(){
+
+let setups=[]
+
+for(let s of watchlist){
+
+try{
+
+let price=await getPrice(s)
+
+let signal=generateSignal()
+
+setups.push({symbol:s,signal})
+
+}catch{}
+
+}
+
+setups.sort((a,b)=>b.signal.confidence-a.signal.confidence)
+
+let html="<div class='card scan'><strong>AI TOP TRADES TODAY</strong><br><br>"
+
+for(let i=0;i<Math.min(5,setups.length);i++){
+
+let s=setups[i]
+
+html+=`${i+1}. ${s.symbol} — ${s.signal.direction} — ${s.signal.confidence}% confidence<br>`
+
+}
+
+html+="</div>"
+
+document.getElementById("tradeBoard").innerHTML=html
+
+}
+
+function generateFlow(){
+
+let strength=Math.floor(Math.random()*40)+60
+let type=Math.random()>0.5?"CALL FLOW":"PUT FLOW"
+
+return {type,strength}
 
 }
 
@@ -197,11 +232,9 @@ try{
 
 let price=await getPrice(s)
 
-let signal=generateSignal()
-
 let flow=generateFlow()
 
-setups.push({symbol:s,price,signal,flow})
+setups.push({symbol:s,flow})
 
 }catch{}
 
@@ -228,9 +261,7 @@ scanner.innerHTML=html
 async function scanTrade(){
 
 const ticker=document.getElementById("ticker").value.toUpperCase()
-
 const account=Number(document.getElementById("account").value||5000)
-
 const expiry=Number(document.getElementById("expiry").value)
 
 const results=document.getElementById("results")
@@ -277,7 +308,7 @@ results.innerHTML=
 
 Price: $${price.toFixed(2)}
 
-<br><br>
+<br>
 
 AI Direction: <span class="${signal.style}">${signal.direction}</span>
 
@@ -351,6 +382,8 @@ results.innerHTML="<div class='card'>Price unavailable or API limit reached</div
 }
 
 }
+
+buildTradeBoard()
 
 </script>
 
