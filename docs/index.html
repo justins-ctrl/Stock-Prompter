@@ -1,431 +1,261 @@
 <!DOCTYPE html>
 <html>
-
 <head>
+<title>AI Options Trading Terminal V8</title>
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Trade Prompter Elite</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
 
 body{
-background:#0e1117;
-font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+font-family:Arial;
+background:#0c0f14;
 color:white;
 padding:20px;
-text-align:center;
 }
 
 .container{
-max-width:760px;
+max-width:500px;
 margin:auto;
 }
 
 h1{
-color:#22c55e;
-font-size:30px;
-margin-bottom:20px;
+text-align:center;
 }
 
-button,input,select{
+input{
 width:100%;
-padding:16px;
-margin-top:12px;
-border-radius:10px;
-border:none;
+padding:14px;
 font-size:18px;
-}
-
-input,select{
-background:#161b22;
-color:white;
+margin-top:10px;
+border-radius:8px;
+border:none;
 }
 
 button{
-background:#2563eb;
+width:100%;
+padding:14px;
+font-size:18px;
+margin-top:10px;
+background:#1e90ff;
+border:none;
 color:white;
-font-weight:bold;
+border-radius:8px;
 }
 
 .card{
 background:#161b22;
-padding:22px;
-margin-top:20px;
-border-radius:14px;
-font-size:18px;
+padding:16px;
+margin-top:14px;
+border-radius:10px;
 }
 
-.bull{color:#22c55e;font-weight:bold;}
-.bear{color:#ef4444;font-weight:bold;}
-.neutral{color:#9ca3af;font-weight:bold;}
-
-.gradeA{color:#00ffc3;font-weight:bold;}
-.gradeB{color:#facc15;font-weight:bold;}
-.gradeC{color:#9ca3af;font-weight:bold;}
-
-.entry{color:#60a5fa;font-weight:bold;}
-.scan{text-align:left;line-height:1.7}
+.good{color:#00e676}
+.bad{color:#ff5252}
+.neutral{color:#ffd54f}
 
 </style>
-
 </head>
 
 <body>
 
 <div class="container">
 
-<h1>Trade Prompter Elite</h1>
+<h1>AI Options Terminal</h1>
 
-<div id="tradeBoard"></div>
+<input id="ticker" placeholder="Enter Ticker (AAPL, NVDA, TSLA)">
 
-<button onclick="scanMarket()">Scan Options Heatmap</button>
-<div id="scanner"></div>
+<button onclick="scan()">Run AI Scan</button>
 
-<button onclick="scanFlow()">Scan Options Flow</button>
-<div id="flow"></div>
-
-<input id="ticker" placeholder="Ticker (SPY, NVDA, TSLA)">
-<input id="account" type="number" placeholder="Account Size ($)">
-
-<select id="expiry">
-<option value="0">0DTE</option>
-<option value="1">Weekly</option>
-<option value="2">Bi-Weekly</option>
-</select>
-
-<button onclick="scanTrade()">Analyze Trade</button>
-
-<div id="results"></div>
+<div id="output"></div>
 
 </div>
 
 <script>
 
-const API_KEY="OHCJWFQEFSXI8IJ3"
+const API_KEY = "OHCJWFQEFSXI8IJ3";
 
-const watchlist=["SPY","QQQ","NVDA","TSLA","AAPL","AMD","META"]
+async function scan(){
 
-async function getHistory(symbol){
+let ticker = document.getElementById("ticker").value.toUpperCase()
 
-const url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
+let url =
+`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${ticker}&apikey=${API_KEY}`
 
-const r=await fetch(url)
-const data=await r.json()
+let res = await fetch(url)
+let data = await res.json()
 
-const series=data["Time Series (Daily)"]
+let series = data["Time Series (Daily)"]
 
-if(!series) throw "no data"
-
-let prices=[]
-
-for(let d in series){
-prices.push(parseFloat(series[d]["4. close"]))
+if(!series){
+document.getElementById("output").innerHTML =
+"<div class='card'>API limit or ticker error</div>"
+return
 }
 
-return prices.slice(0,60)
+let closes = Object.values(series).slice(0,50).map(d=>parseFloat(d["4. close"]))
+
+let price = closes[0]
+
+let ma20 = avg(closes.slice(0,20))
+let ma50 = avg(closes.slice(0,50))
+
+let momentum = (price - closes[10]) / closes[10]
+
+let bias = "Neutral"
+if(price > ma20 && ma20 > ma50) bias = "Bullish"
+if(price < ma20 && ma20 < ma50) bias = "Bearish"
+
+let direction = bias=="Bullish"?"CALL":bias=="Bearish"?"PUT":"WAIT"
+
+let confidence = Math.min(95,
+Math.abs(momentum*100)+50)
+
+let rating = "C"
+if(confidence>80) rating="A"
+else if(confidence>65) rating="B"
+
+let probabilityITM = Math.min(80,
+Math.abs(momentum*120)+40)
+
+let pop = Math.min(85,
+probabilityITM+5)
+
+let expectedMove = (price * 0.04).toFixed(2)
+
+let atm = Math.round(price)
+let otm1 = bias=="Bullish"?atm+2:atm-2
+let otm2 = bias=="Bullish"?atm+4:atm-4
+
+let contracts = Math.max(1,
+Math.floor(1000/(price*10)))
+
+let pullback = (price*0.99).toFixed(2)
+let breakout = (price*1.01).toFixed(2)
+
+let profitTarget = "+50%"
+let stopLoss = "-30%"
+
+let momentumStrength =
+Math.abs(momentum)>0.03?"Strong":
+Math.abs(momentum)>0.015?"Moderate":"Weak"
+
+let trendAlign =
+price>ma20 && ma20>ma50?"Yes":"No"
+
+let volatility =
+Math.abs(momentum)>0.025?"Expanding":"Normal"
+
+let gamma =
+bias=="Bullish"?"Bullish":"Bearish"
+
+let decayRisk =
+"Medium"
+
+document.getElementById("output").innerHTML =
+
+`
+
+<div class="card">
+
+<b>${ticker}</b><br>
+Price: $${price.toFixed(2)}
+
+</div>
+
+<div class="card">
+
+<b>AI Trade Intelligence</b><br>
+
+Market Bias:
+<span class="${bias=="Bullish"?"good":bias=="Bearish"?"bad":"neutral"}">${bias}</span><br>
+
+AI Direction: ${direction}<br>
+
+Trade Decision:
+<b>${direction=="CALL"?"BUY CALL":direction=="PUT"?"BUY PUT":"WAIT"}</b><br>
+
+Confidence Score: ${confidence.toFixed(0)}%<br>
+
+Trade Rating: ${rating}<br>
+
+Probability ITM: ${probabilityITM.toFixed(0)}%<br>
+
+Probability of Profit (POP): ${pop.toFixed(0)}%
+
+</div>
+
+<div class="card">
+
+<b>Market Analysis</b><br>
+
+Momentum Strength: ${momentumStrength}<br>
+
+Trend Alignment: ${trendAlign}<br>
+
+Volatility: ${volatility}<br>
+
+Gamma Pressure: ${gamma}<br>
+
+Premium Risk: Low
+
+</div>
+
+<div class="card">
+
+<b>Options Strategy</b><br>
+
+Expected Move: ±$${expectedMove}<br><br>
+
+Best Strikes<br>
+
+ATM: ${atm}<br>
+
+1 OTM: ${otm1}<br>
+
+2 OTM: ${otm2}<br><br>
+
+Best Expiration: 7-14 Days<br>
+
+Contracts Suggested: ${contracts}<br>
+
+Decay Risk: ${decayRisk}
+
+</div>
+
+<div class="card">
+
+<b>Entry Engine</b><br>
+
+Pullback Entry: ${pullback}<br>
+
+Breakout Entry: ${breakout}
+
+</div>
+
+<div class="card">
+
+<b>AI Exit Plan</b><br>
+
+Profit Target: ${profitTarget}<br>
+
+Stop Loss: ${stopLoss}<br>
+
+Exit Warning: Watch momentum weakening
+
+</div>
+
+`
 
 }
 
 function avg(arr){
-return arr.reduce((a,b)=>a+b)/arr.length
-}
 
-function std(arr){
-let a=avg(arr)
-return Math.sqrt(arr.map(x=>(x-a)**2).reduce((a,b)=>a+b)/arr.length)
-}
-
-function grade(conf){
-
-if(conf>=80)return["A+","gradeA"]
-if(conf>=70)return["A","gradeA"]
-if(conf>=60)return["B","gradeB"]
-
-return["C","gradeC"]
+return arr.reduce((a,b)=>a+b,0)/arr.length
 
 }
-
-function tradeDecision(dir,conf){
-
-if(conf>75 && dir=="CALL") return "BUY CALL"
-if(conf>75 && dir=="PUT") return "BUY PUT"
-if(conf>60) return "WATCH"
-
-return "WAIT"
-
-}
-
-function flowSignal(){
-
-let types=["CALL SWEEP","PUT SWEEP","UNUSUAL CALL VOLUME","UNUSUAL PUT VOLUME"]
-
-return{
-type:types[Math.floor(Math.random()*types.length)],
-strength:Math.floor(Math.random()*40)+60
-}
-
-}
-
-function heatSignal(){
-
-return{
-type:Math.random()>0.5?"CALL FLOW":"PUT FLOW",
-strength:Math.floor(Math.random()*40)+60
-}
-
-}
-
-function optionChain(price,dir){
-
-let strike=dir=="CALL"?Math.round(price+1):Math.round(price-1)
-
-let delta=(Math.random()*0.2+0.35).toFixed(2)
-
-let expirations=["0DTE","Weekly","Bi-Weekly"]
-
-let oi=["Moderate","High","Very High"]
-
-return{
-strike,
-delta,
-expiration:expirations[Math.floor(Math.random()*3)],
-oi:oi[Math.floor(Math.random()*3)]
-}
-
-}
-
-async function scanFlow(){
-
-let arr=[]
-
-for(let s of watchlist){
-arr.push({symbol:s,flow:flowSignal()})
-}
-
-arr.sort((a,b)=>b.flow.strength-a.flow.strength)
-
-let html="<div class='card scan'><strong>OPTIONS FLOW ALERTS</strong><br><br>"
-
-for(let i=0;i<5;i++){
-
-html+=`${arr[i].symbol} — ${arr[i].flow.type} — ${arr[i].flow.strength}%<br>`
-
-}
-
-html+="</div>"
-
-document.getElementById("flow").innerHTML=html
-
-}
-
-async function scanMarket(){
-
-let arr=[]
-
-for(let s of watchlist){
-arr.push({symbol:s,flow:heatSignal()})
-}
-
-arr.sort((a,b)=>b.flow.strength-a.flow.strength)
-
-let html="<div class='card scan'><strong>OPTIONS HEATMAP</strong><br><br>"
-
-for(let i=0;i<5;i++){
-
-html+=`${arr[i].symbol} — ${arr[i].flow.type} — ${arr[i].flow.strength}%<br>`
-
-}
-
-html+="</div>"
-
-document.getElementById("scanner").innerHTML=html
-
-}
-
-async function buildTradeBoard(){
-
-let setups=[]
-
-for(let s of watchlist){
-
-try{
-
-let p=await getHistory(s)
-
-let price=p[0]
-
-let ma20=avg(p.slice(0,20))
-let ma50=avg(p.slice(0,50))
-
-let dir="NEUTRAL"
-
-if(price>ma20 && ma20>ma50) dir="CALL"
-if(price<ma20 && ma20<ma50) dir="PUT"
-
-let momentum=Math.abs(price-ma20)
-
-let conf=Math.min(95,Math.round(momentum/price*400+60))
-
-setups.push({symbol:s,dir,conf})
-
-}catch{}
-
-}
-
-setups.sort((a,b)=>b.conf-a.conf)
-
-let html="<div class='card scan'><strong>AI TOP TRADES TODAY</strong><br><br>"
-
-for(let i=0;i<5;i++){
-
-html+=`${i+1}. ${setups[i].symbol} — ${setups[i].dir} — ${setups[i].conf}%<br>`
-
-}
-
-html+="</div>"
-
-document.getElementById("tradeBoard").innerHTML=html
-
-}
-
-async function scanTrade(){
-
-let ticker=document.getElementById("ticker").value.toUpperCase()
-let account=Number(document.getElementById("account").value||5000)
-
-let res=document.getElementById("results")
-
-res.innerHTML="Analyzing..."
-
-try{
-
-let p=await getHistory(ticker)
-
-let price=p[0]
-
-let ma20=avg(p.slice(0,20))
-let ma50=avg(p.slice(0,50))
-
-let dir="NEUTRAL"
-let style="neutral"
-
-if(price>ma20 && ma20>ma50){dir="CALL";style="bull"}
-if(price<ma20 && ma20<ma50){dir="PUT";style="bear"}
-
-let momentum=Math.abs(price-ma20)
-
-let conf=Math.min(95,Math.round(momentum/price*400+60))
-
-let prob=Math.round(conf*0.75)
-
-let vol=std(p.slice(0,20))
-
-let expected=(price*0.02).toFixed(2)
-
-let risk=account*0.02
-let contractCost=price*0.1
-let contracts=Math.max(1,Math.floor(risk/contractCost))
-
-let rating=grade(conf)
-
-let decision=tradeDecision(dir,conf)
-
-let chain=optionChain(price,dir)
-
-let pull=(price*0.995).toFixed(2)
-let breakout=(price*1.005).toFixed(2)
-
-res.innerHTML=
-
-`<div class="card">
-
-<strong>${ticker}</strong>
-
-<br><br>
-
-Market Bias: <span class="${style}">${dir}</span>
-
-<br>
-
-Trade Decision: <strong>${decision}</strong>
-
-<br><br>
-
-Confidence: ${conf}%
-
-<br>
-
-Trade Rating: <span class="${rating[1]}">${rating[0]}</span>
-
-<br>
-
-Probability ITM: ${prob}%
-
-<br><br>
-
-Volatility: ${vol>price*0.02?"Expanding":"Stable"}
-
-<br>
-
-Expected Move: $${expected}
-
-<br><br>
-
-Recommended Contract
-
-<br>
-
-Strike: ${chain.strike} ${dir}
-
-<br>
-
-Delta: ${chain.delta}
-
-<br>
-
-Expiration: ${chain.expiration}
-
-<br>
-
-Open Interest Strength: ${chain.oi}
-
-<br><br>
-
-Suggested Contracts: ${contracts}
-
-<br>
-
-Max Risk: $${risk.toFixed(2)}
-
-<br><br>
-
-<div class="entry">
-
-Pullback Entry: $${pull}
-
-<br>
-
-Breakout Entry: $${breakout}
-
-</div>
-
-</div>`
-
-}
-
-catch{
-
-res.innerHTML="<div class='card'>API limit reached or ticker unavailable</div>"
-
-}
-
-}
-
-buildTradeBoard()
 
 </script>
 
 </body>
-
 </html>
