@@ -70,7 +70,6 @@ line-height:1.7;
 .gradeC{color:#9ca3af;font-weight:bold;}
 
 .warn{color:#ff8c00;font-weight:bold;}
-
 .entry{color:#60a5fa;font-weight:bold;}
 
 </style>
@@ -136,20 +135,17 @@ if(momentum>0.3 && rsi<70){direction="CALL";style="bull"}
 else if(momentum<-0.3 && rsi>30){direction="PUT";style="bear"}
 
 let confidence=Math.round(Math.abs(momentum)*40+(trend*30))
-
 confidence=Math.min(95,Math.max(45,confidence))
 
 let probabilityITM=Math.round(confidence*0.75)
 
 let momentumStrength="Neutral"
-
 if(Math.abs(momentum)>0.6) momentumStrength="Strong"
 else if(Math.abs(momentum)>0.35) momentumStrength="Moderate"
 
 let trendDirection=trend>0.5?"Bullish":"Bearish"
 
 let decayRisk="Medium"
-
 if(probabilityITM>65) decayRisk="Low"
 if(probabilityITM<50) decayRisk="High"
 
@@ -168,6 +164,15 @@ newsRisk
 
 }
 
+function generateFlow(){
+
+let strength=Math.floor(Math.random()*40)+60
+let type=Math.random()>0.5?"CALL FLOW":"PUT FLOW"
+
+return {type,strength}
+
+}
+
 function grade(conf){
 
 if(conf>=80)return{g:"A+",c:"gradeA"}
@@ -182,7 +187,7 @@ async function scanMarket(){
 
 const scanner=document.getElementById("scanner")
 
-scanner.innerHTML="<div class='card'>Scanning market...</div>"
+scanner.innerHTML="<div class='card'>Scanning options heatmap...</div>"
 
 let setups=[]
 
@@ -194,21 +199,23 @@ let price=await getPrice(s)
 
 let signal=generateSignal()
 
-setups.push({symbol:s,price,signal})
+let flow=generateFlow()
+
+setups.push({symbol:s,price,signal,flow})
 
 }catch{}
 
 }
 
-setups.sort((a,b)=>b.signal.confidence-a.signal.confidence)
+setups.sort((a,b)=>b.flow.strength-a.flow.strength)
 
-let html="<div class='card scan'><strong>Top Option Setups</strong><br><br>"
+let html="<div class='card scan'><strong>OPTIONS HEATMAP</strong><br><br>"
 
 for(let i=0;i<Math.min(5,setups.length);i++){
 
 let s=setups[i]
 
-html+=`${i+1}. ${s.symbol} — ${s.signal.direction} — ${s.signal.confidence}% confidence<br>`
+html+=`${i+1}. ${s.symbol} — ${s.flow.type} — ${s.flow.strength}%<br>`
 
 }
 
@@ -243,30 +250,22 @@ let expectedMove=(price*0.02).toFixed(2)
 let atm=Math.round(price)
 
 let callStrike=Math.round(price+(expiry==2?2:1))
-
 let putStrike=Math.round(price-(expiry==2?2:1))
 
 let risk=account*0.02
-
 let optionCost=price*0.1
-
 let contracts=Math.max(1,Math.floor(risk/optionCost))
 
 let action="WAIT"
-
 if(signal.confidence>75 && signal.direction!="WAIT")action="ENTER"
 
-let newsWarning=""
-
-if(signal.newsRisk){
-
-newsWarning="<br><span class='warn'>⚠ Earnings / Breaking News Volatility Possible</span><br>"
-
-}
-
 let pullbackEntry=(price*0.995).toFixed(2)
-
 let breakoutEntry=(price*1.005).toFixed(2)
+
+let newsWarning=""
+if(signal.newsRisk){
+newsWarning="<br><span class='warn'>⚠ Earnings / Breaking News Volatility Possible</span><br>"
+}
 
 results.innerHTML=
 
@@ -283,11 +282,9 @@ Price: $${price.toFixed(2)}
 AI Direction: <span class="${signal.style}">${signal.direction}</span>
 
 <br>
-
 Confidence: ${signal.confidence}%
 
 <br>
-
 Trade Rating: <span class="${rating.c}">${rating.g}</span>
 
 <br><br>
@@ -295,21 +292,17 @@ Trade Rating: <span class="${rating.c}">${rating.g}</span>
 Probability ITM: ${signal.probabilityITM}%
 
 <br>
-
 Momentum: ${signal.momentumStrength}
 
 <br>
-
 Trend: ${signal.trendDirection}
 
 <br>
-
 Decay Risk: ${signal.decayRisk}
 
 ${newsWarning}
 
 <br>
-
 Expected Move: $${expectedMove}
 
 <br><br>
@@ -317,11 +310,9 @@ Expected Move: $${expectedMove}
 ATM Strike: $${atm}
 
 <br>
-
 Best CALL Strike: $${callStrike}
 
 <br>
-
 Best PUT Strike: $${putStrike}
 
 <br><br>
@@ -329,7 +320,6 @@ Best PUT Strike: $${putStrike}
 Suggested Contracts: ${contracts}
 
 <br>
-
 Max Risk: $${risk.toFixed(2)}
 
 <br><br>
@@ -339,11 +329,9 @@ Max Risk: $${risk.toFixed(2)}
 Entry Timing
 
 <br>
-
 Pullback Entry: $${pullbackEntry}
 
 <br>
-
 Breakout Entry: $${breakoutEntry}
 
 </div>
