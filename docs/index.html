@@ -1,12 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>AI Options Terminal V9</title>
-
+<title>AI Options Terminal V10</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-
 body{
 font-family:Arial;
 background:#0c0f14;
@@ -52,7 +50,6 @@ margin-top:10px;
 td{
 padding:6px;
 }
-
 </style>
 </head>
 
@@ -60,12 +57,11 @@ padding:6px;
 
 <div class="container">
 
-<h2>AI Options Terminal V9</h2>
+<h2>AI Options Terminal V10</h2>
 
 <input id="ticker" placeholder="Enter Ticker">
 
 <button onclick="scan()">Run AI Scan</button>
-
 <button onclick="marketScan()">Scan Market</button>
 
 <div id="output"></div>
@@ -74,53 +70,64 @@ padding:6px;
 
 <script>
 
-const API_KEY = "OHCJWFQEFSXI8IJ3"
+const API_KEY="OHCJWFQEFSXI8IJ3"
 
-const watchlist = [
+const watchlist=[
 "SPY","QQQ","NVDA","TSLA",
 "AAPL","AMD","META","NFLX","COIN"
 ]
 
 async function getData(symbol){
 
-let url =
-`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
+let url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
 
-let r = await fetch(url)
-let d = await r.json()
+let r=await fetch(url)
+let d=await r.json()
 
-let s = d["Time Series (Daily)"]
+let s=d["Time Series (Daily)"]
 
 if(!s) return null
 
-let closes = Object.values(s)
+let closes=Object.values(s)
 .slice(0,50)
 .map(x=>parseFloat(x["4. close"]))
 
-let price = closes[0]
+let price=closes[0]
 
-let ma20 = avg(closes.slice(0,20))
-let ma50 = avg(closes.slice(0,50))
+let ma20=avg(closes.slice(0,20))
+let ma50=avg(closes.slice(0,50))
 
-let momentum = (price-closes[10])/closes[10]
+let momentum=(price-closes[10])/closes[10]
 
 let bias="Neutral"
 
 if(price>ma20 && ma20>ma50) bias="Bullish"
 if(price<ma20 && ma20<ma50) bias="Bearish"
 
-let direction =
+let direction=
 bias=="Bullish"?"CALL":
 bias=="Bearish"?"PUT":"WAIT"
 
-let confidence =
-Math.min(95,Math.abs(momentum*100)+50)
+let confidence=Math.min(95,Math.abs(momentum*100)+50)
 
-let probITM =
-Math.min(80,Math.abs(momentum*120)+40)
+let probITM=Math.min(80,Math.abs(momentum*120)+40)
 
-let pop =
-Math.min(85,probITM+5)
+let pop=Math.min(85,probITM+5)
+
+let volEngine=
+Math.abs(momentum)>0.035?"High IV":
+Math.abs(momentum)>0.02?"Rising IV":
+"Normal IV"
+
+let smartMoney=
+Math.abs(momentum)>0.04?
+"Institutional Momentum Detected":
+"No unusual activity"
+
+let tradeScore=Math.min(100,
+confidence*0.6 +
+(probITM*0.4)
+)
 
 return{
 symbol,
@@ -129,48 +136,41 @@ bias,
 direction,
 confidence,
 probITM,
-pop
+pop,
+volEngine,
+smartMoney,
+tradeScore
 }
 
 }
 
 async function scan(){
 
-let ticker =
-document.getElementById("ticker")
-.value.toUpperCase()
+let ticker=document.getElementById("ticker").value.toUpperCase()
 
-let d = await getData(ticker)
+let d=await getData(ticker)
 
 if(!d){
-output.innerHTML=
-"<div class='card'>API error</div>"
+output.innerHTML="<div class='card'>API error</div>"
 return
 }
 
 let atm=Math.round(d.price)
 
-let otm1=
-d.direction=="CALL"?atm+2:atm-2
-
-let otm2=
-d.direction=="CALL"?atm+4:atm-4
+let otm1=d.direction=="CALL"?atm+2:atm-2
+let otm2=d.direction=="CALL"?atm+4:atm-4
 
 output.innerHTML=`
 
 <div class="card">
-
 <b>${d.symbol}</b><br>
-
 Price: $${d.price.toFixed(2)}<br>
 
 Market Bias:
 <span class="${
 d.bias=="Bullish"?"good":
 d.bias=="Bearish"?"bad":"neutral"}">
-
 ${d.bias}
-
 </span><br>
 
 AI Direction: ${d.direction}<br>
@@ -178,41 +178,48 @@ AI Direction: ${d.direction}<br>
 Trade Decision:
 <b>${
 d.direction=="CALL"?"BUY CALL":
-d.direction=="PUT"?"BUY PUT":
-"WAIT"}
-
+d.direction=="PUT"?"BUY PUT":"WAIT"}
 </b><br>
 
 Confidence: ${d.confidence.toFixed(0)}%<br>
-
 Probability ITM: ${d.probITM.toFixed(0)}%<br>
-
 Probability of Profit: ${d.pop.toFixed(0)}%
-
 </div>
 
 <div class="card">
+<b>AI Trade Score</b><br>
+${d.tradeScore.toFixed(0)}/100
+</div>
 
-Expected Move: ±$${(d.price*0.04).toFixed(2)}<br>
+<div class="card">
+<b>Volatility Engine</b><br>
+${d.volEngine}
+</div>
 
-Best Strikes<br>
+<div class="card">
+<b>Smart Money Detection</b><br>
+${d.smartMoney}
+</div>
 
+<div class="card">
+Expected Move: ±$${(d.price*0.04).toFixed(2)}<br><br>
+
+Smart Strikes<br>
 ATM: ${atm}<br>
-
 1 OTM: ${otm1}<br>
+2 OTM: ${otm2}<br><br>
 
-2 OTM: ${otm2}<br>
-
-Expiration: 7-14 Days
-
+Suggested Expiration: 7–14 Days
 </div>
 
 <div class="card">
+Execution Plan<br><br>
+
+Pullback Entry: $${(d.price*0.99).toFixed(2)}<br>
+Breakout Entry: $${(d.price*1.01).toFixed(2)}<br><br>
 
 Profit Target: +50%<br>
-
 Stop Loss: -30%
-
 </div>
 
 `
@@ -221,36 +228,36 @@ Stop Loss: -30%
 
 async function marketScan(){
 
-output.innerHTML=
-"<div class='card'>Scanning market...</div>"
+output.innerHTML="<div class='card'>Scanning market...</div>"
 
 let results=[]
 
 for(let t of watchlist){
 
-let d = await getData(t)
+let d=await getData(t)
 
 if(d) results.push(d)
 
 }
 
-results.sort(
-(a,b)=>b.confidence-a.confidence
-)
+results.sort((a,b)=>b.tradeScore-a.tradeScore)
 
 let table=`
+
 <div class="card">
 
-<b>🔥 AI Daily Trade Board</b>
+<b>AI Daily Trade Board</b>
 
 <table>
+
 <tr>
 <td>Rank</td>
 <td>Ticker</td>
-<td>Dir</td>
-<td>Conf</td>
+<td>Direction</td>
+<td>Score</td>
 <td>POP</td>
 </tr>
+
 `
 
 results.forEach((r,i)=>{
@@ -258,17 +265,11 @@ results.forEach((r,i)=>{
 table+=`
 
 <tr>
-
 <td>#${i+1}</td>
-
 <td>${r.symbol}</td>
-
 <td>${r.direction}</td>
-
-<td>${r.confidence.toFixed(0)}%</td>
-
+<td>${r.tradeScore.toFixed(0)}</td>
 <td>${r.pop.toFixed(0)}%</td>
-
 </tr>
 
 `
@@ -282,9 +283,7 @@ output.innerHTML=table
 }
 
 function avg(arr){
-
 return arr.reduce((a,b)=>a+b,0)/arr.length
-
 }
 
 </script>
