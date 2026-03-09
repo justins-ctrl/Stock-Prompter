@@ -1,46 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>AI Options Terminal V11</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
+
 body{
 font-family:Arial;
-background:#0c0f14;
+background:#0b0f19;
 color:white;
 padding:20px;
 }
 
 .container{
-max-width:520px;
+max-width:600px;
 margin:auto;
 }
 
-input,button{
+input{
 width:100%;
-padding:14px;
-margin-top:10px;
-font-size:18px;
-border-radius:8px;
+padding:12px;
+font-size:16px;
+border-radius:6px;
 border:none;
+margin-bottom:10px;
 }
 
 button{
-background:#1e90ff;
+width:100%;
+padding:12px;
+font-size:16px;
+border:none;
+border-radius:6px;
+background:#2f8cff;
 color:white;
+margin-top:8px;
 }
 
-.card{
-background:#161b22;
-padding:16px;
-margin-top:14px;
-border-radius:10px;
+button:hover{
+background:#1c6fd1;
 }
 
-.good{color:#00e676}
-.bad{color:#ff5252}
-.neutral{color:#ffd54f}
+#output{
+margin-top:20px;
+padding:10px;
+background:#121826;
+border-radius:8px;
+}
 
 table{
 width:100%;
@@ -50,7 +57,9 @@ margin-top:10px;
 td{
 padding:6px;
 }
+
 </style>
+
 </head>
 
 <body>
@@ -62,6 +71,7 @@ padding:6px;
 <input id="ticker" placeholder="Enter Ticker">
 
 <button onclick="scan()">Run AI Scan</button>
+
 <button onclick="marketScan()">Scan Market</button>
 
 <div id="output"></div>
@@ -71,6 +81,8 @@ padding:6px;
 <script>
 
 const API_KEY="OHCJWFQEFSXI8IJ3"
+
+let output=document.getElementById("output")
 
 const watchlist=[
 "SPY","QQQ","NVDA","TSLA",
@@ -82,6 +94,7 @@ async function getData(symbol){
 let url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
 
 let r=await fetch(url)
+
 let d=await r.json()
 
 let s=d["Time Series (Daily)"]
@@ -92,199 +105,111 @@ let closes=Object.values(s)
 .slice(0,60)
 .map(x=>parseFloat(x["4. close"]))
 
-let price=closes[0]
+return closes
 
-let ma20=avg(closes.slice(0,20))
-let ma50=avg(closes.slice(0,50))
+}
 
-let momentum=(price-closes[10])/closes[10]
+function rsi(prices){
+
+let gains=0
+let losses=0
+
+for(let i=1;i<prices.length;i++){
+
+let diff=prices[i]-prices[i-1]
+
+if(diff>0) gains+=diff
+else losses+=Math.abs(diff)
+
+}
+
+let rs=gains/losses
+
+return 100-(100/(1+rs))
+
+}
+
+function sma(prices,period){
+
+let sum=0
+
+for(let i=0;i<period;i++) sum+=prices[i]
+
+return sum/period
+
+}
+
+function analyze(prices){
+
+let latest=prices[0]
+
+let r=rsi(prices)
+
+let sma20=sma(prices,20)
 
 let bias="Neutral"
 
-if(price>ma20 && ma20>ma50) bias="Bullish"
-if(price<ma20 && ma20<ma50) bias="Bearish"
+if(latest>sma20 && r>55) bias="Bullish"
 
-let direction=
-bias=="Bullish"?"CALL":
-bias=="Bearish"?"PUT":"WAIT"
+if(latest<sma20 && r<45) bias="Bearish"
 
-let confidence=Math.min(95,Math.abs(momentum*100)+50)
+let signal="Wait"
 
-let probITM=Math.min(80,Math.abs(momentum*120)+40)
+if(bias=="Bullish") signal="Buy Calls"
 
-let pop=Math.min(90,probITM+8)
-
-let volEngine=
-Math.abs(momentum)>0.04?"High IV":
-Math.abs(momentum)>0.025?"Rising IV":
-"Normal IV"
-
-let smartMoney=
-Math.abs(momentum)>0.045?
-"Institutional Momentum Detected":
-"No unusual activity"
-
-let rsi = calcRSI(closes)
-
-let macd = calcMACD(closes)
-
-let atr = calcATR(closes)
-
-let regime="Choppy"
-
-if(momentum>0.03) regime="Trending Up"
-if(momentum<-0.03) regime="Trending Down"
-
-let gammaPressure =
-Math.abs(momentum)>0.05?
-"Possible Gamma Squeeze Zone":
-"Normal Dealer Positioning"
-
-let nextDayProb =
-50 + momentum*500
-
-let tradeScore = Math.min(100,
-(confidence*0.3) +
-(probITM*0.25) +
-(pop*0.25) +
-((rsi/100)*20)
-)
+if(bias=="Bearish") signal="Buy Puts"
 
 return{
-symbol,
-price,
-bias,
-direction,
-confidence,
-probITM,
-pop,
-volEngine,
-smartMoney,
-tradeScore,
-rsi,
-macd,
-atr,
-regime,
-gammaPressure,
-nextDayProb
+
+price:latest.toFixed(2),
+
+rsi:r.toFixed(1),
+
+sma:sma20.toFixed(2),
+
+bias:bias,
+
+signal:signal
+
 }
 
 }
 
 async function scan(){
 
-let ticker=document.getElementById("ticker").value.toUpperCase()
+let symbol=document.getElementById("ticker").value.toUpperCase()
 
-let d=await getData(ticker)
+output.innerHTML="Scanning..."
 
-if(!d){
-output.innerHTML="<div class='card'>API error</div>"
+let prices=await getData(symbol)
+
+if(!prices){
+
+output.innerHTML="API error or limit reached"
+
 return
+
 }
 
-let atm=Math.round(d.price)
-
-let otm1=d.direction=="CALL"?atm+2:atm-2
-let otm2=d.direction=="CALL"?atm+4:atm-4
+let a=analyze(prices)
 
 output.innerHTML=`
 
-<div class="card">
+<h3>${symbol}</h3>
 
-<b>${d.symbol}</b><br>
+<table>
 
-Price: $${d.price.toFixed(2)}<br>
+<tr><td>Price</td><td>${a.price}</td></tr>
 
-Market Bias:
-<span class="${
-d.bias=="Bullish"?"good":
-d.bias=="Bearish"?"bad":"neutral"}">
-${d.bias}
-</span><br>
+<tr><td>RSI</td><td>${a.rsi}</td></tr>
 
-AI Direction: ${d.direction}<br>
+<tr><td>SMA20</td><td>${a.sma}</td></tr>
 
-Trade Decision:
-<b>${
-d.direction=="CALL"?"BUY CALL":
-d.direction=="PUT"?"BUY PUT":"WAIT"}
-</b><br>
+<tr><td>Bias</td><td>${a.bias}</td></tr>
 
-Confidence: ${d.confidence.toFixed(0)}%<br>
+<tr><td>Signal</td><td>${a.signal}</td></tr>
 
-Probability ITM: ${d.probITM.toFixed(0)}%<br>
-
-Probability of Profit: ${d.pop.toFixed(0)}%
-
-</div>
-
-<div class="card">
-
-<b>AI Trade Score</b><br>
-
-${d.tradeScore.toFixed(0)}/100
-
-</div>
-
-<div class="card">
-
-<b>Indicator Engine</b><br>
-
-RSI: ${d.rsi.toFixed(0)}<br>
-MACD: ${d.macd}<br>
-ATR: ${d.atr.toFixed(2)}
-
-</div>
-
-<div class="card">
-
-<b>Market Regime</b><br>
-
-${d.regime}
-
-</div>
-
-<div class="card">
-
-<b>Gamma Pressure</b><br>
-
-${d.gammaPressure}
-
-</div>
-
-<div class="card">
-
-<b>Next Day Direction Probability</b><br>
-
-${d.nextDayProb.toFixed(0)}%
-
-</div>
-
-<div class="card">
-
-Expected Move: ±$${(d.price*0.04).toFixed(2)}<br><br>
-
-Smart Strikes<br>
-
-ATM: ${atm}<br>
-1 OTM: ${otm1}<br>
-2 OTM: ${otm2}<br><br>
-
-Suggested Expiration: 7–14 Days
-
-</div>
-
-<div class="card">
-
-Execution Plan<br><br>
-
-Pullback Entry: $${(d.price*0.99).toFixed(2)}<br>
-Breakout Entry: $${(d.price*1.01).toFixed(2)}<br><br>
-
-Profit Target: +50%<br>
-Stop Loss: -30%
-
-</div>
+</table>
 
 `
 
@@ -292,91 +217,50 @@ Stop Loss: -30%
 
 async function marketScan(){
 
-output.innerHTML="<div class='card'>Scanning market...</div>"
+output.innerHTML="Scanning watchlist..."
 
 let results=[]
 
-for(let t of watchlist){
+for(let s of watchlist){
 
-let d=await getData(t)
+let prices=await getData(s)
 
-if(d) results.push(d)
+if(!prices) continue
+
+let a=analyze(prices)
+
+results.push({symbol:s,...a})
 
 }
 
-results.sort((a,b)=>b.tradeScore-a.tradeScore)
+let html=`<table>`
 
-let table=`
+for(let r of results){
 
-<div class="card">
-
-<b>AI Daily Trade Board</b>
-
-<table>
+html+=`
 
 <tr>
-<td>Rank</td>
-<td>Ticker</td>
-<td>Direction</td>
-<td>Score</td>
-<td>POP</td>
-</tr>
 
-`
-
-results.forEach((r,i)=>{
-
-table+=`
-
-<tr>
-<td>#${i+1}</td>
 <td>${r.symbol}</td>
-<td>${r.direction}</td>
-<td>${r.tradeScore.toFixed(0)}</td>
-<td>${r.pop.toFixed(0)}%</td>
+
+<td>${r.signal}</td>
+
+<td>${r.bias}</td>
+
 </tr>
 
 `
 
-})
-
-table+="</table></div>"
-
-output.innerHTML=table
-
 }
 
-function avg(arr){
-return arr.reduce((a,b)=>a+b,0)/arr.length
-}
+html+=`</table>`
 
-function calcRSI(data){
-let gains=0
-let losses=0
-for(let i=1;i<14;i++){
-let diff=data[i-1]-data[i]
-if(diff>0) gains+=diff
-else losses+=Math.abs(diff)
-}
-let rs=gains/losses
-return 100-(100/(1+rs))
-}
+output.innerHTML=html
 
-function calcMACD(data){
-let short=avg(data.slice(0,12))
-let long=avg(data.slice(0,26))
-return short>long?"Bullish":"Bearish"
-}
-
-function calcATR(data){
-let moves=[]
-for(let i=1;i<14;i++){
-moves.push(Math.abs(data[i]-data[i-1]))
-}
-return avg(moves)
 }
 
 </script>
 
 </body>
+
 </html>
