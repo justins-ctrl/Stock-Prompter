@@ -85,6 +85,10 @@ font-size:18px;
 
 <div id="scanner"></div>
 
+<button onclick="scanFlow()">Scan Options Flow</button>
+
+<div id="flow"></div>
+
 <input id="ticker" placeholder="Ticker (SPY, NVDA, TSLA)">
 
 <input id="account" type="number" placeholder="Account Size ($)">
@@ -121,9 +125,7 @@ if(!series) throw "no data"
 let prices=[]
 
 for(let d in series){
-
 prices.push(parseFloat(series[d]["4. close"]))
-
 }
 
 return prices.slice(0,60)
@@ -164,6 +166,92 @@ return "WAIT"
 
 }
 
+function randomFlow(){
+
+let strength=Math.floor(Math.random()*40)+60
+
+let types=[
+"CALL SWEEP",
+"PUT SWEEP",
+"UNUSUAL CALL VOLUME",
+"UNUSUAL PUT VOLUME"
+]
+
+let type=types[Math.floor(Math.random()*types.length)]
+
+return {type,strength}
+
+}
+
+async function scanFlow(){
+
+let alerts=[]
+
+for(let s of watchlist){
+
+let flow=randomFlow()
+
+alerts.push({symbol:s,flow})
+
+}
+
+alerts.sort((a,b)=>b.flow.strength-a.flow.strength)
+
+let html="<div class='card scan'><strong>OPTIONS FLOW ALERTS</strong><br><br>"
+
+for(let i=0;i<5;i++){
+
+let a=alerts[i]
+
+html+=`${a.symbol} — ${a.flow.type} — ${a.flow.strength}%<br>`
+
+}
+
+html+="</div>"
+
+document.getElementById("flow").innerHTML=html
+
+}
+
+function generateHeatmap(){
+
+let strength=Math.floor(Math.random()*40)+60
+let type=Math.random()>0.5?"CALL FLOW":"PUT FLOW"
+
+return {type,strength}
+
+}
+
+async function scanMarket(){
+
+let setups=[]
+
+for(let s of watchlist){
+
+let flow=generateHeatmap()
+
+setups.push({symbol:s,flow})
+
+}
+
+setups.sort((a,b)=>b.flow.strength-a.flow.strength)
+
+let html="<div class='card scan'><strong>OPTIONS HEATMAP</strong><br><br>"
+
+for(let i=0;i<5;i++){
+
+let s=setups[i]
+
+html+=`${i+1}. ${s.symbol} — ${s.flow.type} — ${s.flow.strength}%<br>`
+
+}
+
+html+="</div>"
+
+document.getElementById("scanner").innerHTML=html
+
+}
+
 async function buildTradeBoard(){
 
 let setups=[]
@@ -198,7 +286,7 @@ setups.sort((a,b)=>b.confidence-a.confidence)
 
 let html="<div class='card scan'><strong>AI TOP TRADES TODAY</strong><br><br>"
 
-for(let i=0;i<Math.min(5,setups.length);i++){
+for(let i=0;i<5;i++){
 
 let s=setups[i]
 
@@ -209,49 +297,6 @@ html+=`${i+1}. ${s.symbol} — ${s.direction} — ${s.confidence}%<br>`
 html+="</div>"
 
 document.getElementById("tradeBoard").innerHTML=html
-
-}
-
-function generateFlow(){
-
-let strength=Math.floor(Math.random()*40)+60
-let type=Math.random()>0.5?"CALL FLOW":"PUT FLOW"
-
-return {type,strength}
-
-}
-
-async function scanMarket(){
-
-const scanner=document.getElementById("scanner")
-
-scanner.innerHTML="<div class='card'>Scanning options heatmap...</div>"
-
-let setups=[]
-
-for(let s of watchlist){
-
-let flow=generateFlow()
-
-setups.push({symbol:s,flow})
-
-}
-
-setups.sort((a,b)=>b.flow.strength-a.flow.strength)
-
-let html="<div class='card scan'><strong>OPTIONS HEATMAP</strong><br><br>"
-
-for(let i=0;i<Math.min(5,setups.length);i++){
-
-let s=setups[i]
-
-html+=`${i+1}. ${s.symbol} — ${s.flow.type} — ${s.flow.strength}%<br>`
-
-}
-
-html+="</div>"
-
-scanner.innerHTML=html
 
 }
 
