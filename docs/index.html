@@ -2,7 +2,9 @@
 <html>
 <head>
 
-<title>AI Options Terminal V12</title>
+<title>AI Options Terminal V13 - Hedge Fund Mode</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
 
@@ -10,7 +12,7 @@ body{
 font-family:Arial;
 background:#0b0f19;
 color:white;
-padding:20px;
+padding:16px;
 }
 
 .container{
@@ -20,19 +22,19 @@ margin:auto;
 
 input{
 width:100%;
-padding:12px;
-font-size:16px;
-border-radius:6px;
+padding:14px;
+font-size:18px;
+border-radius:8px;
 border:none;
 margin-bottom:10px;
 }
 
 button{
 width:100%;
-padding:12px;
-font-size:16px;
+padding:14px;
+font-size:18px;
 border:none;
-border-radius:6px;
+border-radius:8px;
 background:#2f8cff;
 color:white;
 margin-top:8px;
@@ -42,20 +44,25 @@ button:hover{
 background:#1c6fd1;
 }
 
-#output{
-margin-top:20px;
-padding:15px;
+.card{
 background:#121826;
-border-radius:8px;
+padding:14px;
+border-radius:10px;
+margin-top:14px;
 }
 
 table{
 width:100%;
-margin-top:10px;
+margin-top:8px;
 }
 
 td{
 padding:6px;
+font-size:14px;
+}
+
+.best{
+background:#1c2c48;
 }
 
 </style>
@@ -66,7 +73,7 @@ padding:6px;
 
 <div class="container">
 
-<h2>AI Options Terminal V12</h2>
+<h2>AI Options Terminal V13</h2>
 
 <input id="ticker" placeholder="Enter Ticker">
 
@@ -131,66 +138,65 @@ return 100-(100/(1+rs))
 
 }
 
-function sma(prices,period){
+function sma(prices,p){
 
 let sum=0
+for(let i=0;i<p;i++) sum+=prices[i]
 
-for(let i=0;i<period;i++) sum+=prices[i]
-
-return sum/period
+return sum/p
 
 }
 
 function macd(prices){
 
-let short=sma(prices,12)
-let long=sma(prices,26)
-
-return short-long
+return sma(prices,12)-sma(prices,26)
 
 }
 
 function vwap(prices){
 
 let sum=0
-
 for(let p of prices) sum+=p
 
 return sum/prices.length
 
 }
 
-function analyze(prices){
+function analyze(prices,spy){
 
 let latest=prices[0]
 
 let r=rsi(prices)
-
-let sma20=sma(prices,20)
-
+let s=sma(prices,20)
 let m=macd(prices)
-
 let v=vwap(prices)
 
 let bias="Neutral"
 
-if(latest>sma20 && r>55 && m>0) bias="Bullish"
-
-if(latest<sma20 && r<45 && m<0) bias="Bearish"
+if(latest>s && r>55 && m>0) bias="Bullish"
+if(latest<s && r<45 && m<0) bias="Bearish"
 
 let signal="Wait"
 
 if(bias=="Bullish") signal="Buy Calls"
-
 if(bias=="Bearish") signal="Buy Puts"
 
 let score=50
 
-if(bias=="Bullish") score+=20
-if(bias=="Bearish") score+=20
-
-if(r>60 || r<40) score+=10
+if(bias!="Neutral") score+=20
+if(r>60||r<40) score+=10
 if(m>0) score+=10
+if(latest>v) score+=10
+
+let relative=0
+
+if(spy){
+relative=((latest-prices[10])-(spy[0]-spy[10])).toFixed(2)
+}
+
+let breakout="No"
+
+if(r>60 && latest>s && m>0) breakout="Breakout"
 
 let pop=Math.min(90,score)
 
@@ -200,27 +206,18 @@ if(score>80) confidence="High"
 if(score<60) confidence="Low"
 
 return{
-
 price:latest.toFixed(2),
-
 rsi:r.toFixed(1),
-
-sma:sma20.toFixed(2),
-
+sma:s.toFixed(2),
 macd:m.toFixed(2),
-
 vwap:v.toFixed(2),
-
 bias:bias,
-
 signal:signal,
-
 score:score,
-
 pop:pop,
-
-confidence:confidence
-
+confidence:confidence,
+relative:relative,
+breakout:breakout
 }
 
 }
@@ -234,42 +231,38 @@ output.innerHTML="Running AI analysis..."
 let prices=await getData(symbol)
 
 if(!prices){
-
-output.innerHTML="API error or limit reached"
-
+output.innerHTML="API error"
 return
-
 }
 
-let a=analyze(prices)
+let spy=await getData("SPY")
+
+let a=analyze(prices,spy)
 
 output.innerHTML=`
+
+<div class="card">
 
 <h3>${symbol}</h3>
 
 <table>
 
 <tr><td>Price</td><td>${a.price}</td></tr>
-
 <tr><td>RSI</td><td>${a.rsi}</td></tr>
-
 <tr><td>SMA20</td><td>${a.sma}</td></tr>
-
 <tr><td>MACD</td><td>${a.macd}</td></tr>
-
 <tr><td>VWAP</td><td>${a.vwap}</td></tr>
-
 <tr><td>Bias</td><td>${a.bias}</td></tr>
-
 <tr><td>Options Signal</td><td>${a.signal}</td></tr>
-
-<tr><td>AI Trade Score</td><td>${a.score}/100</td></tr>
-
+<tr><td>Hedge Fund Score</td><td>${a.score}/100</td></tr>
 <tr><td>Probability of Profit</td><td>${a.pop}%</td></tr>
-
+<tr><td>Relative Strength vs SPY</td><td>${a.relative}</td></tr>
+<tr><td>Momentum</td><td>${a.breakout}</td></tr>
 <tr><td>Confidence</td><td>${a.confidence}</td></tr>
 
 </table>
+
+</div>
 
 `
 
@@ -277,7 +270,9 @@ output.innerHTML=`
 
 async function marketScan(){
 
-output.innerHTML="AI scanning market..."
+output.innerHTML="Scanning market..."
+
+let spy=await getData("SPY")
 
 let results=[]
 
@@ -287,15 +282,35 @@ let prices=await getData(s)
 
 if(!prices) continue
 
-let a=analyze(prices)
+let a=analyze(prices,spy)
 
 results.push({symbol:s,...a})
+
+await new Promise(r=>setTimeout(r,12000))
 
 }
 
 results.sort((a,b)=>b.score-a.score)
 
-let html=`<h3>Top AI Setups</h3><table>`
+let best=results[0]
+
+let html=`<div class="card best">
+
+<b>AI Best Trade Today</b><br>
+
+${best.symbol}<br>
+
+Signal: ${best.signal}<br>
+
+Score: ${best.score}
+
+</div>
+
+<div class="card">
+
+<h3>Top Hedge Fund Setups</h3>
+
+<table>`
 
 for(let r of results.slice(0,10)){
 
@@ -306,7 +321,7 @@ html+=`
 <td>${r.symbol}</td>
 <td>${r.signal}</td>
 <td>${r.score}</td>
-<td>${r.bias}</td>
+<td>${r.breakout}</td>
 
 </tr>
 
@@ -314,7 +329,7 @@ html+=`
 
 }
 
-html+=`</table>`
+html+=`</table></div>`
 
 output.innerHTML=html
 
