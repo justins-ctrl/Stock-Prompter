@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<title>AI Options Terminal V21</title>
+<title>AI Options Terminal V22</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -67,9 +67,9 @@ background:#1a2e3d;
 
 <div class="container">
 
-<h2>AI Options Terminal V21</h2>
+<h2>AI Options Terminal V22</h2>
 
-<div id="dashboard" class="card"></div>
+<div id="dashboard" class="card">Loading AI Market Dashboard...</div>
 
 <input id="ticker" placeholder="Enter Stock Ticker">
 
@@ -87,6 +87,10 @@ const API_KEY="OHCJWFQEFSXI8IJ3"
 
 const watchlist=[
 "SPY","QQQ","AAPL","NVDA","TSLA","AMD","META","MSFT","AMZN","GOOGL"
+]
+
+const premkt=[
+"SPY","QQQ","NVDA","TSLA"
 ]
 
 let cache={}
@@ -314,17 +318,45 @@ output.innerHTML=html
 
 }
 
-function dashboard(){
+async function dashboard(){
 
-document.getElementById("dashboard").innerHTML=`
+let results=[]
 
-<b>Market Dashboard</b><br><br>
+for(let s of premkt){
 
-Market Bias: Loading...<br>
-Best Opportunity: Run Scanner<br>
-Momentum Alert: Monitoring
+let prices=await getData(s)
 
-`
+if(!prices) continue
+
+let a=analyze(prices)
+
+results.push({symbol:s,...a})
+
+}
+
+results.sort((a,b)=>b.score-a.score)
+
+let best=results.slice(0,2)
+
+let bias="Neutral"
+
+if(best[0] && best[0].bias=="Bullish") bias="Bullish"
+if(best[0] && best[0].bias=="Bearish") bias="Bearish"
+
+let html=`<b>AI MARKET DASHBOARD</b><br><br>
+
+Market Bias: ${bias}<br>
+Momentum Alert: Monitoring<br><br>
+
+<b>Top Opportunities</b><br>`
+
+for(let r of best){
+
+html+=`${r.symbol} — ${r.signal}<br>`
+
+}
+
+document.getElementById("dashboard").innerHTML=html
 
 }
 
