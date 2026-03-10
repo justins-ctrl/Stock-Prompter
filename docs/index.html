@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<title>AI Options Terminal V16</title>
+<title>AI Options Terminal V17</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -73,7 +73,7 @@ background:#1c2c48;
 
 <div class="container">
 
-<h2>AI Options Terminal V16</h2>
+<h2>AI Options Terminal V17</h2>
 
 <input id="ticker" placeholder="Enter Stock Ticker">
 
@@ -150,19 +150,13 @@ return 100-(100/(1+rs))
 }
 
 function macd(p){
-
 return sma(p,12)-sma(p,26)
-
 }
 
 function vwap(p){
-
 let s=0
-
 for(let x of p) s+=x
-
 return s/p.length
-
 }
 
 function analyze(prices){
@@ -204,7 +198,6 @@ if(Math.abs(prices[0]-prices[5])>prices[5]*0.04)
 volatility="Expansion"
 
 let flow="Neutral"
-
 if(score>80) flow="Bullish Call Flow"
 if(score<60) flow="Bearish Put Flow"
 
@@ -213,6 +206,13 @@ if(r>60 && price>s) darkPool="Accumulation"
 
 let zeroDTE="No"
 if(r>65 && m>0) zeroDTE="Possible"
+
+let regime="Sideways"
+if(price>s && m>0) regime="Bull Trend"
+if(price<s && m<0) regime="Bear Trend"
+
+let expiration="3-7 Days"
+if(volatility=="Expansion") expiration="1-3 Days Momentum"
 
 let expectedMove=(price*0.04).toFixed(2)
 
@@ -233,6 +233,8 @@ volatility,
 flow,
 darkPool,
 zeroDTE,
+regime,
+expiration,
 expectedMove,
 callStrike,
 putStrike,
@@ -274,6 +276,9 @@ output.innerHTML=`
 <tr><td>Institutional Score</td><td>${a.score}/100</td></tr>
 <tr><td>Confidence</td><td>${a.confidence}</td></tr>
 <tr><td>Probability Profit</td><td>${a.pop}%</td></tr>
+
+<tr><td>Market Regime</td><td>${a.regime}</td></tr>
+<tr><td>Suggested Expiration</td><td>${a.expiration}</td></tr>
 
 <tr><td>Gamma Pressure</td><td>${a.gamma}</td></tr>
 <tr><td>Volatility</td><td>${a.volatility}</td></tr>
