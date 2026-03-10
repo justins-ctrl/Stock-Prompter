@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<title>AI Options Terminal V13 - Hedge Fund Mode</title>
+<title>AI Options Terminal V14</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -20,28 +20,28 @@ max-width:700px;
 margin:auto;
 }
 
+h2{
+text-align:center;
+}
+
 input{
 width:100%;
-padding:14px;
+padding:16px;
 font-size:18px;
-border-radius:8px;
+border-radius:10px;
 border:none;
-margin-bottom:10px;
+margin-top:10px;
 }
 
 button{
 width:100%;
-padding:14px;
+padding:16px;
 font-size:18px;
 border:none;
-border-radius:8px;
+border-radius:10px;
 background:#2f8cff;
 color:white;
-margin-top:8px;
-}
-
-button:hover{
-background:#1c6fd1;
+margin-top:10px;
 }
 
 .card{
@@ -53,7 +53,7 @@ margin-top:14px;
 
 table{
 width:100%;
-margin-top:8px;
+margin-top:10px;
 }
 
 td{
@@ -73,11 +73,11 @@ background:#1c2c48;
 
 <div class="container">
 
-<h2>AI Options Terminal V13</h2>
+<h2>AI Options Terminal V14</h2>
 
-<input id="ticker" placeholder="Enter Ticker">
+<input id="ticker" placeholder="Enter Stock Ticker">
 
-<button onclick="scan()">Run AI Scan</button>
+<button onclick="scan()">Run AI Analysis</button>
 
 <button onclick="marketScan()">Scan Market</button>
 
@@ -92,11 +92,16 @@ const API_KEY="OHCJWFQEFSXI8IJ3"
 let output=document.getElementById("output")
 
 const watchlist=[
-"SPY","QQQ","NVDA","TSLA","AAPL",
-"AMD","META","NFLX","COIN","MSFT",
-"AMZN","GOOGL","SMCI","PLTR","INTC",
-"CRM","ORCL","BA","DIS","SHOP",
-"UBER","SNOW","ADBE","PYPL","SQ"
+"SPY",
+"QQQ",
+"AAPL",
+"NVDA",
+"TSLA",
+"AMD",
+"META",
+"MSFT",
+"AMZN",
+"GOOGL"
 ]
 
 async function getData(symbol){
@@ -118,6 +123,15 @@ return closes
 
 }
 
+function sma(prices,p){
+
+let sum=0
+for(let i=0;i<p;i++) sum+=prices[i]
+
+return sum/p
+
+}
+
 function rsi(prices){
 
 let gains=0
@@ -135,15 +149,6 @@ else losses+=Math.abs(diff)
 let rs=gains/losses
 
 return 100-(100/(1+rs))
-
-}
-
-function sma(prices,p){
-
-let sum=0
-for(let i=0;i<p;i++) sum+=prices[i]
-
-return sum/p
 
 }
 
@@ -176,27 +181,26 @@ let bias="Neutral"
 if(latest>s && r>55 && m>0) bias="Bullish"
 if(latest<s && r<45 && m<0) bias="Bearish"
 
-let signal="Wait"
+let signal="WAIT"
 
-if(bias=="Bullish") signal="Buy Calls"
-if(bias=="Bearish") signal="Buy Puts"
+if(bias=="Bullish") signal="BUY CALL"
+if(bias=="Bearish") signal="BUY PUT"
 
 let score=50
 
-if(bias!="Neutral") score+=20
+if(bias!="Neutral") score+=15
 if(r>60||r<40) score+=10
 if(m>0) score+=10
 if(latest>v) score+=10
 
-let relative=0
+let gamma="Low"
 
-if(spy){
-relative=((latest-prices[10])-(spy[0]-spy[10])).toFixed(2)
-}
+if(r>65 && m>0) gamma="Elevated"
 
-let breakout="No"
+let volatility="Normal"
 
-if(r>60 && latest>s && m>0) breakout="Breakout"
+if(Math.abs(prices[0]-prices[5])>prices[5]*0.04)
+volatility="Expansion"
 
 let pop=Math.min(90,score)
 
@@ -205,19 +209,28 @@ let confidence="Medium"
 if(score>80) confidence="High"
 if(score<60) confidence="Low"
 
+let expectedMove=(latest*0.04).toFixed(2)
+
+let strikeCall=(latest*1.02).toFixed(2)
+let strikePut=(latest*0.98).toFixed(2)
+
 return{
+
 price:latest.toFixed(2),
-rsi:r.toFixed(1),
-sma:s.toFixed(2),
-macd:m.toFixed(2),
-vwap:v.toFixed(2),
 bias:bias,
 signal:signal,
 score:score,
-pop:pop,
+rsi:r.toFixed(1),
+macd:m.toFixed(2),
+vwap:v.toFixed(2),
 confidence:confidence,
-relative:relative,
-breakout:breakout
+gamma:gamma,
+volatility:volatility,
+pop:pop,
+expectedMove:expectedMove,
+callStrike:strikeCall,
+putStrike:strikePut
+
 }
 
 }
@@ -231,8 +244,11 @@ output.innerHTML="Running AI analysis..."
 let prices=await getData(symbol)
 
 if(!prices){
-output.innerHTML="API error"
+
+output.innerHTML="Data unavailable or API limit reached"
+
 return
+
 }
 
 let spy=await getData("SPY")
@@ -248,17 +264,23 @@ output.innerHTML=`
 <table>
 
 <tr><td>Price</td><td>${a.price}</td></tr>
+<tr><td>Market Bias</td><td>${a.bias}</td></tr>
+<tr><td>Trade Decision</td><td>${a.signal}</td></tr>
+<tr><td>Hedge Fund Score</td><td>${a.score}/100</td></tr>
+<tr><td>Confidence</td><td>${a.confidence}</td></tr>
+<tr><td>Probability Profit</td><td>${a.pop}%</td></tr>
+
 <tr><td>RSI</td><td>${a.rsi}</td></tr>
-<tr><td>SMA20</td><td>${a.sma}</td></tr>
 <tr><td>MACD</td><td>${a.macd}</td></tr>
 <tr><td>VWAP</td><td>${a.vwap}</td></tr>
-<tr><td>Bias</td><td>${a.bias}</td></tr>
-<tr><td>Options Signal</td><td>${a.signal}</td></tr>
-<tr><td>Hedge Fund Score</td><td>${a.score}/100</td></tr>
-<tr><td>Probability of Profit</td><td>${a.pop}%</td></tr>
-<tr><td>Relative Strength vs SPY</td><td>${a.relative}</td></tr>
-<tr><td>Momentum</td><td>${a.breakout}</td></tr>
-<tr><td>Confidence</td><td>${a.confidence}</td></tr>
+
+<tr><td>Gamma Pressure</td><td>${a.gamma}</td></tr>
+<tr><td>Volatility Regime</td><td>${a.volatility}</td></tr>
+
+<tr><td>Expected Move</td><td>$${a.expectedMove}</td></tr>
+
+<tr><td>Suggested Call Strike</td><td>${a.callStrike}</td></tr>
+<tr><td>Suggested Put Strike</td><td>${a.putStrike}</td></tr>
 
 </table>
 
@@ -308,11 +330,11 @@ Score: ${best.score}
 
 <div class="card">
 
-<h3>Top Hedge Fund Setups</h3>
+<h3>Top Opportunities</h3>
 
 <table>`
 
-for(let r of results.slice(0,10)){
+for(let r of results.slice(0,5)){
 
 html+=`
 
@@ -321,7 +343,6 @@ html+=`
 <td>${r.symbol}</td>
 <td>${r.signal}</td>
 <td>${r.score}</td>
-<td>${r.breakout}</td>
 
 </tr>
 
