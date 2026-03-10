@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<title>AI Options Terminal V17</title>
+<title>AI Options Terminal V18</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -65,6 +65,11 @@ font-size:14px;
 background:#1c2c48;
 }
 
+.setup{
+background:#1a2e3d;
+font-size:15px;
+}
+
 </style>
 
 </head>
@@ -73,7 +78,7 @@ background:#1c2c48;
 
 <div class="container">
 
-<h2>AI Options Terminal V17</h2>
+<h2>AI Options Terminal V18</h2>
 
 <input id="ticker" placeholder="Enter Stock Ticker">
 
@@ -212,12 +217,16 @@ if(price>s && m>0) regime="Bull Trend"
 if(price<s && m<0) regime="Bear Trend"
 
 let expiration="3-7 Days"
-if(volatility=="Expansion") expiration="1-3 Days Momentum"
+if(volatility=="Expansion") expiration="1-3 Days"
 
 let expectedMove=(price*0.04).toFixed(2)
 
 let callStrike=(price*1.02).toFixed(2)
 let putStrike=(price*0.98).toFixed(2)
+
+let entry="Wait for Pullback"
+if(price>v && bias=="Bullish") entry="Pullback near VWAP"
+if(price<v && bias=="Bearish") entry="Breakdown Momentum"
 
 let pop=Math.min(90,score)
 
@@ -238,6 +247,7 @@ expiration,
 expectedMove,
 callStrike,
 putStrike,
+entry,
 pop
 
 }
@@ -264,29 +274,33 @@ let a=analyze(prices)
 
 output.innerHTML=`
 
-<div class="card">
+<div class="card setup">
 
-<h3>${symbol}</h3>
+<b>AI TRADE SETUP</b><br><br>
+
+Ticker: ${symbol}<br>
+Direction: ${a.signal}<br>
+Confidence: ${a.confidence}<br>
+Strike: ${a.signal=="BUY CALL"?a.callStrike:a.putStrike}<br>
+Expiration: ${a.expiration}<br>
+Entry: ${a.entry}<br>
+Expected Move: $${a.expectedMove}<br>
+Probability Profit: ${a.pop}%<br>
+
+</div>
+
+<div class="card">
 
 <table>
 
 <tr><td>Price</td><td>${a.price}</td></tr>
 <tr><td>Market Bias</td><td>${a.bias}</td></tr>
-<tr><td>Trade Decision</td><td>${a.signal}</td></tr>
 <tr><td>Institutional Score</td><td>${a.score}/100</td></tr>
-<tr><td>Confidence</td><td>${a.confidence}</td></tr>
-<tr><td>Probability Profit</td><td>${a.pop}%</td></tr>
 
 <tr><td>Market Regime</td><td>${a.regime}</td></tr>
-<tr><td>Suggested Expiration</td><td>${a.expiration}</td></tr>
 
 <tr><td>Gamma Pressure</td><td>${a.gamma}</td></tr>
 <tr><td>Volatility</td><td>${a.volatility}</td></tr>
-
-<tr><td>Expected Move</td><td>$${a.expectedMove}</td></tr>
-
-<tr><td>Suggested Call Strike</td><td>${a.callStrike}</td></tr>
-<tr><td>Suggested Put Strike</td><td>${a.putStrike}</td></tr>
 
 <tr><td>Options Flow</td><td>${a.flow}</td></tr>
 <tr><td>Dark Pool Signal</td><td>${a.darkPool}</td></tr>
