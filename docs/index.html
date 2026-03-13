@@ -3,7 +3,7 @@
 
 <head>
 
-<title>AI Options Terminal V24</title>
+<title>AI Options Terminal V25</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -18,7 +18,7 @@ padding:20px;
 }
 
 .container{
-max-width:500px;
+max-width:520px;
 margin:auto;
 }
 
@@ -60,7 +60,7 @@ margin-top:12px;
 
 <div class="container">
 
-<h1>AI Options Terminal V24</h1>
+<h1>AI Options Terminal V25</h1>
 
 <div class="card">
 AI MARKET DASHBOARD<br><br>
@@ -90,7 +90,6 @@ async function getData(symbol){
 let url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
 
 let r=await fetch(url)
-
 let d=await r.json()
 
 let s=d["Time Series (Daily)"]
@@ -105,6 +104,20 @@ return closes
 
 }
 
+function contractPOP(price,strike,premium,expectedMove){
+
+let breakeven=strike+premium
+let distance=Math.abs(breakeven-price)
+
+let pop=70-(distance/expectedMove*20)
+
+if(pop>90) pop=90
+if(pop<30) pop=30
+
+return Math.round(pop)
+
+}
+
 function analyze(closes){
 
 let price=closes[0]
@@ -112,10 +125,7 @@ let price=closes[0]
 let avg20=closes.slice(0,20).reduce((a,b)=>a+b)/20
 let avg50=closes.slice(0,50).reduce((a,b)=>a+b)/50
 
-let momentum5=(price-closes[5])/closes[5]
-let momentum10=(price-closes[10])/closes[10]
-
-let momentum=(momentum5+momentum10)/2
+let momentum=(price-closes[5])/closes[5]
 
 let bias="Neutral"
 
@@ -128,55 +138,50 @@ if(momentum>.02 && bias=="Bullish") direction="BUY CALL"
 if(momentum<-.02 && bias=="Bearish") direction="BUY PUT"
 
 let confidence="Low"
-
 if(Math.abs(momentum)>.03) confidence="Medium"
 if(Math.abs(momentum)>.05) confidence="High"
 
 let expectedMove=price*0.04
 
-let callStrike=(price*1.01)
-let putStrike=(price*0.99)
+let atm=Math.round(price)
+let otm1=atm+1
+let otm2=atm+2
 
-let strike=direction=="BUY PUT"?putStrike:callStrike
+let premiumATM=atm*0.015
+let premium1=otm1*0.013
+let premium2=otm2*0.011
 
-let premium=strike*0.015
+let popATM=contractPOP(price,atm,premiumATM,expectedMove)
+let pop1=contractPOP(price,otm1,premium1,expectedMove)
+let pop2=contractPOP(price,otm2,premium2,expectedMove)
 
-let breakeven=strike+premium
+let bestStrike=atm
+let bestPOP=popATM
 
-let breakevenDistance=Math.abs(breakeven-price)
+if(pop1>bestPOP){
+bestPOP=pop1
+bestStrike=otm1
+}
+
+if(pop2>bestPOP){
+bestPOP=pop2
+bestStrike=otm2
+}
+
+let breakeven=bestStrike+(bestStrike*0.015)
+
+let distance=Math.abs(breakeven-price)
 
 let edge="Neutral"
 
-if(expectedMove>breakevenDistance*1.2) edge="Favorable"
-if(expectedMove<breakevenDistance) edge="Risky"
-
-let thetaWarning="Low"
-
-if(edge=="Risky") thetaWarning="High"
-
-let momentumEngine="Neutral"
-
-if(momentum>.04) momentumEngine="STRONG BULLISH"
-else if(momentum>.02) momentumEngine="BULLISH"
-else if(momentum<-.04) momentumEngine="STRONG BEARISH"
-else if(momentum<-.02) momentumEngine="BEARISH"
-
-let gamma="BALANCED"
-
-if(momentum>.03) gamma="CALL DOMINANT"
-if(momentum<-.03) gamma="PUT DOMINANT"
-
-let smartMoney="NEUTRAL"
-
-if(price>avg20 && momentum>.02) smartMoney="ACCUMULATING"
-if(price<avg20 && momentum<-.02) smartMoney="DISTRIBUTION"
+if(expectedMove>distance*1.2) edge="Favorable"
+if(expectedMove<distance) edge="Risky"
 
 let score=50
 
-if(bias=="Bullish"||bias=="Bearish") score+=10
+if(bias!="Neutral") score+=10
 if(confidence=="High") score+=20
 if(edge=="Favorable") score+=15
-if(momentumEngine.includes("STRONG")) score+=10
 
 if(score>100) score=100
 
@@ -201,17 +206,19 @@ bias,
 direction,
 confidence,
 expectedMove:expectedMove.toFixed(2),
-strike:strike.toFixed(2),
-premium:premium.toFixed(2),
-breakeven:breakeven.toFixed(2),
-breakevenDistance:breakevenDistance.toFixed(2),
-edge,
-thetaWarning,
-momentumEngine,
-gamma,
-smartMoney,
 score,
 grade,
+atm,
+otm1,
+otm2,
+popATM,
+pop1,
+pop2,
+bestStrike,
+bestPOP,
+breakeven:breakeven.toFixed(2),
+distance:distance.toFixed(2),
+edge,
 stopLoss,
 takeProfit
 
@@ -246,23 +253,24 @@ Ticker: ${ticker}<br>
 Price: $${a.price}<br>
 Market Bias: ${a.bias}<br><br>
 
-Momentum Engine: ${a.momentumEngine}<br>
-Gamma Pressure: ${a.gamma}<br>
-Smart Money Flow: ${a.smartMoney}<br><br>
-
 Direction: ${a.direction}<br>
 Confidence: ${a.confidence}<br>
+
 Trade Score: ${a.score}/100 (${a.grade})<br><br>
 
-Strike: ${a.strike}<br>
-Premium Est: $${a.premium}<br>
+<b>AI CONTRACT PICKER</b><br>
+
+ATM ${a.atm} — POP ${a.popATM}%<br>
+1 OTM ${a.otm1} — POP ${a.pop1}%<br>
+2 OTM ${a.otm2} — POP ${a.pop2}%<br><br>
+
+Best Contract: ${a.bestStrike} (POP ${a.bestPOP}%)<br><br>
 
 Breakeven: $${a.breakeven}<br>
-Distance to BE: $${a.breakevenDistance}<br><br>
+Distance to BE: $${a.distance}<br>
 
 Expected Move: $${a.expectedMove}<br>
-Edge: ${a.edge}<br>
-Theta Risk: ${a.thetaWarning}<br><br>
+Edge: ${a.edge}<br><br>
 
 Stop Loss: ${a.stopLoss}<br>
 Take Profit: ${a.takeProfit}
@@ -288,12 +296,10 @@ if(!closes) continue
 let a=analyze(closes)
 
 if(a.direction!="WAIT"){
-
 results.push({
 ticker:watchlist[i],
 score:a.score
 })
-
 }
 
 await new Promise(r=>setTimeout(r,15000))
@@ -305,9 +311,7 @@ results.sort((a,b)=>b.score-a.score)
 results=results.slice(0,2)
 
 if(results.length==0){
-
 output.innerHTML="No strong setups found"
-
 return
 }
 
