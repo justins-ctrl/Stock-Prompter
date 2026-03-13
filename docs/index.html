@@ -1,81 +1,82 @@
 <!DOCTYPE html>
 <html>
+
 <head>
 
-<title>AI Options Terminal V22</title>
+<title>AI Options Terminal V23</title>
 
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 
 body{
 font-family:Arial;
-background:#0b0f19;
+background:#071326;
 color:white;
-padding:16px;
+margin:0;
+padding:20px;
 }
 
 .container{
-max-width:720px;
+max-width:500px;
 margin:auto;
 }
 
-h2{
+h1{
 text-align:center;
+}
+
+.card{
+background:#13233d;
+padding:18px;
+border-radius:12px;
+margin-top:15px;
 }
 
 input{
 width:100%;
-padding:16px;
-font-size:18px;
+padding:14px;
 border-radius:10px;
 border:none;
 margin-top:10px;
+font-size:18px;
 }
 
 button{
 width:100%;
 padding:16px;
-font-size:18px;
+border-radius:12px;
 border:none;
-border-radius:10px;
-background:#2f8cff;
+background:#3a8bfd;
 color:white;
-margin-top:10px;
+font-size:18px;
+margin-top:12px;
 }
 
-.card{
-background:#121826;
-padding:14px;
-border-radius:10px;
-margin-top:14px;
-}
-
-.best{
-background:#1c2c48;
-}
-
-.setup{
-background:#1a2e3d;
+button:active{
+opacity:.7;
 }
 
 </style>
-
 </head>
 
 <body>
 
 <div class="container">
 
-<h2>AI Options Terminal V22</h2>
+<h1>AI Options Terminal V23</h1>
 
-<div id="dashboard" class="card">Loading AI Market Dashboard...</div>
+<div class="card" id="dashboard">
+AI MARKET DASHBOARD<br><br>
+Market Bias: Monitoring<br>
+Momentum Alert: Monitoring
+</div>
 
 <input id="ticker" placeholder="Enter Stock Ticker">
 
-<button onclick="scan()">Run AI Analysis</button>
+<button onclick="runAI()">Run AI Analysis</button>
 
-<button onclick="marketScan()">Scan Top Opportunities</button>
+<button onclick="scanMarket()">Scan Top Opportunities</button>
 
 <div id="output"></div>
 
@@ -86,281 +87,232 @@ background:#1a2e3d;
 const API_KEY="OHCJWFQEFSXI8IJ3"
 
 const watchlist=[
-"SPY","QQQ","AAPL","NVDA","TSLA","AMD","META","MSFT","AMZN","GOOGL"
+"SPY",
+"NVDA",
+"TSLA",
+"QQQ",
+"AAPL",
+"AMD",
+"META",
+"COIN",
+"NFLX",
+"AMZN"
 ]
-
-const premkt=[
-"SPY","QQQ","NVDA","TSLA"
-]
-
-let cache={}
-let output=document.getElementById("output")
 
 async function getData(symbol){
-
-if(cache[symbol] && Date.now()-cache[symbol].time<60000){
-return cache[symbol].data
-}
-
-try{
 
 let url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
 
 let r=await fetch(url)
+
 let d=await r.json()
 
 let s=d["Time Series (Daily)"]
 
-if(!s) throw "limit"
+if(!s) return null
 
 let closes=Object.values(s)
 .slice(0,60)
-.map(x=>parseFloat(x["4. close"]))
-
-cache[symbol]={data:closes,time:Date.now()}
+.map(v=>parseFloat(v["4. close"]))
 
 return closes
 
-}catch{
-
-try{
-
-let y=`https://query1.finance.yahoo.com/v7/finance/chart/${symbol}?range=2mo&interval=1d`
-
-let r=await fetch(y)
-let j=await r.json()
-
-let closes=j.chart.result[0].indicators.quote[0].close
-
-cache[symbol]={data:closes,time:Date.now()}
-
-return closes
-
-}catch{
-
-return null
-
 }
 
-}
+function analyze(closes){
 
-}
+let price=closes[0]
 
-function sma(p,n){
-let s=0
-for(let i=0;i<n;i++) s+=p[i]
-return s/n
-}
+let avg20=closes.slice(0,20).reduce((a,b)=>a+b)/20
+let avg50=closes.slice(0,50).reduce((a,b)=>a+b)/50
 
-function rsi(p){
+let momentum5=(price-closes[5])/closes[5]
+let momentum10=(price-closes[10])/closes[10]
 
-let g=0
-let l=0
-
-for(let i=1;i<p.length;i++){
-
-let d=p[i]-p[i-1]
-
-if(d>0) g+=d
-else l+=Math.abs(d)
-
-}
-
-let rs=g/l
-
-return 100-(100/(1+rs))
-
-}
-
-function macd(p){
-return sma(p,12)-sma(p,26)
-}
-
-function vwap(p){
-let s=0
-for(let x of p) s+=x
-return s/p.length
-}
-
-function analyze(prices){
-
-let price=prices[0]
-
-let r=rsi(prices)
-let s=sma(prices,20)
-let m=macd(prices)
-let v=vwap(prices)
+let momentum=(momentum5+momentum10)/2
 
 let bias="Neutral"
 
-if(price>s && r>55 && m>0) bias="Bullish"
-if(price<s && r<45 && m<0) bias="Bearish"
+if(price>avg20 && avg20>avg50) bias="Bullish"
+if(price<avg20 && avg20<avg50) bias="Bearish"
 
-let signal="WAIT"
+let direction="WAIT"
 
-if(bias=="Bullish") signal="BUY CALL"
-if(bias=="Bearish") signal="BUY PUT"
+if(momentum>.02 && bias=="Bullish") direction="BUY CALL"
+if(momentum<-.02 && bias=="Bearish") direction="BUY PUT"
 
-let score=50
+let confidence="Low"
 
-if(bias!="Neutral") score+=15
-if(r>60||r<40) score+=10
-if(m>0) score+=10
-if(price>v) score+=10
+if(Math.abs(momentum)>.03) confidence="Medium"
+if(Math.abs(momentum)>.05) confidence="High"
 
-let confidence="Medium"
-if(score>80) confidence="High"
-if(score<60) confidence="Low"
+let expectedMove=price*0.04
 
-let expectedMove=(price*0.04).toFixed(2)
-
-let callStrike=(price*1.02).toFixed(2)
-let putStrike=(price*0.98).toFixed(2)
+let callStrike=(price*1.01).toFixed(2)
+let putStrike=(price*0.99).toFixed(2)
 
 let entry="Wait Pullback"
-if(price>v && bias=="Bullish") entry="Pullback near VWAP"
-if(price<v && bias=="Bearish") entry="Breakdown Momentum"
+if(momentum>.04) entry="Breakout Entry"
 
 let expiration="3-7 Days"
 
-let pop=Math.min(90,score)
+let pop=Math.min(90,60+Math.abs(momentum*500))
+
+let stopLoss="-40%"
+let takeProfit="+80%"
+
+if(confidence=="High"){
+stopLoss="-35%"
+takeProfit="+120%"
+}
+
+if(confidence=="Low"){
+stopLoss="-30%"
+takeProfit="+50%"
+}
+
+let momentumEngine="Neutral"
+
+if(momentum>.04) momentumEngine="STRONG BULLISH"
+else if(momentum>.02) momentumEngine="BULLISH"
+else if(momentum<-.04) momentumEngine="STRONG BEARISH"
+else if(momentum<-.02) momentumEngine="BEARISH"
+
+let gamma="BALANCED"
+
+if(momentum>.03) gamma="CALL DOMINANT"
+if(momentum<-.03) gamma="PUT DOMINANT"
+
+let smartMoney="NEUTRAL"
+
+if(price>avg20 && momentum>.02) smartMoney="ACCUMULATING"
+if(price<avg20 && momentum<-.02) smartMoney="DISTRIBUTION"
 
 return{
+
 price:price.toFixed(2),
-signal,
-score,
+bias,
+direction,
 confidence,
-expectedMove,
+expectedMove:expectedMove.toFixed(2),
 callStrike,
 putStrike,
 entry,
 expiration,
-pop,
-bias
-}
+pop:Math.round(pop),
+stopLoss,
+takeProfit,
+momentumEngine,
+gamma,
+smartMoney
 
 }
 
-async function scan(){
+}
 
-let symbol=document.getElementById("ticker").value.toUpperCase()
+async function runAI(){
 
-output.innerHTML="Running AI analysis..."
+let ticker=document.getElementById("ticker").value.toUpperCase()
 
-let prices=await getData(symbol)
+let output=document.getElementById("output")
 
-if(!prices){
+output.innerHTML="Analyzing..."
 
-output.innerHTML="Data unavailable"
+let closes=await getData(ticker)
+
+if(!closes){
+
+output.innerHTML="Data unavailable or API limit reached"
 
 return
-
 }
 
-let a=analyze(prices)
+let a=analyze(closes)
 
-output.innerHTML=`
+let strike=a.direction=="BUY PUT"?a.putStrike:a.callStrike
 
-<div class="card setup">
+output.innerHTML=
+
+`<div class="card">
 
 <b>AI TRADE SETUP</b><br><br>
 
-Ticker: ${symbol}<br>
-Direction: ${a.signal}<br>
-Confidence: ${a.confidence}<br>
-Strike: ${a.signal=="BUY CALL"?a.callStrike:a.putStrike}<br>
+Ticker: ${ticker}<br>
+Price: $${a.price}<br>
+Market Bias: ${a.bias}<br><br>
+
+Momentum Engine: ${a.momentumEngine}<br>
+Gamma Pressure: ${a.gamma}<br>
+Smart Money Flow: ${a.smartMoney}<br><br>
+
+Direction: ${a.direction}<br>
+Confidence: ${a.confidence}<br><br>
+
+Strike: ${strike}<br>
 Expiration: ${a.expiration}<br>
-Entry: ${a.entry}<br>
+Entry: ${a.entry}<br><br>
+
 Expected Move: $${a.expectedMove}<br>
-Probability Profit: ${a.pop}%<br>
+Probability Profit: ${a.pop}%<br><br>
 
-</div>
+Stop Loss: ${a.stopLoss}<br>
+Take Profit: ${a.takeProfit}
 
-`
+</div>`
 
 }
 
-async function marketScan(){
+async function scanMarket(){
 
-output.innerHTML="<div class='card'>Scanning...</div>"
+let output=document.getElementById("output")
+
+output.innerHTML="Scanning Market..."
 
 let results=[]
 
-for(let s of watchlist){
+for(let i=0;i<watchlist.length;i++){
 
-let prices=await getData(s)
+let closes=await getData(watchlist[i])
 
-if(!prices) continue
+if(!closes) continue
 
-let a=analyze(prices)
+let a=analyze(closes)
 
-results.push({symbol:s,...a})
+if(a.direction!="WAIT"){
 
-}
-
-results.sort((a,b)=>b.score-a.score)
-
-let best=results.slice(0,2)
-
-let html=`<div class="card best">
-
-<b>TOP OPPORTUNITIES</b><br><br>`
-
-for(let r of best){
-
-html+=`${r.symbol} — ${r.signal} — Score ${r.score}<br>`
+results.push({
+ticker:watchlist[i],
+confidence:a.confidence
+})
 
 }
 
-html+=`</div>`
-
-output.innerHTML=html
+await new Promise(r=>setTimeout(r,15000))
 
 }
 
-async function dashboard(){
+results=results.slice(0,2)
 
-let results=[]
+if(results.length==0){
 
-for(let s of premkt){
+output.innerHTML="No strong setups found"
 
-let prices=await getData(s)
-
-if(!prices) continue
-
-let a=analyze(prices)
-
-results.push({symbol:s,...a})
-
+return
 }
 
-results.sort((a,b)=>b.score-a.score)
+let text="<div class='card'><b>Top Opportunities</b><br><br>"
 
-let best=results.slice(0,2)
+results.forEach(r=>{
 
-let bias="Neutral"
+text+=`${r.ticker} — ${r.confidence}<br>`
 
-if(best[0] && best[0].bias=="Bullish") bias="Bullish"
-if(best[0] && best[0].bias=="Bearish") bias="Bearish"
+})
 
-let html=`<b>AI MARKET DASHBOARD</b><br><br>
+text+="</div>"
 
-Market Bias: ${bias}<br>
-Momentum Alert: Monitoring<br><br>
-
-<b>Top Opportunities</b><br>`
-
-for(let r of best){
-
-html+=`${r.symbol} — ${r.signal}<br>`
+output.innerHTML=text
 
 }
-
-document.getElementById("dashboard").innerHTML=html
-
-}
-
-dashboard()
 
 </script>
 
