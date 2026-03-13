@@ -3,7 +3,7 @@
 
 <head>
 
-<title>AI Options Terminal V23</title>
+<title>AI Options Terminal V24</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -53,10 +53,6 @@ font-size:18px;
 margin-top:12px;
 }
 
-button:active{
-opacity:.7;
-}
-
 </style>
 </head>
 
@@ -64,12 +60,11 @@ opacity:.7;
 
 <div class="container">
 
-<h1>AI Options Terminal V23</h1>
+<h1>AI Options Terminal V24</h1>
 
-<div class="card" id="dashboard">
+<div class="card">
 AI MARKET DASHBOARD<br><br>
-Market Bias: Monitoring<br>
-Momentum Alert: Monitoring
+Momentum Monitor Active
 </div>
 
 <input id="ticker" placeholder="Enter Stock Ticker">
@@ -87,16 +82,7 @@ Momentum Alert: Monitoring
 const API_KEY="OHCJWFQEFSXI8IJ3"
 
 const watchlist=[
-"SPY",
-"NVDA",
-"TSLA",
-"QQQ",
-"AAPL",
-"AMD",
-"META",
-"COIN",
-"NFLX",
-"AMZN"
+"SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"
 ]
 
 async function getData(symbol){
@@ -148,28 +134,25 @@ if(Math.abs(momentum)>.05) confidence="High"
 
 let expectedMove=price*0.04
 
-let callStrike=(price*1.01).toFixed(2)
-let putStrike=(price*0.99).toFixed(2)
+let callStrike=(price*1.01)
+let putStrike=(price*0.99)
 
-let entry="Wait Pullback"
-if(momentum>.04) entry="Breakout Entry"
+let strike=direction=="BUY PUT"?putStrike:callStrike
 
-let expiration="3-7 Days"
+let premium=strike*0.015
 
-let pop=Math.min(90,60+Math.abs(momentum*500))
+let breakeven=strike+premium
 
-let stopLoss="-40%"
-let takeProfit="+80%"
+let breakevenDistance=Math.abs(breakeven-price)
 
-if(confidence=="High"){
-stopLoss="-35%"
-takeProfit="+120%"
-}
+let edge="Neutral"
 
-if(confidence=="Low"){
-stopLoss="-30%"
-takeProfit="+50%"
-}
+if(expectedMove>breakevenDistance*1.2) edge="Favorable"
+if(expectedMove<breakevenDistance) edge="Risky"
+
+let thetaWarning="Low"
+
+if(edge=="Risky") thetaWarning="High"
 
 let momentumEngine="Neutral"
 
@@ -188,6 +171,29 @@ let smartMoney="NEUTRAL"
 if(price>avg20 && momentum>.02) smartMoney="ACCUMULATING"
 if(price<avg20 && momentum<-.02) smartMoney="DISTRIBUTION"
 
+let score=50
+
+if(bias=="Bullish"||bias=="Bearish") score+=10
+if(confidence=="High") score+=20
+if(edge=="Favorable") score+=15
+if(momentumEngine.includes("STRONG")) score+=10
+
+if(score>100) score=100
+
+let grade="C"
+
+if(score>90) grade="A+"
+else if(score>80) grade="A"
+else if(score>70) grade="B"
+
+let stopLoss="-40%"
+let takeProfit="+80%"
+
+if(confidence=="High"){
+stopLoss="-35%"
+takeProfit="+120%"
+}
+
 return{
 
 price:price.toFixed(2),
@@ -195,16 +201,19 @@ bias,
 direction,
 confidence,
 expectedMove:expectedMove.toFixed(2),
-callStrike,
-putStrike,
-entry,
-expiration,
-pop:Math.round(pop),
-stopLoss,
-takeProfit,
+strike:strike.toFixed(2),
+premium:premium.toFixed(2),
+breakeven:breakeven.toFixed(2),
+breakevenDistance:breakevenDistance.toFixed(2),
+edge,
+thetaWarning,
 momentumEngine,
 gamma,
-smartMoney
+smartMoney,
+score,
+grade,
+stopLoss,
+takeProfit
 
 }
 
@@ -221,15 +230,11 @@ output.innerHTML="Analyzing..."
 let closes=await getData(ticker)
 
 if(!closes){
-
 output.innerHTML="Data unavailable or API limit reached"
-
 return
 }
 
 let a=analyze(closes)
-
-let strike=a.direction=="BUY PUT"?a.putStrike:a.callStrike
 
 output.innerHTML=
 
@@ -246,14 +251,18 @@ Gamma Pressure: ${a.gamma}<br>
 Smart Money Flow: ${a.smartMoney}<br><br>
 
 Direction: ${a.direction}<br>
-Confidence: ${a.confidence}<br><br>
+Confidence: ${a.confidence}<br>
+Trade Score: ${a.score}/100 (${a.grade})<br><br>
 
-Strike: ${strike}<br>
-Expiration: ${a.expiration}<br>
-Entry: ${a.entry}<br><br>
+Strike: ${a.strike}<br>
+Premium Est: $${a.premium}<br>
+
+Breakeven: $${a.breakeven}<br>
+Distance to BE: $${a.breakevenDistance}<br><br>
 
 Expected Move: $${a.expectedMove}<br>
-Probability Profit: ${a.pop}%<br><br>
+Edge: ${a.edge}<br>
+Theta Risk: ${a.thetaWarning}<br><br>
 
 Stop Loss: ${a.stopLoss}<br>
 Take Profit: ${a.takeProfit}
@@ -282,7 +291,7 @@ if(a.direction!="WAIT"){
 
 results.push({
 ticker:watchlist[i],
-confidence:a.confidence
+score:a.score
 })
 
 }
@@ -290,6 +299,8 @@ confidence:a.confidence
 await new Promise(r=>setTimeout(r,15000))
 
 }
+
+results.sort((a,b)=>b.score-a.score)
 
 results=results.slice(0,2)
 
@@ -303,9 +314,7 @@ return
 let text="<div class='card'><b>Top Opportunities</b><br><br>"
 
 results.forEach(r=>{
-
-text+=`${r.ticker} — ${r.confidence}<br>`
-
+text+=`${r.ticker} — Score ${r.score}<br>`
 })
 
 text+="</div>"
