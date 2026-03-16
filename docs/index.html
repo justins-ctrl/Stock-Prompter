@@ -2,9 +2,7 @@
 <html>
 
 <head>
-
-<title>AI Options Terminal V26</title>
-
+<title>AI Options Terminal V26.1</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -60,7 +58,7 @@ margin-top:12px;
 
 <div class="container">
 
-<h1>AI Options Terminal V26</h1>
+<h1>AI Options Terminal V26.1</h1>
 
 <div class="card">
 AI MARKET DASHBOARD<br><br>
@@ -90,7 +88,6 @@ async function getData(symbol){
 let url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
 
 let r=await fetch(url)
-
 let d=await r.json()
 
 let s=d["Time Series (Daily)"]
@@ -192,6 +189,16 @@ let volatility="NORMAL"
 if(range5>range20*.4) volatility="EXPANSION LIKELY"
 if(range5<range20*.2) volatility="COMPRESSION"
 
+let expiration="5-10 Days"
+
+if(confidence=="High" && theta=="Low"){
+expiration="3-5 Days (Weekly)"
+}
+
+if(theta=="High"){
+expiration="10-14 Days (Bi-Weekly)"
+}
+
 let score=50
 
 if(bias!="Neutral") score+=10
@@ -224,6 +231,7 @@ momentumEngine,
 gamma,
 smartMoney,
 volatility,
+expiration,
 score,
 grade,
 bestStrike,
@@ -277,7 +285,8 @@ Confidence: ${a.confidence}<br>
 Trade Score: ${a.score}/100 (${a.grade})<br><br>
 
 Best Strike: ${a.bestStrike}<br>
-POP: ${a.bestPOP}%<br><br>
+POP: ${a.bestPOP}%<br>
+Expiration: ${a.expiration}<br><br>
 
 Breakeven: $${a.breakeven}<br>
 Distance to BE: $${a.dist}<br>
