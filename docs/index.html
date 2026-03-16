@@ -2,7 +2,7 @@
 <html>
 
 <head>
-<title>AI Options Terminal V27</title>
+<title>AI Options Terminal V28</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -58,7 +58,7 @@ margin-top:12px;
 
 <div class="container">
 
-<h1>AI Options Terminal V27</h1>
+<h1>AI Options Terminal V28</h1>
 
 <div class="card">
 AI MARKET DASHBOARD<br><br>
@@ -128,34 +128,15 @@ if(Math.abs(momentum)>.05) confidence="High"
 let expectedMove=price*0.04
 
 let atm=Math.round(price)
-let otm1=atm+1
-let otm2=atm+2
+let premium=atm*0.015
 
-let premiumATM=atm*0.015
-let premium1=otm1*0.013
-let premium2=otm2*0.011
-
-function pop(price,strike,premium){
-let breakeven=strike+premium
+let breakeven=atm+premium
 let dist=Math.abs(breakeven-price)
-let p=70-(dist/expectedMove*20)
-if(p>90)p=90
-if(p<30)p=30
-return Math.round(p)
-}
 
-let popATM=pop(price,atm,premiumATM)
-let pop1=pop(price,otm1,premium1)
-let pop2=pop(price,otm2,premium2)
-
-let bestStrike=atm
-let bestPOP=popATM
-
-if(pop1>bestPOP){bestPOP=pop1;bestStrike=otm1}
-if(pop2>bestPOP){bestPOP=pop2;bestStrike=otm2}
-
-let breakeven=bestStrike+(bestStrike*0.015)
-let dist=Math.abs(breakeven-price)
+let pop=70-(dist/expectedMove*20)
+if(pop>90) pop=90
+if(pop<30) pop=30
+pop=Math.round(pop)
 
 let edge="Neutral"
 if(expectedMove>dist*1.2) edge="Favorable"
@@ -195,6 +176,15 @@ if(momentum>.05 && price>avg20) flow="STRONG ACCUMULATION"
 else if(momentum>.02) flow="ACCUMULATION"
 else if(momentum<-.05 && price<avg20) flow="STRONG SELLING"
 else if(momentum<-.02) flow="SELLING"
+
+let regime="RANGE"
+
+if(volatility=="EXPANSION LIKELY" && Math.abs(momentum)>.03){
+regime="BREAKOUT"
+}
+else if(Math.abs(momentum)>.02){
+regime="TREND"
+}
 
 let expiration="5-10 Days"
 
@@ -239,11 +229,12 @@ gamma,
 smartMoney,
 volatility,
 flow,
+regime,
 expiration,
 score,
 grade,
-bestStrike,
-bestPOP,
+strike:atm,
+pop,
 breakeven:breakeven.toFixed(2),
 dist:dist.toFixed(2),
 expectedMove:expectedMove.toFixed(2),
@@ -287,14 +278,15 @@ Momentum Engine: ${a.momentumEngine}<br>
 Gamma Pressure: ${a.gamma}<br>
 Smart Money Flow: ${a.smartMoney}<br>
 Volatility Signal: ${a.volatility}<br>
-Institutional Flow: ${a.flow}<br><br>
+Institutional Flow: ${a.flow}<br>
+Market Regime: ${a.regime}<br><br>
 
 Direction: ${a.direction}<br>
 Confidence: ${a.confidence}<br>
 Trade Score: ${a.score}/100 (${a.grade})<br><br>
 
-Best Strike: ${a.bestStrike}<br>
-POP: ${a.bestPOP}%<br>
+Best Strike: ${a.strike}<br>
+POP: ${a.pop}%<br>
 Expiration: ${a.expiration}<br><br>
 
 Breakeven: $${a.breakeven}<br>
