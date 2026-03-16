@@ -2,7 +2,7 @@
 <html>
 
 <head>
-<title>AI Options Terminal V26.1</title>
+<title>AI Options Terminal V27</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -58,7 +58,7 @@ margin-top:12px;
 
 <div class="container">
 
-<h1>AI Options Terminal V26.1</h1>
+<h1>AI Options Terminal V27</h1>
 
 <div class="card">
 AI MARKET DASHBOARD<br><br>
@@ -189,6 +189,13 @@ let volatility="NORMAL"
 if(range5>range20*.4) volatility="EXPANSION LIKELY"
 if(range5<range20*.2) volatility="COMPRESSION"
 
+let flow="NEUTRAL"
+
+if(momentum>.05 && price>avg20) flow="STRONG ACCUMULATION"
+else if(momentum>.02) flow="ACCUMULATION"
+else if(momentum<-.05 && price<avg20) flow="STRONG SELLING"
+else if(momentum<-.02) flow="SELLING"
+
 let expiration="5-10 Days"
 
 if(confidence=="High" && theta=="Low"){
@@ -231,6 +238,7 @@ momentumEngine,
 gamma,
 smartMoney,
 volatility,
+flow,
 expiration,
 score,
 grade,
@@ -278,7 +286,8 @@ Market Bias: ${a.bias}<br><br>
 Momentum Engine: ${a.momentumEngine}<br>
 Gamma Pressure: ${a.gamma}<br>
 Smart Money Flow: ${a.smartMoney}<br>
-Volatility Signal: ${a.volatility}<br><br>
+Volatility Signal: ${a.volatility}<br>
+Institutional Flow: ${a.flow}<br><br>
 
 Direction: ${a.direction}<br>
 Confidence: ${a.confidence}<br>
