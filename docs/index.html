@@ -2,11 +2,10 @@
 <html>
 
 <head>
-<title>AI Options Terminal V28</title>
+<title>AI Options Terminal V29</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-
 body{
 font-family:Arial;
 background:#071326;
@@ -14,23 +13,16 @@ color:white;
 margin:0;
 padding:20px;
 }
-
 .container{
 max-width:520px;
 margin:auto;
 }
-
-h1{
-text-align:center;
-}
-
 .card{
 background:#13233d;
 padding:18px;
 border-radius:12px;
 margin-top:15px;
 }
-
 input{
 width:100%;
 padding:14px;
@@ -39,7 +31,6 @@ border:none;
 margin-top:10px;
 font-size:18px;
 }
-
 button{
 width:100%;
 padding:16px;
@@ -50,15 +41,12 @@ color:white;
 font-size:18px;
 margin-top:12px;
 }
-
 </style>
 </head>
 
 <body>
 
 <div class="container">
-
-<h1>AI Options Terminal V28</h1>
 
 <div class="card">
 AI MARKET DASHBOARD<br><br>
@@ -68,7 +56,6 @@ Momentum Monitor Active
 <input id="ticker" placeholder="Enter Stock Ticker">
 
 <button onclick="runAI()">Run AI Analysis</button>
-
 <button onclick="scanMarket()">Scan Top Opportunities</button>
 
 <div id="output"></div>
@@ -84,22 +71,13 @@ const watchlist=[
 ]
 
 async function getData(symbol){
-
 let url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
-
 let r=await fetch(url)
 let d=await r.json()
-
 let s=d["Time Series (Daily)"]
-
 if(!s) return null
-
-let closes=Object.values(s)
-.slice(0,60)
-.map(v=>parseFloat(v["4. close"]))
-
+let closes=Object.values(s).slice(0,60).map(v=>parseFloat(v["4. close"]))
 return closes
-
 }
 
 function analyze(closes){
@@ -112,12 +90,10 @@ let avg50=closes.slice(0,50).reduce((a,b)=>a+b)/50
 let momentum=(price-closes[5])/closes[5]
 
 let bias="Neutral"
-
 if(price>avg20 && avg20>avg50) bias="Bullish"
 if(price<avg20 && avg20<avg50) bias="Bearish"
 
 let direction="WAIT"
-
 if(momentum>.02 && bias=="Bullish") direction="BUY CALL"
 if(momentum<-.02 && bias=="Bearish") direction="BUY PUT"
 
@@ -134,9 +110,7 @@ let breakeven=atm+premium
 let dist=Math.abs(breakeven-price)
 
 let pop=70-(dist/expectedMove*20)
-if(pop>90) pop=90
-if(pop<30) pop=30
-pop=Math.round(pop)
+pop=Math.max(30,Math.min(90,Math.round(pop)))
 
 let edge="Neutral"
 if(expectedMove>dist*1.2) edge="Favorable"
@@ -146,19 +120,16 @@ let theta="Low"
 if(edge=="Risky") theta="High"
 
 let momentumEngine="Neutral"
-
 if(momentum>.04) momentumEngine="STRONG BULLISH"
 else if(momentum>.02) momentumEngine="BULLISH"
 else if(momentum<-.04) momentumEngine="STRONG BEARISH"
 else if(momentum<-.02) momentumEngine="BEARISH"
 
 let gamma="BALANCED"
-
 if(momentum>.03) gamma="CALL DOMINANT"
 if(momentum<-.03) gamma="PUT DOMINANT"
 
 let smartMoney="NEUTRAL"
-
 if(price>avg20 && momentum>.02) smartMoney="ACCUMULATING"
 if(price<avg20 && momentum<-.02) smartMoney="DISTRIBUTION"
 
@@ -166,44 +137,36 @@ let range5=Math.max(...closes.slice(0,5))-Math.min(...closes.slice(0,5))
 let range20=Math.max(...closes.slice(0,20))-Math.min(...closes.slice(0,20))
 
 let volatility="NORMAL"
-
 if(range5>range20*.4) volatility="EXPANSION LIKELY"
 if(range5<range20*.2) volatility="COMPRESSION"
 
 let flow="NEUTRAL"
-
 if(momentum>.05 && price>avg20) flow="STRONG ACCUMULATION"
 else if(momentum>.02) flow="ACCUMULATION"
 else if(momentum<-.05 && price<avg20) flow="STRONG SELLING"
 else if(momentum<-.02) flow="SELLING"
 
 let regime="RANGE"
-
 if(volatility=="EXPANSION LIKELY" && Math.abs(momentum)>.03){
 regime="BREAKOUT"
-}
-else if(Math.abs(momentum)>.02){
+}else if(Math.abs(momentum)>.02){
 regime="TREND"
 }
 
 let expiration="5-10 Days"
-
 if(confidence=="High" && theta=="Low"){
 expiration="3-5 Days (Weekly)"
 }
-
 if(theta=="High"){
 expiration="10-14 Days (Bi-Weekly)"
 }
 
 let score=50
-
 if(bias!="Neutral") score+=10
 if(confidence=="High") score+=20
 if(edge=="Favorable") score+=15
 if(volatility=="EXPANSION LIKELY") score+=10
-
-if(score>100) score=100
+score=Math.min(100,score)
 
 let grade="C"
 if(score>90) grade="A+"
@@ -212,14 +175,49 @@ else if(score>70) grade="B"
 
 let stop="-40%"
 let profit="+80%"
-
 if(confidence=="High"){
 stop="-35%"
 profit="+120%"
 }
 
-return{
+//////////////////////////////////////
+// 🔥 OTM STRIKE ENGINE (NEW V29)
+//////////////////////////////////////
 
+let otmStrike="-"
+let otmDistance="-"
+let otmGrade="-"
+let profitPotential="-"
+
+if(direction!=="WAIT"){
+
+let multiplier=0.5
+if(regime==="BREAKOUT") multiplier=0.7
+if(regime==="RANGE") multiplier=0.4
+
+let moveTarget=expectedMove*multiplier
+
+if(direction==="BUY CALL"){
+otmStrike=Math.round(price+moveTarget)
+otmDistance=((otmStrike-price)/price*100)
+}else{
+otmStrike=Math.round(price-moveTarget)
+otmDistance=((price-otmStrike)/price*100)
+}
+
+profitPotential=(expectedMove/premium)*100
+profitPotential=Math.min(200,profitPotential)
+
+if(profitPotential>120) otmGrade="A"
+else if(profitPotential>80) otmGrade="B"
+else otmGrade="C"
+
+otmDistance=otmDistance.toFixed(1)
+profitPotential=Math.round(profitPotential)
+
+}
+
+return{
 price:price.toFixed(2),
 bias,
 direction,
@@ -241,8 +239,11 @@ expectedMove:expectedMove.toFixed(2),
 edge,
 theta,
 stop,
-profit
-
+profit,
+otmStrike,
+otmDistance,
+otmGrade,
+profitPotential
 }
 
 }
@@ -250,7 +251,6 @@ profit
 async function runAI(){
 
 let ticker=document.getElementById("ticker").value.toUpperCase()
-
 let output=document.getElementById("output")
 
 output.innerHTML="Analyzing..."
@@ -258,7 +258,7 @@ output.innerHTML="Analyzing..."
 let closes=await getData(ticker)
 
 if(!closes){
-output.innerHTML="Data unavailable or API limit reached"
+output.innerHTML="Data unavailable"
 return
 }
 
@@ -289,6 +289,11 @@ Best Strike: ${a.strike}<br>
 POP: ${a.pop}%<br>
 Expiration: ${a.expiration}<br><br>
 
+Best OTM Strike: ${a.otmStrike}<br>
+OTM Distance: ${a.otmDistance}%<br>
+OTM Grade: ${a.otmGrade}<br>
+Profit Potential: +${a.profitPotential}%<br><br>
+
 Breakeven: $${a.breakeven}<br>
 Distance to BE: $${a.dist}<br>
 
@@ -300,39 +305,34 @@ Stop Loss: ${a.stop}<br>
 Take Profit: ${a.profit}
 
 </div>`
-
 }
 
 async function scanMarket(){
 
 let output=document.getElementById("output")
-
-output.innerHTML="Scanning Market..."
+output.innerHTML="Scanning..."
 
 let results=[]
 
 for(let i=0;i<watchlist.length;i++){
 
 let closes=await getData(watchlist[i])
-
 if(!closes) continue
 
 let a=analyze(closes)
 
-if(a.direction!="WAIT"){
+if(a.direction!=="WAIT"){
 results.push({ticker:watchlist[i],score:a.score})
 }
 
 await new Promise(r=>setTimeout(r,15000))
-
 }
 
 results.sort((a,b)=>b.score-a.score)
-
 results=results.slice(0,2)
 
-if(results.length==0){
-output.innerHTML="No strong setups found"
+if(results.length===0){
+output.innerHTML="No setups found"
 return
 }
 
@@ -345,7 +345,6 @@ text+=`${r.ticker} — Score ${r.score}<br>`
 text+="</div>"
 
 output.innerHTML=text
-
 }
 
 </script>
