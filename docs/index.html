@@ -1,59 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>AI Options Terminal V30</title>
+<title>AI Options Terminal V31</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{
-font-family:Arial;
-background:#071326;
-color:white;
-margin:0;
-padding:20px;
-}
-.container{
-max-width:520px;
-margin:auto;
-}
-.card{
-background:#13233d;
-padding:18px;
-border-radius:12px;
-margin-top:15px;
-}
-input{
-width:100%;
-padding:14px;
-border-radius:10px;
-border:none;
-margin-top:10px;
-font-size:18px;
-}
-button{
-width:100%;
-padding:16px;
-border-radius:12px;
-border:none;
-background:#3a8bfd;
-color:white;
-font-size:18px;
-margin-top:12px;
-}
+body{font-family:Arial;background:#071326;color:white;margin:0;padding:20px;}
+.container{max-width:520px;margin:auto;}
+.card{background:#13233d;padding:18px;border-radius:12px;margin-top:15px;}
+input{width:100%;padding:14px;border-radius:10px;border:none;margin-top:10px;font-size:18px;}
+button{width:100%;padding:16px;border-radius:12px;border:none;background:#3a8bfd;color:white;font-size:18px;margin-top:12px;}
 </style>
 </head>
 
 <body>
-
 <div class="container">
 
-<div class="card">
-AI MARKET DASHBOARD<br><br>
-Momentum Monitor Active
-</div>
+<div class="card">AI MARKET DASHBOARD<br><br>Momentum Monitor Active</div>
 
 <input id="ticker" placeholder="Enter Stock Ticker">
-
 <button onclick="runAI()">Run AI Analysis</button>
 <button onclick="scanMarket()">Scan Top Opportunities</button>
 
@@ -64,7 +29,6 @@ Momentum Monitor Active
 <script>
 
 const API_KEY="OHCJWFQEFSXI8IJ3"
-
 const watchlist=["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"]
 
 async function getData(symbol){
@@ -73,195 +37,133 @@ let r=await fetch(url)
 let d=await r.json()
 let s=d["Time Series (Daily)"]
 if(!s) return null
-let closes=Object.values(s).slice(0,60).map(v=>parseFloat(v["4. close"]))
-return closes
+return Object.values(s).slice(0,60).map(v=>parseFloat(v["4. close"]))
 }
 
 function analyze(closes){
 
 let price=closes[0]
-
 let avg20=closes.slice(0,20).reduce((a,b)=>a+b)/20
 let avg50=closes.slice(0,50).reduce((a,b)=>a+b)/50
-
 let momentum=(price-closes[5])/closes[5]
 
-let bias="Neutral"
-if(price>avg20 && avg20>avg50) bias="Bullish"
-if(price<avg20 && avg20<avg50) bias="Bearish"
+let bias = price>avg20&&avg20>avg50?"Bullish":price<avg20&&avg20<avg50?"Bearish":"Neutral"
+let direction = momentum>.02&&bias=="Bullish"?"BUY CALL":momentum<-.02&&bias=="Bearish"?"BUY PUT":"WAIT"
 
-let direction="WAIT"
-if(momentum>.02 && bias=="Bullish") direction="BUY CALL"
-if(momentum<-.02 && bias=="Bearish") direction="BUY PUT"
-
-let confidence="Low"
-if(Math.abs(momentum)>.03) confidence="Medium"
-if(Math.abs(momentum)>.05) confidence="High"
+let confidence=Math.abs(momentum)>.05?"High":Math.abs(momentum)>.03?"Medium":"Low"
 
 let expectedMove=price*0.04
-
 let atm=Math.round(price)
 let premium=atm*0.015
 
-let breakeven=(direction==="BUY PUT") ? atm-premium : atm+premium
+let breakeven=(direction==="BUY PUT")?atm-premium:atm+premium
 let dist=Math.abs(breakeven-price)
 
-let pop=70-(dist/expectedMove*20)
-pop=Math.max(30,Math.min(90,Math.round(pop)))
+let pop=Math.max(30,Math.min(90,Math.round(70-(dist/expectedMove*20))))
 
-let edge="Neutral"
-if(expectedMove>dist*1.2) edge="Favorable"
-if(expectedMove<dist) edge="Risky"
-
-let theta="Low"
-if(edge=="Risky") theta="High"
-
-let momentumEngine="Neutral"
-if(momentum>.04) momentumEngine="STRONG BULLISH"
-else if(momentum>.02) momentumEngine="BULLISH"
-else if(momentum<-.04) momentumEngine="STRONG BEARISH"
-else if(momentum<-.02) momentumEngine="BEARISH"
-
-let gamma="BALANCED"
-if(momentum>.03) gamma="CALL DOMINANT"
-if(momentum<-.03) gamma="PUT DOMINANT"
-
-let smartMoney="NEUTRAL"
-if(price>avg20 && momentum>.02) smartMoney="ACCUMULATING"
-if(price<avg20 && momentum<-.02) smartMoney="DISTRIBUTION"
-
-let range5=Math.max(...closes.slice(0,5))-Math.min(...closes.slice(0,5))
-let range20=Math.max(...closes.slice(0,20))-Math.min(...closes.slice(0,20))
+let edge=expectedMove>dist*1.2?"Favorable":expectedMove<dist?"Risky":"Neutral"
+let theta=edge==="Risky"?"High":"Low"
 
 let volatility="NORMAL"
+let range5=Math.max(...closes.slice(0,5))-Math.min(...closes.slice(0,5))
+let range20=Math.max(...closes.slice(0,20))-Math.min(...closes.slice(0,20))
 if(range5>range20*.4) volatility="EXPANSION LIKELY"
 if(range5<range20*.2) volatility="COMPRESSION"
 
-let flow="NEUTRAL"
-if(momentum>.05 && price>avg20) flow="STRONG ACCUMULATION"
-else if(momentum>.02) flow="ACCUMULATION"
-else if(momentum<-.05 && price<avg20) flow="STRONG SELLING"
-else if(momentum<-.02) flow="SELLING"
-
-let regime="RANGE"
-if(volatility=="EXPANSION LIKELY" && Math.abs(momentum)>.03){
-regime="BREAKOUT"
-}else if(Math.abs(momentum)>.02){
-regime="TREND"
-}
+let regime=volatility==="EXPANSION LIKELY"&&Math.abs(momentum)>.03?"BREAKOUT":Math.abs(momentum)>.02?"TREND":"RANGE"
 
 let expiration="5-10 Days"
-if(confidence=="High" && theta=="Low") expiration="3-5 Days (Weekly)"
-if(theta=="High") expiration="10-14 Days (Bi-Weekly)"
+if(confidence==="High"&&theta==="Low") expiration="3-5 Days (Weekly)"
+if(theta==="High") expiration="10-14 Days (Bi-Weekly)"
 
-let score=50
-if(bias!="Neutral") score+=10
-if(confidence=="High") score+=20
-if(edge=="Favorable") score+=15
-if(volatility=="EXPANSION LIKELY") score+=10
+let score=50+(bias!=="Neutral"?10:0)+(confidence==="High"?20:0)+(edge==="Favorable"?15:0)+(volatility==="EXPANSION LIKELY"?10:0)
 score=Math.min(100,score)
 
-let grade="C"
-if(score>90) grade="A+"
-else if(score>80) grade="A"
-else if(score>70) grade="B"
+let grade=score>90?"A+":score>80?"A":score>70?"B":"C"
 
-let stop="-40%"
-let profit="+80%"
-if(confidence=="High"){
-stop="-35%"
-profit="+120%"
+/////////////////////////
+// 🚫 TRADE FILTER (NEW)
+/////////////////////////
+
+let tradeFilter="PASS"
+if(grade==="C"||direction==="WAIT"){
+tradeFilter="FAIL"
+}
+
+/////////////////////////
+// 💰 POSITION SIZING
+/////////////////////////
+
+let contracts=1
+let allocation="5%"
+let risk="Low"
+
+if(grade==="A+"&&confidence==="High"){
+contracts=5
+allocation="25%"
+risk="High"
+}
+else if(grade==="A"){
+contracts=3
+allocation="18%"
+risk="Moderate"
+}
+else if(grade==="B"){
+contracts=2
+allocation="10%"
+risk="Moderate"
+}
+else{
+contracts=0
+allocation="0%"
+risk="Avoid"
 }
 
 /////////////////////////
 // OTM ENGINE
 /////////////////////////
 
-let otmStrike="-"
-let otmDistance="-"
-let otmGrade="-"
-let profitPotential="-"
+let otmStrike="-",otmDistance="-",otmGrade="-",profitPotential="-"
 
 if(direction!=="WAIT"){
-
-let multiplier=0.5
-if(regime==="BREAKOUT") multiplier=0.7
-if(regime==="RANGE") multiplier=0.4
-
-let moveTarget=expectedMove*multiplier
-
+let move=expectedMove*0.5
 if(direction==="BUY CALL"){
-otmStrike=Math.round(price+moveTarget)
-otmDistance=((otmStrike-price)/price*100)
+otmStrike=Math.round(price+move)
+otmDistance=((otmStrike-price)/price*100).toFixed(1)
 }else{
-otmStrike=Math.round(price-moveTarget)
-otmDistance=((price-otmStrike)/price*100)
+otmStrike=Math.round(price-move)
+otmDistance=((price-otmStrike)/price*100).toFixed(1)
 }
-
-profitPotential=(expectedMove/premium)*100
-profitPotential=Math.min(200,profitPotential)
-
-if(profitPotential>120) otmGrade="A"
-else if(profitPotential>80) otmGrade="B"
-else otmGrade="C"
-
-otmDistance=otmDistance.toFixed(1)
-profitPotential=Math.round(profitPotential)
+profitPotential=Math.min(200,Math.round((expectedMove/premium)*100))
+otmGrade=profitPotential>120?"A":profitPotential>80?"B":"C"
 }
 
 /////////////////////////
-// EXIT AI (V30)
+// EXIT AI
 /////////////////////////
 
-let optimalExit="+50%"
-let runnerTarget="+100%"
-let thetaKill="3 Days"
-
-if(confidence==="High"){
-optimalExit="+65%"
-runnerTarget="+120%"
-thetaKill="2 Days"
-}
-if(theta==="High"){
-optimalExit="+40%"
-runnerTarget="+80%"
-thetaKill="1 Day"
-}
+let optimalExit=confidence==="High"?"+65%":"+50%"
+let runnerTarget=confidence==="High"?"+120%":"+100%"
+let thetaKill=theta==="High"?"1 Day":"2-3 Days"
 
 /////////////////////////
-// LIQUIDITY ENGINE
+// LIQUIDITY
 /////////////////////////
 
-let liquidity="Moderate"
-let spreadRisk="Medium"
-let executionGrade="B"
-
-if(price>50){
-liquidity="High"
-spreadRisk="Low"
-executionGrade="A"
-}
-else if(price<15){
-liquidity="Low"
-spreadRisk="High"
-executionGrade="C"
-}
+let liquidity=price>50?"High":price<15?"Low":"Moderate"
+let spreadRisk=price>50?"Low":price<15?"High":"Medium"
+let executionGrade=price>50?"A":price<15?"C":"B"
 
 return{
-price:price.toFixed(2),
-bias,direction,confidence,
-momentumEngine,gamma,smartMoney,volatility,flow,regime,
-expiration,score,grade,
-strike:atm,pop,
-breakeven:breakeven.toFixed(2),
-dist:dist.toFixed(2),
-expectedMove:expectedMove.toFixed(2),
-edge,theta,stop,profit,
+price:price.toFixed(2),bias,direction,confidence,score,grade,
+strike:atm,pop,expiration,
+breakeven:breakeven.toFixed(2),dist:dist.toFixed(2),
+expectedMove:expectedMove.toFixed(2),edge,theta,
 otmStrike,otmDistance,otmGrade,profitPotential,
 optimalExit,runnerTarget,thetaKill,
-liquidity,spreadRisk,executionGrade
+liquidity,spreadRisk,executionGrade,
+tradeFilter,contracts,allocation,risk
 }
-
 }
 
 async function runAI(){
@@ -272,11 +174,7 @@ let output=document.getElementById("output")
 output.innerHTML="Analyzing..."
 
 let closes=await getData(ticker)
-
-if(!closes){
-output.innerHTML="Data unavailable"
-return
-}
+if(!closes){output.innerHTML="No Data";return}
 
 let a=analyze(closes)
 
@@ -288,16 +186,14 @@ Ticker: ${ticker}<br>
 Price: $${a.price}<br>
 Market Bias: ${a.bias}<br><br>
 
-Momentum Engine: ${a.momentumEngine}<br>
-Gamma Pressure: ${a.gamma}<br>
-Smart Money Flow: ${a.smartMoney}<br>
-Volatility Signal: ${a.volatility}<br>
-Institutional Flow: ${a.flow}<br>
-Market Regime: ${a.regime}<br><br>
-
 Direction: ${a.direction}<br>
 Confidence: ${a.confidence}<br>
-Trade Score: ${a.score}/100 (${a.grade})<br><br>
+Trade Score: ${a.score}/100 (${a.grade})<br>
+Trade Filter: ${a.tradeFilter}<br><br>
+
+Suggested Contracts: ${a.contracts}<br>
+Capital Allocation: ${a.allocation}<br>
+Risk Level: ${a.risk}<br><br>
 
 Best Strike: ${a.strike}<br>
 POP: ${a.pop}%<br>
@@ -314,13 +210,9 @@ Expected Move: $${a.expectedMove}<br>
 Edge: ${a.edge}<br>
 Theta Risk: ${a.theta}<br><br>
 
-Stop Loss: ${a.stop}<br>
-Take Profit: ${a.profit}<br><br>
-
 Optimal Exit: ${a.optimalExit}<br>
-Runner Target: ${a.runnerTarget}<br><br>
-
-Theta Kill Zone: After ${a.thetaKill}<br><br>
+Runner Target: ${a.runnerTarget}<br>
+Theta Kill Zone: ${a.thetaKill}<br><br>
 
 Liquidity: ${a.liquidity}<br>
 Spread Risk: ${a.spreadRisk}<br>
@@ -337,13 +229,11 @@ output.innerHTML="Scanning..."
 let results=[]
 
 for(let i=0;i<watchlist.length;i++){
-
 let closes=await getData(watchlist[i])
 if(!closes) continue
-
 let a=analyze(closes)
 
-if(a.direction!=="WAIT"){
+if(a.tradeFilter==="PASS"){
 results.push({ticker:watchlist[i],score:a.score})
 }
 
@@ -354,16 +244,12 @@ results.sort((a,b)=>b.score-a.score)
 results=results.slice(0,2)
 
 if(results.length===0){
-output.innerHTML="No setups found"
+output.innerHTML="No A/B setups found"
 return
 }
 
-let text="<div class='card'><b>Top Opportunities</b><br><br>"
-
-results.forEach(r=>{
-text+=`${r.ticker} — Score ${r.score}<br>`
-})
-
+let text="<div class='card'><b>Top A/B Opportunities</b><br><br>"
+results.forEach(r=>{text+=`${r.ticker} — Score ${r.score}<br>`})
 text+="</div>"
 
 output.innerHTML=text
