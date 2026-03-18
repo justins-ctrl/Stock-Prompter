@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-<title>AI Options Terminal V29</title>
+<title>AI Options Terminal V30</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -66,9 +65,7 @@ Momentum Monitor Active
 
 const API_KEY="OHCJWFQEFSXI8IJ3"
 
-const watchlist=[
-"SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"
-]
+const watchlist=["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"]
 
 async function getData(symbol){
 let url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
@@ -106,7 +103,7 @@ let expectedMove=price*0.04
 let atm=Math.round(price)
 let premium=atm*0.015
 
-let breakeven=atm+premium
+let breakeven=(direction==="BUY PUT") ? atm-premium : atm+premium
 let dist=Math.abs(breakeven-price)
 
 let pop=70-(dist/expectedMove*20)
@@ -154,12 +151,8 @@ regime="TREND"
 }
 
 let expiration="5-10 Days"
-if(confidence=="High" && theta=="Low"){
-expiration="3-5 Days (Weekly)"
-}
-if(theta=="High"){
-expiration="10-14 Days (Bi-Weekly)"
-}
+if(confidence=="High" && theta=="Low") expiration="3-5 Days (Weekly)"
+if(theta=="High") expiration="10-14 Days (Bi-Weekly)"
 
 let score=50
 if(bias!="Neutral") score+=10
@@ -180,9 +173,9 @@ stop="-35%"
 profit="+120%"
 }
 
-//////////////////////////////////////
-// 🔥 OTM STRIKE ENGINE (NEW V29)
-//////////////////////////////////////
+/////////////////////////
+// OTM ENGINE
+/////////////////////////
 
 let otmStrike="-"
 let otmDistance="-"
@@ -214,36 +207,59 @@ else otmGrade="C"
 
 otmDistance=otmDistance.toFixed(1)
 profitPotential=Math.round(profitPotential)
+}
 
+/////////////////////////
+// EXIT AI (V30)
+/////////////////////////
+
+let optimalExit="+50%"
+let runnerTarget="+100%"
+let thetaKill="3 Days"
+
+if(confidence==="High"){
+optimalExit="+65%"
+runnerTarget="+120%"
+thetaKill="2 Days"
+}
+if(theta==="High"){
+optimalExit="+40%"
+runnerTarget="+80%"
+thetaKill="1 Day"
+}
+
+/////////////////////////
+// LIQUIDITY ENGINE
+/////////////////////////
+
+let liquidity="Moderate"
+let spreadRisk="Medium"
+let executionGrade="B"
+
+if(price>50){
+liquidity="High"
+spreadRisk="Low"
+executionGrade="A"
+}
+else if(price<15){
+liquidity="Low"
+spreadRisk="High"
+executionGrade="C"
 }
 
 return{
 price:price.toFixed(2),
-bias,
-direction,
-confidence,
-momentumEngine,
-gamma,
-smartMoney,
-volatility,
-flow,
-regime,
-expiration,
-score,
-grade,
-strike:atm,
-pop,
+bias,direction,confidence,
+momentumEngine,gamma,smartMoney,volatility,flow,regime,
+expiration,score,grade,
+strike:atm,pop,
 breakeven:breakeven.toFixed(2),
 dist:dist.toFixed(2),
 expectedMove:expectedMove.toFixed(2),
-edge,
-theta,
-stop,
-profit,
-otmStrike,
-otmDistance,
-otmGrade,
-profitPotential
+edge,theta,stop,profit,
+otmStrike,otmDistance,otmGrade,profitPotential,
+optimalExit,runnerTarget,thetaKill,
+liquidity,spreadRisk,executionGrade
 }
 
 }
@@ -264,9 +280,7 @@ return
 
 let a=analyze(closes)
 
-output.innerHTML=
-
-`<div class="card">
+output.innerHTML=`<div class="card">
 
 <b>AI TRADE SETUP</b><br><br>
 
@@ -296,13 +310,21 @@ Profit Potential: +${a.profitPotential}%<br><br>
 
 Breakeven: $${a.breakeven}<br>
 Distance to BE: $${a.dist}<br>
-
 Expected Move: $${a.expectedMove}<br>
 Edge: ${a.edge}<br>
 Theta Risk: ${a.theta}<br><br>
 
 Stop Loss: ${a.stop}<br>
-Take Profit: ${a.profit}
+Take Profit: ${a.profit}<br><br>
+
+Optimal Exit: ${a.optimalExit}<br>
+Runner Target: ${a.runnerTarget}<br><br>
+
+Theta Kill Zone: After ${a.thetaKill}<br><br>
+
+Liquidity: ${a.liquidity}<br>
+Spread Risk: ${a.spreadRisk}<br>
+Execution Quality: ${a.executionGrade}
 
 </div>`
 }
