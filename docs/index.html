@@ -1,47 +1,90 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Options Terminal V31.2 Watchlist</title>
+  <title>AI Options Terminal Futuristic</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
     body{
       font-family:Arial, sans-serif;
-      background:#071326;
+      background:linear-gradient(180deg,#050d1f,#071326);
       color:white;
       margin:0;
       padding:20px;
     }
+
     .container{
       max-width:520px;
       margin:auto;
     }
-    .card{
-      background:#13233d;
-      padding:18px;
-      border-radius:12px;
-      margin-top:15px;
-      line-height:1.35;
+
+    .title{
+      text-align:center;
+      font-size:28px;
+      font-weight:bold;
+      margin-bottom:8px;
+      letter-spacing:.5px;
+      text-shadow:0 0 10px rgba(58,139,253,.35);
     }
+
+    .subtitle{
+      text-align:center;
+      opacity:.8;
+      margin-bottom:18px;
+      font-size:14px;
+    }
+
+    .card{
+      background:rgba(19,35,61,0.88);
+      padding:18px;
+      border-radius:14px;
+      margin-top:15px;
+      line-height:1.45;
+      border:1px solid rgba(58,139,253,0.22);
+      box-shadow:0 0 14px rgba(58,139,253,0.14);
+      backdrop-filter: blur(6px);
+      animation:fadeIn .28s ease;
+    }
+
+    .section-title{
+      font-size:16px;
+      font-weight:bold;
+      margin-bottom:10px;
+      color:#9fd0ff;
+      text-transform:uppercase;
+      letter-spacing:.7px;
+    }
+
     input{
       width:100%;
       padding:14px;
-      border-radius:10px;
+      border-radius:12px;
       border:none;
       margin-top:10px;
       font-size:18px;
       box-sizing:border-box;
+      background:#0e1c33;
+      color:white;
+      box-shadow:inset 0 0 0 1px rgba(58,139,253,0.18);
     }
+
     button{
       width:100%;
       padding:16px;
       border-radius:12px;
       border:none;
-      background:#3a8bfd;
+      background:linear-gradient(135deg,#3a8bfd,#1f6df0);
       color:white;
       font-size:18px;
       margin-top:12px;
+      box-shadow:0 0 10px rgba(58,139,253,.45);
+      cursor:pointer;
     }
+
+    button:active{
+      transform:scale(.98);
+    }
+
     .small-btn{
       width:auto;
       padding:8px 12px;
@@ -49,47 +92,97 @@
       margin-top:0;
       margin-left:8px;
       border-radius:8px;
-      background:#244b84;
+      background:linear-gradient(135deg,#2f5fa7,#244b84);
+      box-shadow:none;
     }
+
+    .danger{
+      background:linear-gradient(135deg,#a53030,#7b2020);
+    }
+
     .row{
       display:flex;
       gap:10px;
       align-items:center;
     }
+
     .row input{
       margin-top:0;
       flex:1;
     }
+
     .watch-item{
       display:flex;
       justify-content:space-between;
       align-items:center;
       padding:10px 0;
-      border-bottom:1px solid rgba(255,255,255,0.08);
+      border-bottom:1px solid rgba(255,255,255,.08);
     }
+
     .watch-item:last-child{
       border-bottom:none;
     }
-    .muted{
-      opacity:.85;
+
+    .green{color:#3cff88;}
+    .red{color:#ff6b6b;}
+    .yellow{color:#ffd84d;}
+    .blue{color:#8ecbff;}
+    .muted{opacity:.82;}
+
+    .metric{
+      margin:4px 0;
     }
-    .danger{
-      background:#8b2d2d;
+
+    .divider{
+      height:1px;
+      background:rgba(255,255,255,.08);
+      margin:14px 0;
+    }
+
+    .bar{
+      height:10px;
+      background:#0e1c33;
+      border-radius:8px;
+      margin-top:8px;
+      overflow:hidden;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+    }
+
+    .fill{
+      height:100%;
+      background:linear-gradient(90deg,#3cff88,#3a8bfd);
+      border-radius:8px;
+    }
+
+    .pill{
+      display:inline-block;
+      padding:4px 10px;
+      border-radius:999px;
+      font-size:13px;
+      background:rgba(255,255,255,.08);
+      margin-top:4px;
+    }
+
+    @keyframes fadeIn{
+      from{opacity:0;transform:translateY(8px);}
+      to{opacity:1;transform:translateY(0);}
     }
   </style>
 </head>
 
 <body>
   <div class="container">
+    <div class="title">AI Options Terminal</div>
+    <div class="subtitle">Futuristic mobile trading dashboard</div>
 
     <div class="card">
-      <b>AI MARKET DASHBOARD</b><br><br>
-      Momentum Monitor Active<br>
-      <span class="muted">Custom watchlist enabled</span>
+      <div class="section-title">AI Market Dashboard</div>
+      <div class="metric">Momentum Monitor <span class="blue">Active</span></div>
+      <div class="metric muted">Live price mode enabled</div>
     </div>
 
     <div class="card">
-      <b>My Watchlist</b>
+      <div class="section-title">My Watchlist</div>
 
       <div class="row" style="margin-top:12px;">
         <input id="watchlistInput" placeholder="Add ticker (AAPL, NVDA, SOFI)">
@@ -107,7 +200,6 @@
     <button onclick="scanMarket()">Scan Default Top Opportunities</button>
 
     <div id="output"></div>
-
   </div>
 
 <script>
@@ -403,6 +495,20 @@ function analyze(closes, livePrice){
   };
 }
 
+function signalClass(value){
+  if(typeof value !== "string") return "blue";
+  if(value.includes("BUY CALL") || value.includes("BULLISH") || value.includes("ACCUMULATION") || value.includes("PASS") || value === "A+" || value === "A" || value === "Low" || value === "Favorable" || value === "High"){
+    return "green";
+  }
+  if(value.includes("BUY PUT") || value.includes("BEARISH") || value.includes("SELLING") || value.includes("FAIL") || value === "C" || value === "Risky" || value === "High"){
+    return "red";
+  }
+  if(value.includes("WAIT") || value === "B" || value === "Medium" || value.includes("BALANCED") || value.includes("RANGE") || value.includes("NORMAL")){
+    return "yellow";
+  }
+  return "blue";
+}
+
 async function runAI(){
   const ticker = document.getElementById("ticker").value.toUpperCase().trim();
   const output = document.getElementById("output");
@@ -423,54 +529,70 @@ async function runAI(){
   const livePrice = await getLivePrice(ticker);
   const a = analyze(closes, livePrice);
 
-  output.innerHTML = `<div class="card">
+  output.innerHTML = `
+  <div class="card">
+    <div class="section-title">AI Trade Setup</div>
 
-<b>AI TRADE SETUP</b><br><br>
+    <div class="metric"><b>Ticker:</b> ${ticker}</div>
+    <div class="metric"><b>Price:</b> $${a.price}</div>
+    <div class="metric"><b>Market Bias:</b> <span class="${signalClass(a.bias)}">${a.bias}</span></div>
 
-Ticker: ${ticker}<br>
-Price: $${a.price}<br>
-Market Bias: ${a.bias}<br><br>
+    <div class="divider"></div>
 
-Direction: ${a.direction}<br>
-Confidence: ${a.confidence}<br>
-Trade Score: ${a.score}/100 (${a.grade})<br>
-Trade Filter: ${a.tradeFilter}<br><br>
+    <div class="section-title">Trade Decision</div>
+    <div class="metric"><b>Direction:</b> <span class="${signalClass(a.direction)}">${a.direction}</span></div>
+    <div class="metric"><b>Confidence:</b> <span class="${signalClass(a.confidence)}">${a.confidence}</span></div>
+    <div class="metric"><b>Trade Score:</b> ${a.score}/100 (<span class="${signalClass(a.grade)}">${a.grade}</span>)</div>
+    <div class="bar"><div class="fill" style="width:${a.score}%"></div></div>
+    <div class="metric"><b>Trade Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div>
 
-Suggested Contracts: ${a.contracts}<br>
-Capital Allocation: ${a.allocation}<br>
-Risk Level: ${a.risk}<br><br>
+    <div class="divider"></div>
 
-Momentum Engine: ${a.momentumEngine}<br>
-Gamma Pressure: ${a.gamma}<br>
-Smart Money Flow: ${a.smartMoney}<br>
-Volatility Signal: ${a.volatility}<br>
-Institutional Flow: ${a.flow}<br>
-Market Regime: ${a.regime}<br><br>
+    <div class="section-title">Position Sizing</div>
+    <div class="metric"><b>Suggested Contracts:</b> ${a.contracts}</div>
+    <div class="metric"><b>Capital Allocation:</b> ${a.allocation}</div>
+    <div class="metric"><b>Risk Level:</b> <span class="${signalClass(a.risk)}">${a.risk}</span></div>
 
-Best Strike: ${a.strike}<br>
-POP: ${a.pop}%<br>
-Expiration: ${a.expiration}<br><br>
+    <div class="divider"></div>
 
-Best OTM Strike: ${a.otmStrike}<br>
-OTM Distance: ${a.otmDistance}%<br>
-OTM Grade: ${a.otmGrade}<br>
-Profit Potential: +${a.profitPotential}%<br><br>
+    <div class="section-title">Market Intelligence</div>
+    <div class="metric"><b>Momentum Engine:</b> <span class="${signalClass(a.momentumEngine)}">${a.momentumEngine}</span></div>
+    <div class="metric"><b>Gamma Pressure:</b> <span class="${signalClass(a.gamma)}">${a.gamma}</span></div>
+    <div class="metric"><b>Smart Money Flow:</b> <span class="${signalClass(a.smartMoney)}">${a.smartMoney}</span></div>
+    <div class="metric"><b>Volatility Signal:</b> <span class="${signalClass(a.volatility)}">${a.volatility}</span></div>
+    <div class="metric"><b>Institutional Flow:</b> <span class="${signalClass(a.flow)}">${a.flow}</span></div>
+    <div class="metric"><b>Market Regime:</b> <span class="${signalClass(a.regime)}">${a.regime}</span></div>
 
-Breakeven: $${a.breakeven}<br>
-Distance to BE: $${a.dist}<br>
-Expected Move: $${a.expectedMove}<br>
-Edge: ${a.edge}<br>
-Theta Risk: ${a.theta}<br><br>
+    <div class="divider"></div>
 
-Optimal Exit: ${a.optimalExit}<br>
-Runner Target: ${a.runnerTarget}<br>
-Theta Kill Zone: ${a.thetaKill}<br><br>
+    <div class="section-title">Contract Setup</div>
+    <div class="metric"><b>Best Strike:</b> ${a.strike}</div>
+    <div class="metric"><b>POP:</b> ${a.pop}%</div>
+    <div class="metric"><b>Expiration:</b> ${a.expiration}</div>
+    <div class="metric"><b>Best OTM Strike:</b> ${a.otmStrike}</div>
+    <div class="metric"><b>OTM Distance:</b> ${a.otmDistance}%</div>
+    <div class="metric"><b>OTM Grade:</b> <span class="${signalClass(a.otmGrade)}">${a.otmGrade}</span></div>
+    <div class="metric"><b>Profit Potential:</b> +${a.profitPotential}%</div>
 
-Liquidity: ${a.liquidity}<br>
-Spread Risk: ${a.spreadRisk}<br>
-Execution Quality: ${a.executionGrade}
+    <div class="divider"></div>
 
-</div>`;
+    <div class="section-title">Breakeven & Edge</div>
+    <div class="metric"><b>Breakeven:</b> $${a.breakeven}</div>
+    <div class="metric"><b>Distance to BE:</b> $${a.dist}</div>
+    <div class="metric"><b>Expected Move:</b> $${a.expectedMove}</div>
+    <div class="metric"><b>Edge:</b> <span class="${signalClass(a.edge)}">${a.edge}</span></div>
+    <div class="metric"><b>Theta Risk:</b> <span class="${signalClass(a.theta)}">${a.theta}</span></div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">Exit & Execution</div>
+    <div class="metric"><b>Optimal Exit:</b> ${a.optimalExit}</div>
+    <div class="metric"><b>Runner Target:</b> ${a.runnerTarget}</div>
+    <div class="metric"><b>Theta Kill Zone:</b> ${a.thetaKill}</div>
+    <div class="metric"><b>Liquidity:</b> ${a.liquidity}</div>
+    <div class="metric"><b>Spread Risk:</b> ${a.spreadRisk}</div>
+    <div class="metric"><b>Execution Quality:</b> <span class="${signalClass(a.executionGrade)}">${a.executionGrade}</span></div>
+  </div>`;
 }
 
 async function scanList(list, title){
@@ -487,7 +609,7 @@ async function scanList(list, title){
     const a = analyze(closes, livePrice);
 
     if(a.tradeFilter === "PASS"){
-      results.push({ticker: list[i], score: a.score});
+      results.push({ticker: list[i], score: a.score, direction: a.direction});
     }
 
     await new Promise(r => setTimeout(r, 15000));
@@ -501,12 +623,14 @@ async function scanList(list, title){
     return;
   }
 
-  let html = `<div class='card'><b>${title}</b><br><br>`;
-  results.forEach(r => {
-    html += `${r.ticker} — Score ${r.score}<br>`;
-  });
-  html += "</div>";
+  let html = `<div class='card'>
+    <div class='section-title'>${title}</div>`;
 
+  results.forEach(r => {
+    html += `<div class="metric">${r.ticker} — <span class="${signalClass(r.direction)}">${r.direction}</span> — Score ${r.score}</div>`;
+  });
+
+  html += `</div>`;
   output.innerHTML = html;
 }
 
