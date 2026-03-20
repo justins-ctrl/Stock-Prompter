@@ -1,184 +1,322 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>AI Options Terminal V31</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Options Terminal V31.1 Live Pricing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<style>
-body{font-family:Arial;background:#071326;color:white;margin:0;padding:20px;}
-.container{max-width:520px;margin:auto;}
-.card{background:#13233d;padding:18px;border-radius:12px;margin-top:15px;}
-input{width:100%;padding:14px;border-radius:10px;border:none;margin-top:10px;font-size:18px;}
-button{width:100%;padding:16px;border-radius:12px;border:none;background:#3a8bfd;color:white;font-size:18px;margin-top:12px;}
-</style>
+  <style>
+    body{
+      font-family:Arial, sans-serif;
+      background:#071326;
+      color:white;
+      margin:0;
+      padding:20px;
+    }
+    .container{
+      max-width:520px;
+      margin:auto;
+    }
+    .card{
+      background:#13233d;
+      padding:18px;
+      border-radius:12px;
+      margin-top:15px;
+      line-height:1.35;
+    }
+    input{
+      width:100%;
+      padding:14px;
+      border-radius:10px;
+      border:none;
+      margin-top:10px;
+      font-size:18px;
+      box-sizing:border-box;
+    }
+    button{
+      width:100%;
+      padding:16px;
+      border-radius:12px;
+      border:none;
+      background:#3a8bfd;
+      color:white;
+      font-size:18px;
+      margin-top:12px;
+    }
+    .muted{
+      opacity:.85;
+    }
+  </style>
 </head>
 
 <body>
-<div class="container">
+  <div class="container">
 
-<div class="card">AI MARKET DASHBOARD<br><br>Momentum Monitor Active</div>
+    <div class="card">
+      <b>AI MARKET DASHBOARD</b><br><br>
+      Momentum Monitor Active<br>
+      <span class="muted">Live price mode enabled</span>
+    </div>
 
-<input id="ticker" placeholder="Enter Stock Ticker">
-<button onclick="runAI()">Run AI Analysis</button>
-<button onclick="scanMarket()">Scan Top Opportunities</button>
+    <input id="ticker" placeholder="Enter Stock Ticker">
 
-<div id="output"></div>
+    <button onclick="runAI()">Run AI Analysis</button>
+    <button onclick="scanMarket()">Scan Top Opportunities</button>
 
-</div>
+    <div id="output"></div>
+
+  </div>
 
 <script>
+const API_KEY = "OHCJWFQEFSXI8IJ3";
+const watchlist = ["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"];
 
-const API_KEY="OHCJWFQEFSXI8IJ3"
-const watchlist=["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"]
-
-async function getData(symbol){
-let url=`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`
-let r=await fetch(url)
-let d=await r.json()
-let s=d["Time Series (Daily)"]
-if(!s) return null
-return Object.values(s).slice(0,60).map(v=>parseFloat(v["4. close"]))
+async function getHistory(symbol){
+  try{
+    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const s = d["Time Series (Daily)"];
+    if(!s) return null;
+    return Object.values(s).slice(0,60).map(v => parseFloat(v["4. close"])).filter(v => !Number.isNaN(v));
+  }catch(e){
+    return null;
+  }
 }
 
-function analyze(closes){
+async function getLivePrice(symbol){
+  try{
+    const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+    const qr = await fetch(quoteUrl);
+    const qd = await qr.json();
+    const qp = parseFloat(qd?.["Global Quote"]?.["05. price"]);
+    if(!Number.isNaN(qp) && qp > 0) return qp;
+  }catch(e){}
 
-let price=closes[0]
-let avg20=closes.slice(0,20).reduce((a,b)=>a+b)/20
-let avg50=closes.slice(0,50).reduce((a,b)=>a+b)/50
-let momentum=(price-closes[5])/closes[5]
+  try{
+    const intradayUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=5min&outputsize=compact&apikey=${API_KEY}`;
+    const ir = await fetch(intradayUrl);
+    const id = await ir.json();
+    const series = id["Time Series (5min)"];
+    if(!series) return null;
+    const latestKey = Object.keys(series)[0];
+    const ip = parseFloat(series[latestKey]["4. close"]);
+    if(!Number.isNaN(ip) && ip > 0) return ip;
+  }catch(e){}
 
-let bias = price>avg20&&avg20>avg50?"Bullish":price<avg20&&avg20<avg50?"Bearish":"Neutral"
-let direction = momentum>.02&&bias=="Bullish"?"BUY CALL":momentum<-.02&&bias=="Bearish"?"BUY PUT":"WAIT"
-
-let confidence=Math.abs(momentum)>.05?"High":Math.abs(momentum)>.03?"Medium":"Low"
-
-let expectedMove=price*0.04
-let atm=Math.round(price)
-let premium=atm*0.015
-
-let breakeven=(direction==="BUY PUT")?atm-premium:atm+premium
-let dist=Math.abs(breakeven-price)
-
-let pop=Math.max(30,Math.min(90,Math.round(70-(dist/expectedMove*20))))
-
-let edge=expectedMove>dist*1.2?"Favorable":expectedMove<dist?"Risky":"Neutral"
-let theta=edge==="Risky"?"High":"Low"
-
-let volatility="NORMAL"
-let range5=Math.max(...closes.slice(0,5))-Math.min(...closes.slice(0,5))
-let range20=Math.max(...closes.slice(0,20))-Math.min(...closes.slice(0,20))
-if(range5>range20*.4) volatility="EXPANSION LIKELY"
-if(range5<range20*.2) volatility="COMPRESSION"
-
-let regime=volatility==="EXPANSION LIKELY"&&Math.abs(momentum)>.03?"BREAKOUT":Math.abs(momentum)>.02?"TREND":"RANGE"
-
-let expiration="5-10 Days"
-if(confidence==="High"&&theta==="Low") expiration="3-5 Days (Weekly)"
-if(theta==="High") expiration="10-14 Days (Bi-Weekly)"
-
-let score=50+(bias!=="Neutral"?10:0)+(confidence==="High"?20:0)+(edge==="Favorable"?15:0)+(volatility==="EXPANSION LIKELY"?10:0)
-score=Math.min(100,score)
-
-let grade=score>90?"A+":score>80?"A":score>70?"B":"C"
-
-/////////////////////////
-// 🚫 TRADE FILTER (NEW)
-/////////////////////////
-
-let tradeFilter="PASS"
-if(grade==="C"||direction==="WAIT"){
-tradeFilter="FAIL"
+  return null;
 }
 
-/////////////////////////
-// 💰 POSITION SIZING
-/////////////////////////
-
-let contracts=1
-let allocation="5%"
-let risk="Low"
-
-if(grade==="A+"&&confidence==="High"){
-contracts=5
-allocation="25%"
-risk="High"
-}
-else if(grade==="A"){
-contracts=3
-allocation="18%"
-risk="Moderate"
-}
-else if(grade==="B"){
-contracts=2
-allocation="10%"
-risk="Moderate"
-}
-else{
-contracts=0
-allocation="0%"
-risk="Avoid"
+function avg(arr){
+  return arr.reduce((a,b)=>a+b,0)/arr.length;
 }
 
-/////////////////////////
-// OTM ENGINE
-/////////////////////////
+function analyze(closes, livePrice){
+  const price = livePrice ?? closes[0];
 
-let otmStrike="-",otmDistance="-",otmGrade="-",profitPotential="-"
+  const avg20 = avg(closes.slice(0,20));
+  const avg50 = avg(closes.slice(0,50));
+  const momentum = (closes[0] - closes[5]) / closes[5];
 
-if(direction!=="WAIT"){
-let move=expectedMove*0.5
-if(direction==="BUY CALL"){
-otmStrike=Math.round(price+move)
-otmDistance=((otmStrike-price)/price*100).toFixed(1)
-}else{
-otmStrike=Math.round(price-move)
-otmDistance=((price-otmStrike)/price*100).toFixed(1)
-}
-profitPotential=Math.min(200,Math.round((expectedMove/premium)*100))
-otmGrade=profitPotential>120?"A":profitPotential>80?"B":"C"
-}
+  let bias = "Neutral";
+  if(price > avg20 && avg20 > avg50) bias = "Bullish";
+  if(price < avg20 && avg20 < avg50) bias = "Bearish";
 
-/////////////////////////
-// EXIT AI
-/////////////////////////
+  let direction = "WAIT";
+  if(momentum > 0.02 && bias === "Bullish") direction = "BUY CALL";
+  if(momentum < -0.02 && bias === "Bearish") direction = "BUY PUT";
 
-let optimalExit=confidence==="High"?"+65%":"+50%"
-let runnerTarget=confidence==="High"?"+120%":"+100%"
-let thetaKill=theta==="High"?"1 Day":"2-3 Days"
+  let confidence = "Low";
+  if(Math.abs(momentum) > 0.03) confidence = "Medium";
+  if(Math.abs(momentum) > 0.05) confidence = "High";
 
-/////////////////////////
-// LIQUIDITY
-/////////////////////////
+  const expectedMove = price * 0.04;
 
-let liquidity=price>50?"High":price<15?"Low":"Moderate"
-let spreadRisk=price>50?"Low":price<15?"High":"Medium"
-let executionGrade=price>50?"A":price<15?"C":"B"
+  const atm = Math.round(price);
+  const premium = atm * 0.015;
 
-return{
-price:price.toFixed(2),bias,direction,confidence,score,grade,
-strike:atm,pop,expiration,
-breakeven:breakeven.toFixed(2),dist:dist.toFixed(2),
-expectedMove:expectedMove.toFixed(2),edge,theta,
-otmStrike,otmDistance,otmGrade,profitPotential,
-optimalExit,runnerTarget,thetaKill,
-liquidity,spreadRisk,executionGrade,
-tradeFilter,contracts,allocation,risk
-}
+  const breakeven = direction === "BUY PUT" ? atm - premium : atm + premium;
+  const dist = Math.abs(breakeven - price);
+
+  let pop = 70 - (dist / expectedMove * 20);
+  pop = Math.max(30, Math.min(90, Math.round(pop)));
+
+  let edge = "Neutral";
+  if(expectedMove > dist * 1.2) edge = "Favorable";
+  if(expectedMove < dist) edge = "Risky";
+
+  let theta = "Low";
+  if(edge === "Risky") theta = "High";
+
+  let momentumEngine = "Neutral";
+  if(momentum > 0.04) momentumEngine = "STRONG BULLISH";
+  else if(momentum > 0.02) momentumEngine = "BULLISH";
+  else if(momentum < -0.04) momentumEngine = "STRONG BEARISH";
+  else if(momentum < -0.02) momentumEngine = "BEARISH";
+
+  let gamma = "BALANCED";
+  if(momentum > 0.03) gamma = "CALL DOMINANT";
+  if(momentum < -0.03) gamma = "PUT DOMINANT";
+
+  let smartMoney = "NEUTRAL";
+  if(price > avg20 && momentum > 0.02) smartMoney = "ACCUMULATING";
+  if(price < avg20 && momentum < -0.02) smartMoney = "DISTRIBUTION";
+
+  const range5 = Math.max(...closes.slice(0,5)) - Math.min(...closes.slice(0,5));
+  const range20 = Math.max(...closes.slice(0,20)) - Math.min(...closes.slice(0,20));
+
+  let volatility = "NORMAL";
+  if(range5 > range20 * 0.4) volatility = "EXPANSION LIKELY";
+  if(range5 < range20 * 0.2) volatility = "COMPRESSION";
+
+  let flow = "NEUTRAL";
+  if(momentum > 0.05 && price > avg20) flow = "STRONG ACCUMULATION";
+  else if(momentum > 0.02) flow = "ACCUMULATION";
+  else if(momentum < -0.05 && price < avg20) flow = "STRONG SELLING";
+  else if(momentum < -0.02) flow = "SELLING";
+
+  let regime = "RANGE";
+  if(volatility === "EXPANSION LIKELY" && Math.abs(momentum) > 0.03){
+    regime = "BREAKOUT";
+  }else if(Math.abs(momentum) > 0.02){
+    regime = "TREND";
+  }
+
+  let expiration = "5-10 Days";
+  if(confidence === "High" && theta === "Low") expiration = "3-5 Days (Weekly)";
+  if(theta === "High") expiration = "10-14 Days (Bi-Weekly)";
+
+  let score = 50;
+  if(bias !== "Neutral") score += 10;
+  if(confidence === "High") score += 20;
+  if(edge === "Favorable") score += 15;
+  if(volatility === "EXPANSION LIKELY") score += 10;
+  score = Math.min(100, score);
+
+  let grade = "C";
+  if(score > 90) grade = "A+";
+  else if(score > 80) grade = "A";
+  else if(score > 70) grade = "B";
+
+  let tradeFilter = "PASS";
+  if(grade === "C" || direction === "WAIT") tradeFilter = "FAIL";
+
+  let contracts = 1;
+  let allocation = "5%";
+  let risk = "Low";
+
+  if(grade === "A+" && confidence === "High"){
+    contracts = 5;
+    allocation = "25%";
+    risk = "High";
+  }else if(grade === "A"){
+    contracts = 3;
+    allocation = "18%";
+    risk = "Moderate";
+  }else if(grade === "B"){
+    contracts = 2;
+    allocation = "10%";
+    risk = "Moderate";
+  }else{
+    contracts = 0;
+    allocation = "0%";
+    risk = "Avoid";
+  }
+
+  let otmStrike = "-";
+  let otmDistance = "-";
+  let otmGrade = "-";
+  let profitPotential = "-";
+
+  if(direction !== "WAIT"){
+    let moveTarget = expectedMove * 0.5;
+    if(direction === "BUY CALL"){
+      otmStrike = Math.round(price + moveTarget);
+      otmDistance = ((otmStrike - price) / price * 100).toFixed(1);
+    }else{
+      otmStrike = Math.round(price - moveTarget);
+      otmDistance = ((price - otmStrike) / price * 100).toFixed(1);
+    }
+    profitPotential = Math.min(200, Math.round((expectedMove / premium) * 100));
+    otmGrade = profitPotential > 120 ? "A" : profitPotential > 80 ? "B" : "C";
+  }
+
+  let optimalExit = confidence === "High" ? "+65%" : "+50%";
+  let runnerTarget = confidence === "High" ? "+120%" : "+100%";
+  let thetaKill = theta === "High" ? "1 Day" : "2-3 Days";
+
+  let liquidity = "Moderate";
+  let spreadRisk = "Medium";
+  let executionGrade = "B";
+
+  if(price > 50){
+    liquidity = "High";
+    spreadRisk = "Low";
+    executionGrade = "A";
+  }else if(price < 15){
+    liquidity = "Low";
+    spreadRisk = "High";
+    executionGrade = "C";
+  }
+
+  return {
+    price: price.toFixed(2),
+    bias,
+    direction,
+    confidence,
+    score,
+    grade,
+    tradeFilter,
+    contracts,
+    allocation,
+    risk,
+    strike: atm,
+    pop,
+    expiration,
+    otmStrike,
+    otmDistance,
+    otmGrade,
+    profitPotential,
+    breakeven: breakeven.toFixed(2),
+    dist: dist.toFixed(2),
+    expectedMove: expectedMove.toFixed(2),
+    edge,
+    theta,
+    momentumEngine,
+    gamma,
+    smartMoney,
+    volatility,
+    flow,
+    regime,
+    optimalExit,
+    runnerTarget,
+    thetaKill,
+    liquidity,
+    spreadRisk,
+    executionGrade
+  };
 }
 
 async function runAI(){
+  const ticker = document.getElementById("ticker").value.toUpperCase().trim();
+  const output = document.getElementById("output");
 
-let ticker=document.getElementById("ticker").value.toUpperCase()
-let output=document.getElementById("output")
+  if(!ticker){
+    output.innerHTML = "<div class='card'>Enter a ticker first.</div>";
+    return;
+  }
 
-output.innerHTML="Analyzing..."
+  output.innerHTML = "<div class='card'>Analyzing...</div>";
 
-let closes=await getData(ticker)
-if(!closes){output.innerHTML="No Data";return}
+  const closes = await getHistory(ticker);
+  if(!closes){
+    output.innerHTML = "<div class='card'>Data unavailable.</div>";
+    return;
+  }
 
-let a=analyze(closes)
+  const livePrice = await getLivePrice(ticker);
+  const a = analyze(closes, livePrice);
 
-output.innerHTML=`<div class="card">
+  output.innerHTML = `<div class="card">
 
 <b>AI TRADE SETUP</b><br><br>
 
@@ -194,6 +332,13 @@ Trade Filter: ${a.tradeFilter}<br><br>
 Suggested Contracts: ${a.contracts}<br>
 Capital Allocation: ${a.allocation}<br>
 Risk Level: ${a.risk}<br><br>
+
+Momentum Engine: ${a.momentumEngine}<br>
+Gamma Pressure: ${a.gamma}<br>
+Smart Money Flow: ${a.smartMoney}<br>
+Volatility Signal: ${a.volatility}<br>
+Institutional Flow: ${a.flow}<br>
+Market Regime: ${a.regime}<br><br>
 
 Best Strike: ${a.strike}<br>
 POP: ${a.pop}%<br>
@@ -218,44 +363,45 @@ Liquidity: ${a.liquidity}<br>
 Spread Risk: ${a.spreadRisk}<br>
 Execution Quality: ${a.executionGrade}
 
-</div>`
+</div>`;
 }
 
 async function scanMarket(){
+  const output = document.getElementById("output");
+  output.innerHTML = "<div class='card'>Scanning...</div>";
 
-let output=document.getElementById("output")
-output.innerHTML="Scanning..."
+  let results = [];
 
-let results=[]
+  for(let i=0; i<watchlist.length; i++){
+    const closes = await getHistory(watchlist[i]);
+    if(!closes) continue;
 
-for(let i=0;i<watchlist.length;i++){
-let closes=await getData(watchlist[i])
-if(!closes) continue
-let a=analyze(closes)
+    const livePrice = await getLivePrice(watchlist[i]);
+    const a = analyze(closes, livePrice);
 
-if(a.tradeFilter==="PASS"){
-results.push({ticker:watchlist[i],score:a.score})
+    if(a.tradeFilter === "PASS"){
+      results.push({ticker: watchlist[i], score: a.score});
+    }
+
+    await new Promise(r => setTimeout(r, 15000));
+  }
+
+  results.sort((a,b)=>b.score-a.score);
+  results = results.slice(0,2);
+
+  if(results.length === 0){
+    output.innerHTML = "<div class='card'>No A/B setups found.</div>";
+    return;
+  }
+
+  let html = "<div class='card'><b>Top A/B Opportunities</b><br><br>";
+  results.forEach(r => {
+    html += `${r.ticker} — Score ${r.score}<br>`;
+  });
+  html += "</div>";
+
+  output.innerHTML = html;
 }
-
-await new Promise(r=>setTimeout(r,15000))
-}
-
-results.sort((a,b)=>b.score-a.score)
-results=results.slice(0,2)
-
-if(results.length===0){
-output.innerHTML="No A/B setups found"
-return
-}
-
-let text="<div class='card'><b>Top A/B Opportunities</b><br><br>"
-results.forEach(r=>{text+=`${r.ticker} — Score ${r.score}<br>`})
-text+="</div>"
-
-output.innerHTML=text
-}
-
 </script>
-
 </body>
 </html>
