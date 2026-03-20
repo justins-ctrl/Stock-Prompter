@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Options Terminal V31.1 Live Pricing</title>
+  <title>AI Options Terminal V31.2 Watchlist</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
@@ -42,8 +42,39 @@
       font-size:18px;
       margin-top:12px;
     }
+    .small-btn{
+      width:auto;
+      padding:8px 12px;
+      font-size:14px;
+      margin-top:0;
+      margin-left:8px;
+      border-radius:8px;
+      background:#244b84;
+    }
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .row input{
+      margin-top:0;
+      flex:1;
+    }
+    .watch-item{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:10px 0;
+      border-bottom:1px solid rgba(255,255,255,0.08);
+    }
+    .watch-item:last-child{
+      border-bottom:none;
+    }
     .muted{
       opacity:.85;
+    }
+    .danger{
+      background:#8b2d2d;
     }
   </style>
 </head>
@@ -54,13 +85,26 @@
     <div class="card">
       <b>AI MARKET DASHBOARD</b><br><br>
       Momentum Monitor Active<br>
-      <span class="muted">Live price mode enabled</span>
+      <span class="muted">Custom watchlist enabled</span>
+    </div>
+
+    <div class="card">
+      <b>My Watchlist</b>
+
+      <div class="row" style="margin-top:12px;">
+        <input id="watchlistInput" placeholder="Add ticker (AAPL, NVDA, SOFI)">
+        <button class="small-btn" onclick="addTicker()">Add</button>
+      </div>
+
+      <div id="watchlistContainer" style="margin-top:14px;"></div>
+
+      <button onclick="scanMyWatchlist()">Scan My Watchlist</button>
     </div>
 
     <input id="ticker" placeholder="Enter Stock Ticker">
 
     <button onclick="runAI()">Run AI Analysis</button>
-    <button onclick="scanMarket()">Scan Top Opportunities</button>
+    <button onclick="scanMarket()">Scan Default Top Opportunities</button>
 
     <div id="output"></div>
 
@@ -68,7 +112,70 @@
 
 <script>
 const API_KEY = "OHCJWFQEFSXI8IJ3";
-const watchlist = ["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"];
+const DEFAULT_WATCHLIST = ["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"];
+
+function getSavedWatchlist(){
+  const raw = localStorage.getItem("ai_options_watchlist");
+  if(!raw) return ["AAPL","NVDA","TSLA","SOFI"];
+  try{
+    const parsed = JSON.parse(raw);
+    if(Array.isArray(parsed) && parsed.length) return parsed;
+  }catch(e){}
+  return ["AAPL","NVDA","TSLA","SOFI"];
+}
+
+function saveWatchlist(list){
+  localStorage.setItem("ai_options_watchlist", JSON.stringify(list));
+}
+
+let customWatchlist = getSavedWatchlist();
+
+function renderWatchlist(){
+  const container = document.getElementById("watchlistContainer");
+
+  if(!customWatchlist.length){
+    container.innerHTML = "<div class='muted'>No tickers saved yet.</div>";
+    return;
+  }
+
+  let html = "";
+  customWatchlist.forEach((ticker, index) => {
+    html += `
+      <div class="watch-item">
+        <span>${ticker}</span>
+        <button class="small-btn danger" onclick="removeTicker(${index})">Remove</button>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+function addTicker(){
+  const input = document.getElementById("watchlistInput");
+  const ticker = input.value.toUpperCase().trim();
+
+  if(!ticker) return;
+  if(customWatchlist.includes(ticker)){
+    input.value = "";
+    return;
+  }
+  if(customWatchlist.length >= 15){
+    alert("Keep your watchlist at 15 or fewer tickers for faster scans.");
+    return;
+  }
+
+  customWatchlist.push(ticker);
+  saveWatchlist(customWatchlist);
+  renderWatchlist();
+  input.value = "";
+}
+
+function removeTicker(index){
+  customWatchlist.splice(index, 1);
+  saveWatchlist(customWatchlist);
+  renderWatchlist();
+}
 
 async function getHistory(symbol){
   try{
@@ -366,21 +473,21 @@ Execution Quality: ${a.executionGrade}
 </div>`;
 }
 
-async function scanMarket(){
+async function scanList(list, title){
   const output = document.getElementById("output");
   output.innerHTML = "<div class='card'>Scanning...</div>";
 
   let results = [];
 
-  for(let i=0; i<watchlist.length; i++){
-    const closes = await getHistory(watchlist[i]);
+  for(let i=0; i<list.length; i++){
+    const closes = await getHistory(list[i]);
     if(!closes) continue;
 
-    const livePrice = await getLivePrice(watchlist[i]);
+    const livePrice = await getLivePrice(list[i]);
     const a = analyze(closes, livePrice);
 
     if(a.tradeFilter === "PASS"){
-      results.push({ticker: watchlist[i], score: a.score});
+      results.push({ticker: list[i], score: a.score});
     }
 
     await new Promise(r => setTimeout(r, 15000));
@@ -390,11 +497,11 @@ async function scanMarket(){
   results = results.slice(0,2);
 
   if(results.length === 0){
-    output.innerHTML = "<div class='card'>No A/B setups found.</div>";
+    output.innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`;
     return;
   }
 
-  let html = "<div class='card'><b>Top A/B Opportunities</b><br><br>";
+  let html = `<div class='card'><b>${title}</b><br><br>`;
   results.forEach(r => {
     html += `${r.ticker} — Score ${r.score}<br>`;
   });
@@ -402,6 +509,20 @@ async function scanMarket(){
 
   output.innerHTML = html;
 }
+
+async function scanMarket(){
+  await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities");
+}
+
+async function scanMyWatchlist(){
+  if(!customWatchlist.length){
+    document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>";
+    return;
+  }
+  await scanList(customWatchlist, "Top Watchlist Opportunities");
+}
+
+renderWatchlist();
 </script>
 </body>
 </html>
