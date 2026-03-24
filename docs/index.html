@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Options Terminal V32 iPhone Edition</title>
+  <title>AI Options Terminal V32.1 Position Fix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
@@ -72,9 +72,7 @@
       box-shadow:0 0 10px rgba(58,139,253,.45);
       cursor:pointer;
     }
-    button:active{
-      transform:scale(.98);
-    }
+    button:active{ transform:scale(.98); }
     .small-btn{
       width:auto;
       padding:8px 12px;
@@ -104,15 +102,13 @@
       padding:10px 0;
       border-bottom:1px solid rgba(255,255,255,.08);
     }
-    .watch-item:last-child{
-      border-bottom:none;
-    }
+    .watch-item:last-child{ border-bottom:none; }
     .green{color:#3cff88;}
     .red{color:#ff6b6b;}
     .yellow{color:#ffd84d;}
     .blue{color:#8ecbff;}
     .muted{opacity:.82;}
-    .metric{margin:4px 0;}
+    .metric{ margin:4px 0; }
     .divider{
       height:1px;
       background:rgba(255,255,255,.08);
@@ -147,7 +143,7 @@
       box-shadow:0 0 14px rgba(60,255,136,0.12);
     }
     @media (max-width:520px){
-      .grid-2{grid-template-columns:1fr;}
+      .grid-2{ grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -160,7 +156,7 @@
     <div class="card">
       <div class="section-title">AI Market Dashboard</div>
       <div class="metric">Momentum Monitor <span class="blue">Active</span></div>
-      <div class="metric muted">No backend mode enabled</div>
+      <div class="metric muted">Position scanner fallback mode enabled</div>
     </div>
 
     <div class="card">
@@ -238,6 +234,10 @@ function savePositions(list){
 }
 let savedPositions = getSavedPositions();
 
+function normalizeTicker(ticker){
+  return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,"");
+}
+
 function renderWatchlist(){
   const container = document.getElementById("watchlistContainer");
   if(!customWatchlist.length){
@@ -258,7 +258,7 @@ function renderWatchlist(){
 
 function addTicker(){
   const input = document.getElementById("watchlistInput");
-  const ticker = input.value.toUpperCase().trim();
+  const ticker = normalizeTicker(input.value);
   if(!ticker) return;
   if(customWatchlist.includes(ticker)){
     input.value = "";
@@ -299,7 +299,7 @@ function renderPositions(){
 }
 
 function addPosition(){
-  const ticker = document.getElementById("posTicker").value.toUpperCase().trim();
+  const ticker = normalizeTicker(document.getElementById("posTicker").value);
   const type = document.getElementById("posType").value;
   const strike = parseFloat(document.getElementById("posStrike").value);
   const breakeven = parseFloat(document.getElementById("posBreakeven").value);
@@ -346,14 +346,17 @@ async function getHistory(symbol){
   }
 }
 
-async function getLivePrice(symbol){
+async function getGlobalQuotePrice(symbol){
   try{
     const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`;
     const qd = await fetchJson(quoteUrl);
     const qp = parseFloat(qd?.["Global Quote"]?.["05. price"]);
     if(!Number.isNaN(qp) && qp > 0) return qp;
   }catch(e){}
+  return null;
+}
 
+async function getIntradayPrice(symbol){
   try{
     const intradayUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=compact&apikey=${API_KEY}`;
     const id = await fetchJson(intradayUrl);
@@ -363,8 +366,16 @@ async function getLivePrice(symbol){
     const ip = parseFloat(series[latestKey]["4. close"]);
     if(!Number.isNaN(ip) && ip > 0) return ip;
   }catch(e){}
-
   return null;
+}
+
+async function getBestAvailablePrice(symbol, closes){
+  const q = await getGlobalQuotePrice(symbol);
+  if(q) return {price:q, source:"Global Quote"};
+  const i = await getIntradayPrice(symbol);
+  if(i) return {price:i, source:"Intraday"};
+  if(closes && closes.length) return {price:closes[0], source:"Daily Close"};
+  return {price:null, source:"Unavailable"};
 }
 
 function avg(arr){
@@ -583,7 +594,7 @@ function analyze(closes, livePrice){
   };
 }
 
-function analyzePosition(position, livePrice, ai){
+function analyzePosition(position, livePrice, ai, priceSource){
   const price = livePrice;
   const type = position.type;
   const strike = position.strike;
@@ -637,7 +648,8 @@ function analyzePosition(position, livePrice, ai){
     status,
     reason,
     approxPnLPercent,
-    cardClass
+    cardClass,
+    priceSource
   };
 }
 
@@ -752,7 +764,7 @@ function renderCompact(ticker, a){
 }
 
 async function runAI(){
-  const ticker = document.getElementById("ticker").value.toUpperCase().trim();
+  const ticker = normalizeTicker(document.getElementById("ticker").value);
   const output = document.getElementById("output");
   const mode = document.getElementById("uiMode").value;
 
@@ -768,8 +780,13 @@ async function runAI(){
     return;
   }
 
-  const livePrice = await getLivePrice(ticker);
-  const a = analyze(closes, livePrice);
+  const pricePack = await getBestAvailablePrice(ticker, closes);
+  if(pricePack.price === null){
+    output.innerHTML = "<div class='card'>Price unavailable.</div>";
+    return;
+  }
+
+  const a = analyze(closes, pricePack.price);
   output.innerHTML = mode === "compact" ? renderCompact(ticker, a) : renderFull(ticker, a);
 }
 
@@ -779,13 +796,17 @@ async function scanList(list, title){
 
   let results = [];
   for(let i=0; i<list.length; i++){
-    const closes = await getHistory(list[i]);
+    const ticker = normalizeTicker(list[i]);
+    const closes = await getHistory(ticker);
     if(!closes) continue;
-    const livePrice = await getLivePrice(list[i]);
-    const a = analyze(closes, livePrice);
+
+    const pricePack = await getBestAvailablePrice(ticker, closes);
+    if(pricePack.price === null) continue;
+
+    const a = analyze(closes, pricePack.price);
 
     if(a.tradeFilter === "PASS"){
-      results.push({ticker:list[i], score:a.score, direction:a.direction, expiration:a.expiration});
+      results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration});
     }
 
     await new Promise(r => setTimeout(r, 15000));
@@ -831,14 +852,44 @@ async function scanMyPositions(){
   let results = [];
   for(let i=0; i<savedPositions.length; i++){
     const p = savedPositions[i];
-    const closes = await getHistory(p.ticker);
-    if(!closes) continue;
+    const ticker = normalizeTicker(p.ticker);
 
-    const livePrice = await getLivePrice(p.ticker);
-    if(!livePrice) continue;
+    const closes = await getHistory(ticker);
+    if(!closes){
+      results.push({
+        ticker,
+        type:p.type,
+        strike:p.strike,
+        breakeven:p.breakeven,
+        livePrice:"N/A",
+        status:"UNAVAILABLE",
+        reason:"Could not load historical data",
+        approxPnLPercent:null,
+        cardClass:"sell-alert",
+        priceSource:"Unavailable"
+      });
+      continue;
+    }
 
-    const ai = analyze(closes, livePrice);
-    const monitor = analyzePosition(p, livePrice, ai);
+    const pricePack = await getBestAvailablePrice(ticker, closes);
+    if(pricePack.price === null){
+      results.push({
+        ticker,
+        type:p.type,
+        strike:p.strike,
+        breakeven:p.breakeven,
+        livePrice:"N/A",
+        status:"UNAVAILABLE",
+        reason:"Could not load quote or fallback price",
+        approxPnLPercent:null,
+        cardClass:"sell-alert",
+        priceSource:"Unavailable"
+      });
+      continue;
+    }
+
+    const ai = analyze(closes, pricePack.price);
+    const monitor = analyzePosition(p, pricePack.price, ai, pricePack.source);
     results.push(monitor);
 
     if(monitor.status !== "HOLD"){
@@ -847,12 +898,7 @@ async function scanMyPositions(){
       }catch(e){}
     }
 
-    await new Promise(r => setTimeout(r, 8000));
-  }
-
-  if(!results.length){
-    output.innerHTML = "<div class='card'>Could not evaluate saved positions.</div>";
-    return;
+    await new Promise(r => setTimeout(r, 5000));
   }
 
   let html = "";
@@ -861,10 +907,11 @@ async function scanMyPositions(){
       <div class="card ${r.cardClass}">
         <div class="section-title">AI Sell Signal</div>
         <div class="metric"><b>${r.ticker}</b> ${r.strike} ${r.type}</div>
-        <div class="metric"><b>Live Price:</b> $${r.livePrice}</div>
+        <div class="metric"><b>Live Price:</b> ${r.livePrice === "N/A" ? "N/A" : "$" + r.livePrice}</div>
         <div class="metric"><b>Breakeven:</b> $${r.breakeven}</div>
         <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
         <div class="metric"><b>Reason:</b> ${r.reason}</div>
+        <div class="metric"><b>Price Source:</b> ${r.priceSource}</div>
         ${r.approxPnLPercent !== null ? `<div class="metric"><b>Approx P/L:</b> ${r.approxPnLPercent > 0 ? "+" : ""}${r.approxPnLPercent}%</div>` : ""}
       </div>
     `;
