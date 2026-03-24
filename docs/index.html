@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Options Terminal V31.4 Position Exit Monitor</title>
+  <title>AI Options Terminal V32 iPhone Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
@@ -72,7 +72,9 @@
       box-shadow:0 0 10px rgba(58,139,253,.45);
       cursor:pointer;
     }
-    button:active{ transform:scale(.98); }
+    button:active{
+      transform:scale(.98);
+    }
     .small-btn{
       width:auto;
       padding:8px 12px;
@@ -83,13 +85,15 @@
       background:linear-gradient(135deg,#2f5fa7,#244b84);
       box-shadow:none;
     }
-    .danger{ background:linear-gradient(135deg,#a53030,#7b2020); }
+    .danger{
+      background:linear-gradient(135deg,#a53030,#7b2020);
+    }
     .row{
       display:flex;
       gap:10px;
       align-items:center;
     }
-    .row input, .row select{
+    .row input,.row select{
       margin-top:0;
       flex:1;
     }
@@ -100,13 +104,15 @@
       padding:10px 0;
       border-bottom:1px solid rgba(255,255,255,.08);
     }
-    .watch-item:last-child{ border-bottom:none; }
+    .watch-item:last-child{
+      border-bottom:none;
+    }
     .green{color:#3cff88;}
     .red{color:#ff6b6b;}
     .yellow{color:#ffd84d;}
     .blue{color:#8ecbff;}
     .muted{opacity:.82;}
-    .metric{ margin:4px 0; }
+    .metric{margin:4px 0;}
     .divider{
       height:1px;
       background:rgba(255,255,255,.08);
@@ -141,7 +147,7 @@
       box-shadow:0 0 14px rgba(60,255,136,0.12);
     }
     @media (max-width:520px){
-      .grid-2{ grid-template-columns:1fr; }
+      .grid-2{grid-template-columns:1fr;}
     }
   </style>
 </head>
@@ -149,16 +155,16 @@
 <body>
   <div class="container">
     <div class="title">AI Options Terminal</div>
-    <div class="subtitle">Live options range + watchlist + position exit monitor</div>
+    <div class="subtitle">Live quote mode • watchlist • position monitor</div>
 
     <div class="card">
       <div class="section-title">AI Market Dashboard</div>
       <div class="metric">Momentum Monitor <span class="blue">Active</span></div>
-      <div class="metric muted">API connected • live quote mode enabled</div>
+      <div class="metric muted">No backend mode enabled</div>
     </div>
 
     <div class="card">
-      <div class="section-title">Mode</div>
+      <div class="section-title">Display Mode</div>
       <select id="uiMode">
         <option value="full">Full Detail Mode</option>
         <option value="compact">Quick Glance Mode</option>
@@ -249,11 +255,15 @@ function renderWatchlist(){
   });
   container.innerHTML = html;
 }
+
 function addTicker(){
   const input = document.getElementById("watchlistInput");
   const ticker = input.value.toUpperCase().trim();
   if(!ticker) return;
-  if(customWatchlist.includes(ticker)){ input.value=""; return; }
+  if(customWatchlist.includes(ticker)){
+    input.value = "";
+    return;
+  }
   if(customWatchlist.length >= 15){
     alert("Keep your watchlist at 15 or fewer tickers for faster scans.");
     return;
@@ -263,6 +273,7 @@ function addTicker(){
   renderWatchlist();
   input.value = "";
 }
+
 function removeTicker(index){
   customWatchlist.splice(index,1);
   saveWatchlist(customWatchlist);
@@ -286,6 +297,7 @@ function renderPositions(){
   });
   container.innerHTML = html;
 }
+
 function addPosition(){
   const ticker = document.getElementById("posTicker").value.toUpperCase().trim();
   const type = document.getElementById("posType").value;
@@ -298,9 +310,7 @@ function addPosition(){
     return;
   }
 
-  savedPositions.push({
-    ticker, type, strike, breakeven, entryPremium
-  });
+  savedPositions.push({ticker,type,strike,breakeven,entryPremium});
   savePositions(savedPositions);
   renderPositions();
 
@@ -309,20 +319,28 @@ function addPosition(){
   document.getElementById("posBreakeven").value="";
   document.getElementById("posEntryPremium").value="";
 }
+
 function removePosition(index){
   savedPositions.splice(index,1);
   savePositions(savedPositions);
   renderPositions();
 }
 
+async function fetchJson(url){
+  const r = await fetch(url);
+  return await r.json();
+}
+
 async function getHistory(symbol){
   try{
-    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${symbol}&apikey=${API_KEY}`;
-    const r = await fetch(url);
-    const d = await r.json();
+    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`;
+    const d = await fetchJson(url);
     const s = d["Time Series (Daily)"];
     if(!s) return null;
-    return Object.values(s).slice(0,60).map(v => parseFloat(v["4. close"])).filter(v => !Number.isNaN(v));
+    return Object.values(s)
+      .slice(0,60)
+      .map(v => parseFloat(v["4. close"]))
+      .filter(v => !Number.isNaN(v));
   }catch(e){
     return null;
   }
@@ -330,17 +348,15 @@ async function getHistory(symbol){
 
 async function getLivePrice(symbol){
   try{
-    const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
-    const qr = await fetch(quoteUrl);
-    const qd = await qr.json();
+    const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`;
+    const qd = await fetchJson(quoteUrl);
     const qp = parseFloat(qd?.["Global Quote"]?.["05. price"]);
     if(!Number.isNaN(qp) && qp > 0) return qp;
   }catch(e){}
 
   try{
-    const intradayUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=5min&outputsize=compact&apikey=${API_KEY}`;
-    const ir = await fetch(intradayUrl);
-    const id = await ir.json();
+    const intradayUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=compact&apikey=${API_KEY}`;
+    const id = await fetchJson(intradayUrl);
     const series = id["Time Series (5min)"];
     if(!series) return null;
     const latestKey = Object.keys(series)[0];
@@ -354,6 +370,7 @@ async function getLivePrice(symbol){
 function avg(arr){
   return arr.reduce((a,b)=>a+b,0)/arr.length;
 }
+
 function nextFridayFrom(date){
   const d = new Date(date);
   const day = d.getDay();
@@ -361,9 +378,11 @@ function nextFridayFrom(date){
   d.setDate(d.getDate() + (diff === 0 ? 7 : diff));
   return d;
 }
+
 function formatDate(d){
   return d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
 }
+
 function buildExpirationChoices(confidence, theta){
   const today = new Date();
   const weekly = nextFridayFrom(today);
@@ -408,10 +427,13 @@ function buildContractLadder(price, direction, expectedMove, regime){
     {label:"1 OTM", strike:oneOtm, premium:premium1, ...oneStats},
     {label:"2 OTM", strike:twoOtm, premium:premium2, ...twoStats}
   ];
+
   all.forEach(c=>{ if(c.pop > best.pop) best = c; });
 
   let otmPreferred = all[1];
-  if(regime === "BREAKOUT" && all[2].pop >= all[1].pop - 4) otmPreferred = all[2];
+  if(regime === "BREAKOUT" && all[2].pop >= all[1].pop - 4){
+    otmPreferred = all[2];
+  }
 
   let otmGrade = "C";
   let profitPotential = Math.min(220, Math.round((expectedMove / otmPreferred.premium) * 100));
@@ -421,7 +443,7 @@ function buildContractLadder(price, direction, expectedMove, regime){
   return {
     all,
     best,
-    otmPreferred: {
+    otmPreferred:{
       ...otmPreferred,
       distancePct: Math.abs((otmPreferred.strike - price) / price * 100).toFixed(1),
       grade: otmGrade,
@@ -542,9 +564,9 @@ function analyze(closes, livePrice){
 
   return {
     price: price.toFixed(2),
-    bias, direction, confidence, score, grade, tradeFilter,
-    contracts, allocation, risk,
-    strike: atm, pop,
+    bias,direction,confidence,score,grade,tradeFilter,
+    contracts,allocation,risk,
+    strike: atm,pop,
     expiration: expirationPack.suggested,
     weeklyLabel: expirationPack.weeklyLabel,
     biweeklyLabel: expirationPack.biweeklyLabel,
@@ -554,10 +576,10 @@ function analyze(closes, livePrice){
     breakeven: breakeven.toFixed(2),
     dist: dist.toFixed(2),
     expectedMove: expectedMove.toFixed(2),
-    edge, theta,
-    momentumEngine, gamma, smartMoney, volatility, flow, regime,
-    optimalExit, runnerTarget, thetaKill,
-    liquidity, spreadRisk, executionGrade
+    edge,theta,
+    momentumEngine,gamma,smartMoney,volatility,flow,regime,
+    optimalExit,runnerTarget,thetaKill,
+    liquidity,spreadRisk,executionGrade
   };
 }
 
@@ -761,9 +783,11 @@ async function scanList(list, title){
     if(!closes) continue;
     const livePrice = await getLivePrice(list[i]);
     const a = analyze(closes, livePrice);
+
     if(a.tradeFilter === "PASS"){
       results.push({ticker:list[i], score:a.score, direction:a.direction, expiration:a.expiration});
     }
+
     await new Promise(r => setTimeout(r, 15000));
   }
 
@@ -786,6 +810,7 @@ async function scanList(list, title){
 async function scanMarket(){
   await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities");
 }
+
 async function scanMyWatchlist(){
   if(!customWatchlist.length){
     document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>";
@@ -808,6 +833,7 @@ async function scanMyPositions(){
     const p = savedPositions[i];
     const closes = await getHistory(p.ticker);
     if(!closes) continue;
+
     const livePrice = await getLivePrice(p.ticker);
     if(!livePrice) continue;
 
