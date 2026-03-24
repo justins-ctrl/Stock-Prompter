@@ -1,23 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Options Terminal Futuristic</title>
+  <title>AI Options Terminal V31.3 Live Options Range</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
     body{
-      font-family:Arial, sans-serif;
+      font-family:Arial,sans-serif;
       background:linear-gradient(180deg,#050d1f,#071326);
       color:white;
       margin:0;
       padding:20px;
     }
-
     .container{
       max-width:520px;
       margin:auto;
     }
-
     .title{
       text-align:center;
       font-size:28px;
@@ -26,16 +24,14 @@
       letter-spacing:.5px;
       text-shadow:0 0 10px rgba(58,139,253,.35);
     }
-
     .subtitle{
       text-align:center;
       opacity:.8;
       margin-bottom:18px;
       font-size:14px;
     }
-
     .card{
-      background:rgba(19,35,61,0.88);
+      background:rgba(19,35,61,0.9);
       padding:18px;
       border-radius:14px;
       margin-top:15px;
@@ -43,9 +39,7 @@
       border:1px solid rgba(58,139,253,0.22);
       box-shadow:0 0 14px rgba(58,139,253,0.14);
       backdrop-filter: blur(6px);
-      animation:fadeIn .28s ease;
     }
-
     .section-title{
       font-size:16px;
       font-weight:bold;
@@ -54,8 +48,7 @@
       text-transform:uppercase;
       letter-spacing:.7px;
     }
-
-    input{
+    input,select{
       width:100%;
       padding:14px;
       border-radius:12px;
@@ -67,7 +60,6 @@
       color:white;
       box-shadow:inset 0 0 0 1px rgba(58,139,253,0.18);
     }
-
     button{
       width:100%;
       padding:16px;
@@ -80,11 +72,7 @@
       box-shadow:0 0 10px rgba(58,139,253,.45);
       cursor:pointer;
     }
-
-    button:active{
-      transform:scale(.98);
-    }
-
+    button:active{ transform:scale(.98); }
     .small-btn{
       width:auto;
       padding:8px 12px;
@@ -95,22 +83,16 @@
       background:linear-gradient(135deg,#2f5fa7,#244b84);
       box-shadow:none;
     }
-
-    .danger{
-      background:linear-gradient(135deg,#a53030,#7b2020);
-    }
-
+    .danger{ background:linear-gradient(135deg,#a53030,#7b2020); }
     .row{
       display:flex;
       gap:10px;
       align-items:center;
     }
-
     .row input{
       margin-top:0;
       flex:1;
     }
-
     .watch-item{
       display:flex;
       justify-content:space-between;
@@ -118,27 +100,18 @@
       padding:10px 0;
       border-bottom:1px solid rgba(255,255,255,.08);
     }
-
-    .watch-item:last-child{
-      border-bottom:none;
-    }
-
+    .watch-item:last-child{ border-bottom:none; }
     .green{color:#3cff88;}
     .red{color:#ff6b6b;}
     .yellow{color:#ffd84d;}
     .blue{color:#8ecbff;}
     .muted{opacity:.82;}
-
-    .metric{
-      margin:4px 0;
-    }
-
+    .metric{ margin:4px 0; }
     .divider{
       height:1px;
       background:rgba(255,255,255,.08);
       margin:14px 0;
     }
-
     .bar{
       height:10px;
       background:#0e1c33;
@@ -147,13 +120,11 @@
       overflow:hidden;
       box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
     }
-
     .fill{
       height:100%;
       background:linear-gradient(90deg,#3cff88,#3a8bfd);
       border-radius:8px;
     }
-
     .pill{
       display:inline-block;
       padding:4px 10px;
@@ -162,10 +133,13 @@
       background:rgba(255,255,255,.08);
       margin-top:4px;
     }
-
-    @keyframes fadeIn{
-      from{opacity:0;transform:translateY(8px);}
-      to{opacity:1;transform:translateY(0);}
+    .grid-2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+    @media (max-width:520px){
+      .grid-2{ grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -173,24 +147,29 @@
 <body>
   <div class="container">
     <div class="title">AI Options Terminal</div>
-    <div class="subtitle">Futuristic mobile trading dashboard</div>
+    <div class="subtitle">Live options range mode • free-friendly</div>
 
     <div class="card">
       <div class="section-title">AI Market Dashboard</div>
       <div class="metric">Momentum Monitor <span class="blue">Active</span></div>
-      <div class="metric muted">Live price mode enabled</div>
+      <div class="metric muted">Live quote + dynamic weekly/bi-weekly ladder</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Mode</div>
+      <select id="uiMode">
+        <option value="full">Full Detail Mode</option>
+        <option value="compact">Quick Glance Mode</option>
+      </select>
     </div>
 
     <div class="card">
       <div class="section-title">My Watchlist</div>
-
       <div class="row" style="margin-top:12px;">
         <input id="watchlistInput" placeholder="Add ticker (AAPL, NVDA, SOFI)">
         <button class="small-btn" onclick="addTicker()">Add</button>
       </div>
-
       <div id="watchlistContainer" style="margin-top:14px;"></div>
-
       <button onclick="scanMyWatchlist()">Scan My Watchlist</button>
     </div>
 
@@ -224,7 +203,6 @@ let customWatchlist = getSavedWatchlist();
 
 function renderWatchlist(){
   const container = document.getElementById("watchlistContainer");
-
   if(!customWatchlist.length){
     container.innerHTML = "<div class='muted'>No tickers saved yet.</div>";
     return;
@@ -239,14 +217,12 @@ function renderWatchlist(){
       </div>
     `;
   });
-
   container.innerHTML = html;
 }
 
 function addTicker(){
   const input = document.getElementById("watchlistInput");
   const ticker = input.value.toUpperCase().trim();
-
   if(!ticker) return;
   if(customWatchlist.includes(ticker)){
     input.value = "";
@@ -256,7 +232,6 @@ function addTicker(){
     alert("Keep your watchlist at 15 or fewer tickers for faster scans.");
     return;
   }
-
   customWatchlist.push(ticker);
   saveWatchlist(customWatchlist);
   renderWatchlist();
@@ -309,6 +284,95 @@ function avg(arr){
   return arr.reduce((a,b)=>a+b,0)/arr.length;
 }
 
+function nextFridayFrom(date){
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = (5 - day + 7) % 7;
+  d.setDate(d.getDate() + (diff === 0 ? 7 : diff));
+  return d;
+}
+
+function formatDate(d){
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+
+function buildExpirationChoices(confidence, theta){
+  const today = new Date();
+  const weekly = nextFridayFrom(today);
+  const biweekly = new Date(weekly);
+  biweekly.setDate(weekly.getDate() + 7);
+
+  let suggested = "5-10 Days";
+  if(confidence === "High" && theta === "Low") suggested = "3-5 Days (Weekly)";
+  if(theta === "High") suggested = "10-14 Days (Bi-Weekly)";
+
+  return {
+    suggested,
+    weeklyLabel: `${formatDate(weekly)} (Weekly)`,
+    biweeklyLabel: `${formatDate(biweekly)} (Bi-Weekly)`
+  };
+}
+
+function buildContractLadder(price, direction, expectedMove, regime){
+  const atm = Math.round(price);
+  const oneOtm = direction === "BUY PUT" ? atm - 1 : atm + 1;
+  const twoOtm = direction === "BUY PUT" ? atm - 2 : atm + 2;
+
+  const premiumATM = Math.max(0.35, atm * 0.015);
+  const premium1 = Math.max(0.25, Math.abs(oneOtm) * 0.013);
+  const premium2 = Math.max(0.18, Math.abs(twoOtm) * 0.011);
+
+  function contractPop(strike, premium){
+    const breakeven = direction === "BUY PUT" ? strike - premium : strike + premium;
+    const dist = Math.abs(price - breakeven);
+    let p = 72 - (dist / expectedMove * 22);
+    p = Math.max(25, Math.min(90, Math.round(p)));
+    return {breakeven, dist, pop:p};
+  }
+
+  const atmStats = contractPop(atm, premiumATM);
+  const oneStats = contractPop(oneOtm, premium1);
+  const twoStats = contractPop(twoOtm, premium2);
+
+  let best = {
+    label: "ATM",
+    strike: atm,
+    premium: premiumATM,
+    ...atmStats
+  };
+
+  const all = [
+    {label:"ATM", strike:atm, premium:premiumATM, ...atmStats},
+    {label:"1 OTM", strike:oneOtm, premium:premium1, ...oneStats},
+    {label:"2 OTM", strike:twoOtm, premium:premium2, ...twoStats}
+  ];
+
+  all.forEach(c => {
+    if(c.pop > best.pop) best = c;
+  });
+
+  let otmPreferred = all[1];
+  if(regime === "BREAKOUT" && all[2].pop >= all[1].pop - 4){
+    otmPreferred = all[2];
+  }
+
+  let otmGrade = "C";
+  let profitPotential = Math.min(220, Math.round((expectedMove / otmPreferred.premium) * 100));
+  if(profitPotential > 130) otmGrade = "A";
+  else if(profitPotential > 90) otmGrade = "B";
+
+  return {
+    all,
+    best,
+    otmPreferred: {
+      ...otmPreferred,
+      distancePct: Math.abs((otmPreferred.strike - price) / price * 100).toFixed(1),
+      grade: otmGrade,
+      profitPotential
+    }
+  };
+}
+
 function analyze(closes, livePrice){
   const price = livePrice ?? closes[0];
 
@@ -329,22 +393,6 @@ function analyze(closes, livePrice){
   if(Math.abs(momentum) > 0.05) confidence = "High";
 
   const expectedMove = price * 0.04;
-
-  const atm = Math.round(price);
-  const premium = atm * 0.015;
-
-  const breakeven = direction === "BUY PUT" ? atm - premium : atm + premium;
-  const dist = Math.abs(breakeven - price);
-
-  let pop = 70 - (dist / expectedMove * 20);
-  pop = Math.max(30, Math.min(90, Math.round(pop)));
-
-  let edge = "Neutral";
-  if(expectedMove > dist * 1.2) edge = "Favorable";
-  if(expectedMove < dist) edge = "Risky";
-
-  let theta = "Low";
-  if(edge === "Risky") theta = "High";
 
   let momentumEngine = "Neutral";
   if(momentum > 0.04) momentumEngine = "STRONG BULLISH";
@@ -380,9 +428,23 @@ function analyze(closes, livePrice){
     regime = "TREND";
   }
 
-  let expiration = "5-10 Days";
-  if(confidence === "High" && theta === "Low") expiration = "3-5 Days (Weekly)";
-  if(theta === "High") expiration = "10-14 Days (Bi-Weekly)";
+  const atm = Math.round(price);
+  const premium = Math.max(0.35, atm * 0.015);
+  const breakeven = direction === "BUY PUT" ? atm - premium : atm + premium;
+  const dist = Math.abs(breakeven - price);
+
+  let pop = 70 - (dist / expectedMove * 20);
+  pop = Math.max(30, Math.min(90, Math.round(pop)));
+
+  let edge = "Neutral";
+  if(expectedMove > dist * 1.2) edge = "Favorable";
+  if(expectedMove < dist) edge = "Risky";
+
+  let theta = "Low";
+  if(edge === "Risky") theta = "High";
+
+  const expirationPack = buildExpirationChoices(confidence, theta);
+  const ladder = buildContractLadder(price, direction, expectedMove, regime);
 
   let score = 50;
   if(bias !== "Neutral") score += 10;
@@ -421,24 +483,6 @@ function analyze(closes, livePrice){
     risk = "Avoid";
   }
 
-  let otmStrike = "-";
-  let otmDistance = "-";
-  let otmGrade = "-";
-  let profitPotential = "-";
-
-  if(direction !== "WAIT"){
-    let moveTarget = expectedMove * 0.5;
-    if(direction === "BUY CALL"){
-      otmStrike = Math.round(price + moveTarget);
-      otmDistance = ((otmStrike - price) / price * 100).toFixed(1);
-    }else{
-      otmStrike = Math.round(price - moveTarget);
-      otmDistance = ((price - otmStrike) / price * 100).toFixed(1);
-    }
-    profitPotential = Math.min(200, Math.round((expectedMove / premium) * 100));
-    otmGrade = profitPotential > 120 ? "A" : profitPotential > 80 ? "B" : "C";
-  }
-
   let optimalExit = confidence === "High" ? "+65%" : "+50%";
   let runnerTarget = confidence === "High" ? "+120%" : "+100%";
   let thetaKill = theta === "High" ? "1 Day" : "2-3 Days";
@@ -470,11 +514,12 @@ function analyze(closes, livePrice){
     risk,
     strike: atm,
     pop,
-    expiration,
-    otmStrike,
-    otmDistance,
-    otmGrade,
-    profitPotential,
+    expiration: expirationPack.suggested,
+    weeklyLabel: expirationPack.weeklyLabel,
+    biweeklyLabel: expirationPack.biweeklyLabel,
+    bestContract: ladder.best,
+    otmPreferred: ladder.otmPreferred,
+    ladder: ladder.all,
     breakeven: breakeven.toFixed(2),
     dist: dist.toFixed(2),
     expectedMove: expectedMove.toFixed(2),
@@ -497,10 +542,10 @@ function analyze(closes, livePrice){
 
 function signalClass(value){
   if(typeof value !== "string") return "blue";
-  if(value.includes("BUY CALL") || value.includes("BULLISH") || value.includes("ACCUMULATION") || value.includes("PASS") || value === "A+" || value === "A" || value === "Low" || value === "Favorable" || value === "High"){
+  if(value.includes("BUY CALL") || value.includes("BULLISH") || value.includes("ACCUMULATION") || value.includes("PASS") || value === "A+" || value === "A" || value === "Favorable" || value === "Low" || value === "High"){
     return "green";
   }
-  if(value.includes("BUY PUT") || value.includes("BEARISH") || value.includes("SELLING") || value.includes("FAIL") || value === "C" || value === "Risky" || value === "High"){
+  if(value.includes("BUY PUT") || value.includes("BEARISH") || value.includes("SELLING") || value.includes("FAIL") || value === "C" || value === "Risky"){
     return "red";
   }
   if(value.includes("WAIT") || value === "B" || value === "Medium" || value.includes("BALANCED") || value.includes("RANGE") || value.includes("NORMAL")){
@@ -509,27 +554,8 @@ function signalClass(value){
   return "blue";
 }
 
-async function runAI(){
-  const ticker = document.getElementById("ticker").value.toUpperCase().trim();
-  const output = document.getElementById("output");
-
-  if(!ticker){
-    output.innerHTML = "<div class='card'>Enter a ticker first.</div>";
-    return;
-  }
-
-  output.innerHTML = "<div class='card'>Analyzing...</div>";
-
-  const closes = await getHistory(ticker);
-  if(!closes){
-    output.innerHTML = "<div class='card'>Data unavailable.</div>";
-    return;
-  }
-
-  const livePrice = await getLivePrice(ticker);
-  const a = analyze(closes, livePrice);
-
-  output.innerHTML = `
+function renderFull(ticker, a){
+  return `
   <div class="card">
     <div class="section-title">AI Trade Setup</div>
 
@@ -565,19 +591,33 @@ async function runAI(){
 
     <div class="divider"></div>
 
-    <div class="section-title">Contract Setup</div>
-    <div class="metric"><b>Best Strike:</b> ${a.strike}</div>
-    <div class="metric"><b>POP:</b> ${a.pop}%</div>
-    <div class="metric"><b>Expiration:</b> ${a.expiration}</div>
-    <div class="metric"><b>Best OTM Strike:</b> ${a.otmStrike}</div>
-    <div class="metric"><b>OTM Distance:</b> ${a.otmDistance}%</div>
-    <div class="metric"><b>OTM Grade:</b> <span class="${signalClass(a.otmGrade)}">${a.otmGrade}</span></div>
-    <div class="metric"><b>Profit Potential:</b> +${a.profitPotential}%</div>
+    <div class="section-title">Live Options Range</div>
+    <div class="metric"><b>Suggested Expiration:</b> ${a.expiration}</div>
+    <div class="metric"><b>Weekly Choice:</b> ${a.weeklyLabel}</div>
+    <div class="metric"><b>Bi-Weekly Choice:</b> ${a.biweeklyLabel}</div>
+
+    <div class="grid-2" style="margin-top:10px;">
+      ${a.ladder.map(c => `
+        <div class="card" style="margin-top:0;padding:12px;">
+          <div><b>${c.label}</b></div>
+          <div>Strike: ${c.strike}</div>
+          <div>Premium Est: $${c.premium.toFixed(2)}</div>
+          <div>BE: $${c.breakeven.toFixed(2)}</div>
+          <div>POP: ${c.pop}%</div>
+        </div>
+      `).join("")}
+    </div>
+
+    <div class="metric" style="margin-top:10px;"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div>
+    <div class="metric"><b>Best OTM Strike:</b> ${a.otmPreferred.strike}</div>
+    <div class="metric"><b>OTM Distance:</b> ${a.otmPreferred.distancePct}%</div>
+    <div class="metric"><b>OTM Grade:</b> <span class="${signalClass(a.otmPreferred.grade)}">${a.otmPreferred.grade}</span></div>
+    <div class="metric"><b>Profit Potential:</b> +${a.otmPreferred.profitPotential}%</div>
 
     <div class="divider"></div>
 
     <div class="section-title">Breakeven & Edge</div>
-    <div class="metric"><b>Breakeven:</b> $${a.breakeven}</div>
+    <div class="metric"><b>Base Breakeven:</b> $${a.breakeven}</div>
     <div class="metric"><b>Distance to BE:</b> $${a.dist}</div>
     <div class="metric"><b>Expected Move:</b> $${a.expectedMove}</div>
     <div class="metric"><b>Edge:</b> <span class="${signalClass(a.edge)}">${a.edge}</span></div>
@@ -595,6 +635,45 @@ async function runAI(){
   </div>`;
 }
 
+function renderCompact(ticker, a){
+  return `
+  <div class="card">
+    <div class="section-title">Quick Glance</div>
+    <div class="metric"><b>${ticker}</b> — $${a.price}</div>
+    <div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> • <span class="${signalClass(a.grade)}">${a.grade}</span> • Score ${a.score}</div>
+    <div class="bar"><div class="fill" style="width:${a.score}%"></div></div>
+    <div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div>
+    <div class="metric"><b>Expiration:</b> ${a.expiration}</div>
+    <div class="metric"><b>Edge:</b> ${a.edge}</div>
+    <div class="metric"><b>Stop/Target:</b> ${a.optimalExit} / ${a.runnerTarget}</div>
+    <div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div>
+  </div>`;
+}
+
+async function runAI(){
+  const ticker = document.getElementById("ticker").value.toUpperCase().trim();
+  const output = document.getElementById("output");
+  const mode = document.getElementById("uiMode").value;
+
+  if(!ticker){
+    output.innerHTML = "<div class='card'>Enter a ticker first.</div>";
+    return;
+  }
+
+  output.innerHTML = "<div class='card'>Analyzing...</div>";
+
+  const closes = await getHistory(ticker);
+  if(!closes){
+    output.innerHTML = "<div class='card'>Data unavailable.</div>";
+    return;
+  }
+
+  const livePrice = await getLivePrice(ticker);
+  const a = analyze(closes, livePrice);
+
+  output.innerHTML = mode === "compact" ? renderCompact(ticker, a) : renderFull(ticker, a);
+}
+
 async function scanList(list, title){
   const output = document.getElementById("output");
   output.innerHTML = "<div class='card'>Scanning...</div>";
@@ -609,7 +688,7 @@ async function scanList(list, title){
     const a = analyze(closes, livePrice);
 
     if(a.tradeFilter === "PASS"){
-      results.push({ticker: list[i], score: a.score, direction: a.direction});
+      results.push({ticker: list[i], score: a.score, direction: a.direction, expiration: a.expiration});
     }
 
     await new Promise(r => setTimeout(r, 15000));
@@ -623,14 +702,12 @@ async function scanList(list, title){
     return;
   }
 
-  let html = `<div class='card'>
-    <div class='section-title'>${title}</div>`;
-
+  let html = `<div class='card'><div class='section-title'>${title}</div>`;
   results.forEach(r => {
-    html += `<div class="metric">${r.ticker} — <span class="${signalClass(r.direction)}">${r.direction}</span> — Score ${r.score}</div>`;
+    html += `<div class="metric">${r.ticker} — <span class="${signalClass(r.direction)}">${r.direction}</span> — Score ${r.score} — ${r.expiration}</div>`;
   });
-
   html += `</div>`;
+
   output.innerHTML = html;
 }
 
