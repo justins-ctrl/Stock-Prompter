@@ -1,234 +1,93 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Options Terminal V32.4 Calendar Picker</title>
+  <title>AI Options Terminal V33 Time-to-Target Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
   <style>
-    body{
-      font-family:Arial,sans-serif;
-      background:linear-gradient(180deg,#050d1f,#071326);
-      color:white;
-      margin:0;
-      padding:20px;
-    }
-    .container{
-      max-width:520px;
-      margin:auto;
-    }
-    .title{
-      text-align:center;
-      font-size:28px;
-      font-weight:bold;
-      margin-bottom:8px;
-      letter-spacing:.5px;
-      text-shadow:0 0 10px rgba(58,139,253,.35);
-    }
-    .subtitle{
-      text-align:center;
-      opacity:.8;
-      margin-bottom:18px;
-      font-size:14px;
-    }
-    .card{
-      background:rgba(19,35,61,0.9);
-      padding:18px;
-      border-radius:14px;
-      margin-top:15px;
-      line-height:1.45;
-      border:1px solid rgba(58,139,253,0.22);
-      box-shadow:0 0 14px rgba(58,139,253,0.14);
-      backdrop-filter: blur(6px);
-    }
-    .section-title{
-      font-size:16px;
-      font-weight:bold;
-      margin-bottom:10px;
-      color:#9fd0ff;
-      text-transform:uppercase;
-      letter-spacing:.7px;
-    }
-    .field-label{
-      font-size:13px;
-      color:#9fd0ff;
-      margin-top:12px;
-      margin-bottom:4px;
-      letter-spacing:.3px;
-    }
-    input,select{
-      width:100%;
-      padding:14px;
-      border-radius:12px;
-      border:none;
-      margin-top:10px;
-      font-size:18px;
-      box-sizing:border-box;
-      background:#0e1c33;
-      color:white;
-      box-shadow:inset 0 0 0 1px rgba(58,139,253,0.18);
-      -webkit-appearance:none;
-      appearance:none;
-    }
-    input[type="date"]{
-      color:white;
-      min-height:54px;
-    }
-    input[type="date"]::-webkit-calendar-picker-indicator{
-      filter:invert(1);
-      opacity:.9;
-      cursor:pointer;
-    }
-    button{
-      width:100%;
-      padding:16px;
-      border-radius:12px;
-      border:none;
-      background:linear-gradient(135deg,#3a8bfd,#1f6df0);
-      color:white;
-      font-size:18px;
-      margin-top:12px;
-      box-shadow:0 0 10px rgba(58,139,253,.45);
-      cursor:pointer;
-    }
-    button:active{
-      transform:scale(.98);
-    }
-    .small-btn{
-      width:auto;
-      padding:8px 12px;
-      font-size:14px;
-      margin-top:0;
-      margin-left:8px;
-      border-radius:8px;
-      background:linear-gradient(135deg,#2f5fa7,#244b84);
-      box-shadow:none;
-    }
-    .danger{
-      background:linear-gradient(135deg,#a53030,#7b2020);
-    }
-    .row{
-      display:flex;
-      gap:10px;
-      align-items:center;
-    }
-    .row input,.row select{
-      margin-top:0;
-      flex:1;
-    }
-    .watch-item{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      padding:10px 0;
-      border-bottom:1px solid rgba(255,255,255,.08);
-    }
-    .watch-item:last-child{
-      border-bottom:none;
-    }
-    .green{color:#3cff88;}
-    .red{color:#ff6b6b;}
-    .yellow{color:#ffd84d;}
-    .blue{color:#8ecbff;}
-    .muted{opacity:.82;}
-    .metric{margin:4px 0;}
-    .divider{
-      height:1px;
-      background:rgba(255,255,255,.08);
-      margin:14px 0;
-    }
-    .bar{
-      height:10px;
-      background:#0e1c33;
-      border-radius:8px;
-      margin-top:8px;
-      overflow:hidden;
-      box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
-    }
-    .fill{
-      height:100%;
-      background:linear-gradient(90deg,#3cff88,#3a8bfd);
-      border-radius:8px;
-    }
-    .grid-2{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
-    }
-    .sell-alert{
-      background:rgba(165,48,48,0.2);
-      border:1px solid rgba(255,107,107,0.45);
-      box-shadow:0 0 14px rgba(255,107,107,0.18);
-    }
-    .hold-alert{
-      background:rgba(35,85,35,0.18);
-      border:1px solid rgba(60,255,136,0.35);
-      box-shadow:0 0 14px rgba(60,255,136,0.12);
-    }
-    .weak-alert{
-      background:rgba(140,110,20,0.18);
-      border:1px solid rgba(255,216,77,0.35);
-      box-shadow:0 0 14px rgba(255,216,77,0.10);
-    }
-    @media (max-width:520px){
-      .grid-2{grid-template-columns:1fr;}
-    }
+    body{font-family:Arial,sans-serif;background:linear-gradient(180deg,#050d1f,#071326);color:#fff;margin:0;padding:20px}
+    .container{max-width:520px;margin:auto}
+    .title{text-align:center;font-size:28px;font-weight:bold;margin-bottom:8px;letter-spacing:.5px;text-shadow:0 0 10px rgba(58,139,253,.35)}
+    .subtitle{text-align:center;opacity:.8;margin-bottom:18px;font-size:14px}
+    .card{background:rgba(19,35,61,.9);padding:18px;border-radius:14px;margin-top:15px;line-height:1.45;border:1px solid rgba(58,139,253,.22);box-shadow:0 0 14px rgba(58,139,253,.14);backdrop-filter:blur(6px)}
+    .section-title{font-size:16px;font-weight:bold;margin-bottom:10px;color:#9fd0ff;text-transform:uppercase;letter-spacing:.7px}
+    .field-label{font-size:13px;color:#9fd0ff;margin-top:12px;margin-bottom:4px;letter-spacing:.3px}
+    input,select{width:100%;padding:14px;border-radius:12px;border:none;margin-top:10px;font-size:18px;box-sizing:border-box;background:#0e1c33;color:#fff;box-shadow:inset 0 0 0 1px rgba(58,139,253,.18);-webkit-appearance:none;appearance:none}
+    input[type="date"]{color:#fff;min-height:54px}
+    input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.9;cursor:pointer}
+    button{width:100%;padding:16px;border-radius:12px;border:none;background:linear-gradient(135deg,#3a8bfd,#1f6df0);color:#fff;font-size:18px;margin-top:12px;box-shadow:0 0 10px rgba(58,139,253,.45);cursor:pointer}
+    button:active{transform:scale(.98)}
+    .small-btn{width:auto;padding:8px 12px;font-size:14px;margin-top:0;margin-left:8px;border-radius:8px;background:linear-gradient(135deg,#2f5fa7,#244b84);box-shadow:none}
+    .danger{background:linear-gradient(135deg,#a53030,#7b2020)}
+    .row{display:flex;gap:10px;align-items:center}
+    .row input,.row select{margin-top:0;flex:1}
+    .watch-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)}
+    .watch-item:last-child{border-bottom:none}
+    .green{color:#3cff88}.red{color:#ff6b6b}.yellow{color:#ffd84d}.blue{color:#8ecbff}.muted{opacity:.82}
+    .metric{margin:4px 0}
+    .divider{height:1px;background:rgba(255,255,255,.08);margin:14px 0}
+    .bar{height:10px;background:#0e1c33;border-radius:8px;margin-top:8px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+    .fill{height:100%;background:linear-gradient(90deg,#3cff88,#3a8bfd);border-radius:8px}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .sell-alert{background:rgba(165,48,48,.2);border:1px solid rgba(255,107,107,.45);box-shadow:0 0 14px rgba(255,107,107,.18)}
+    .hold-alert{background:rgba(35,85,35,.18);border:1px solid rgba(60,255,136,.35);box-shadow:0 0 14px rgba(60,255,136,.12)}
+    .weak-alert{background:rgba(140,110,20,.18);border:1px solid rgba(255,216,77,.35);box-shadow:0 0 14px rgba(255,216,77,.10)}
+    @media (max-width:520px){.grid-2{grid-template-columns:1fr}}
   </style>
 </head>
-
 <body>
-  <div class="container">
-    <div class="title">AI Options Terminal</div>
-    <div class="subtitle">Live quote mode â¢ watchlist â¢ calendar picker expiration monitor</div>
+<div class="container">
+  <div class="title">AI Options Terminal V33</div>
+  <div class="subtitle">Time-to-target engine â¢ watchlist â¢ calendar picker â¢ expiration-aware position monitor</div>
 
-    <div class="card">
-      <div class="section-title">AI Market Dashboard</div>
-      <div class="metric">Momentum Monitor <span class="blue">Active</span></div>
-      <div class="metric muted">Expiration-aware position logic enabled</div>
-    </div>
-
-    <div class="card">
-      <div class="section-title">Display Mode</div>
-      <select id="uiMode">
-        <option value="full">Full Detail Mode</option>
-        <option value="compact">Quick Glance Mode</option>
-      </select>
-    </div>
-
-    <div class="card">
-      <div class="section-title">My Watchlist</div>
-      <div class="row" style="margin-top:12px;">
-        <input id="watchlistInput" placeholder="Add ticker (AAPL, NVDA, SOFI)">
-        <button class="small-btn" onclick="addTicker()">Add</button>
-      </div>
-      <div id="watchlistContainer" style="margin-top:14px;"></div>
-      <button onclick="scanMyWatchlist()">Scan My Watchlist</button>
-    </div>
-
-    <div class="card">
-      <div class="section-title">Saved Positions</div>
-      <div class="grid-2">
-        <input id="posTicker" placeholder="Ticker">
-        <select id="posType">
-          <option value="CALL">Call</option>
-          <option value="PUT">Put</option>
-        </select>
-        <input id="posStrike" placeholder="Strike">
-        <input id="posBreakeven" placeholder="Breakeven">
-      </div>
-      <input id="posEntryPremium" placeholder="Entry Premium (optional)">
-      <div class="field-label">Expiration Date</div>
-      <input id="posExpiration" type="date">
-      <button onclick="addPosition()">Save Position</button>
-      <div id="positionsContainer" style="margin-top:14px;"></div>
-      <button onclick="scanMyPositions()">Scan My Positions</button>
-    </div>
-
-    <input id="ticker" placeholder="Enter Stock Ticker">
-    <button onclick="runAI()">Run AI Analysis</button>
-    <button onclick="scanMarket()">Scan Default Top Opportunities</button>
-
-    <div id="output"></div>
+  <div class="card">
+    <div class="section-title">AI Market Dashboard</div>
+    <div class="metric">Momentum Monitor <span class="blue">Active</span></div>
+    <div class="metric muted">Time-to-target probability engine enabled</div>
   </div>
+
+  <div class="card">
+    <div class="section-title">Display Mode</div>
+    <select id="uiMode">
+      <option value="full">Full Detail Mode</option>
+      <option value="compact">Quick Glance Mode</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <div class="section-title">My Watchlist</div>
+    <div class="row" style="margin-top:12px;">
+      <input id="watchlistInput" placeholder="Add ticker (AAPL, NVDA, SOFI)">
+      <button class="small-btn" onclick="addTicker()">Add</button>
+    </div>
+    <div id="watchlistContainer" style="margin-top:14px;"></div>
+    <button onclick="scanMyWatchlist()">Scan My Watchlist</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Saved Positions</div>
+    <div class="grid-2">
+      <input id="posTicker" placeholder="Ticker">
+      <select id="posType">
+        <option value="CALL">Call</option>
+        <option value="PUT">Put</option>
+      </select>
+      <input id="posStrike" placeholder="Strike">
+      <input id="posBreakeven" placeholder="Breakeven">
+    </div>
+    <input id="posEntryPremium" placeholder="Entry Premium (optional)">
+    <div class="field-label">Expiration Date</div>
+    <input id="posExpiration" type="date">
+    <button onclick="addPosition()">Save Position</button>
+    <div id="positionsContainer" style="margin-top:14px;"></div>
+    <button onclick="scanMyPositions()">Scan My Positions</button>
+  </div>
+
+  <input id="ticker" placeholder="Enter Stock Ticker">
+  <button onclick="runAI()">Run AI Analysis</button>
+  <button onclick="scanMarket()">Scan Default Top Opportunities</button>
+
+  <div id="output"></div>
+</div>
 
 <script>
 const API_KEY = "OHCJWFQEFSXI8IJ3";
@@ -243,9 +102,7 @@ function getSavedWatchlist(){
   }catch(e){}
   return ["AAPL","NVDA","TSLA","SOFI"];
 }
-function saveWatchlist(list){
-  localStorage.setItem("ai_options_watchlist", JSON.stringify(list));
-}
+function saveWatchlist(list){ localStorage.setItem("ai_options_watchlist", JSON.stringify(list)); }
 let customWatchlist = getSavedWatchlist();
 
 function getSavedPositions(){
@@ -254,79 +111,41 @@ function getSavedPositions(){
   try{
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
-  }catch(e){
-    return [];
-  }
+  }catch(e){ return []; }
 }
-function savePositions(list){
-  localStorage.setItem("ai_options_positions", JSON.stringify(list));
-}
+function savePositions(list){ localStorage.setItem("ai_options_positions", JSON.stringify(list)); }
 let savedPositions = getSavedPositions();
 
-function normalizeTicker(ticker){
-  return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,"");
-}
+function normalizeTicker(ticker){ return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,""); }
 
 function renderWatchlist(){
   const container = document.getElementById("watchlistContainer");
-  if(!customWatchlist.length){
-    container.innerHTML = "<div class='muted'>No tickers saved yet.</div>";
-    return;
-  }
+  if(!customWatchlist.length){ container.innerHTML = "<div class='muted'>No tickers saved yet.</div>"; return; }
   let html = "";
   customWatchlist.forEach((ticker, index) => {
-    html += `
-      <div class="watch-item">
-        <span>${ticker}</span>
-        <button class="small-btn danger" onclick="removeTicker(${index})">Remove</button>
-      </div>
-    `;
+    html += `<div class="watch-item"><span>${ticker}</span><button class="small-btn danger" onclick="removeTicker(${index})">Remove</button></div>`;
   });
   container.innerHTML = html;
 }
-
 function addTicker(){
   const input = document.getElementById("watchlistInput");
   const ticker = normalizeTicker(input.value);
   if(!ticker) return;
-  if(customWatchlist.includes(ticker)){
-    input.value = "";
-    return;
-  }
-  if(customWatchlist.length >= 15){
-    alert("Keep your watchlist at 15 or fewer tickers for faster scans.");
-    return;
-  }
-  customWatchlist.push(ticker);
-  saveWatchlist(customWatchlist);
-  renderWatchlist();
-  input.value = "";
+  if(customWatchlist.includes(ticker)){ input.value=""; return; }
+  if(customWatchlist.length >= 15){ alert("Keep your watchlist at 15 or fewer tickers for faster scans."); return; }
+  customWatchlist.push(ticker); saveWatchlist(customWatchlist); renderWatchlist(); input.value="";
 }
-
-function removeTicker(index){
-  customWatchlist.splice(index,1);
-  saveWatchlist(customWatchlist);
-  renderWatchlist();
-}
+function removeTicker(index){ customWatchlist.splice(index,1); saveWatchlist(customWatchlist); renderWatchlist(); }
 
 function renderPositions(){
   const container = document.getElementById("positionsContainer");
-  if(!savedPositions.length){
-    container.innerHTML = "<div class='muted'>No saved positions yet.</div>";
-    return;
-  }
+  if(!savedPositions.length){ container.innerHTML = "<div class='muted'>No saved positions yet.</div>"; return; }
   let html = "";
   savedPositions.forEach((p,index)=>{
-    html += `
-      <div class="watch-item">
-        <span>${p.ticker} ${p.strike} ${p.type} â¢ BE ${p.breakeven}${p.expiration ? " â¢ Exp " + p.expiration : ""}</span>
-        <button class="small-btn danger" onclick="removePosition(${index})">Remove</button>
-      </div>
-    `;
+    html += `<div class="watch-item"><span>${p.ticker} ${p.strike} ${p.type} â¢ BE ${p.breakeven}${p.expiration ? " â¢ Exp " + p.expiration : ""}</span><button class="small-btn danger" onclick="removePosition(${index})">Remove</button></div>`;
   });
   container.innerHTML = html;
 }
-
 function addPosition(){
   const ticker = normalizeTicker(document.getElementById("posTicker").value);
   const type = document.getElementById("posType").value;
@@ -335,10 +154,7 @@ function addPosition(){
   const entryPremium = parseFloat(document.getElementById("posEntryPremium").value || "0");
   const expiration = document.getElementById("posExpiration").value;
 
-  if(!ticker || Number.isNaN(strike) || Number.isNaN(breakeven)){
-    alert("Enter ticker, strike, and breakeven.");
-    return;
-  }
+  if(!ticker || Number.isNaN(strike) || Number.isNaN(breakeven)){ alert("Enter ticker, strike, and breakeven."); return; }
 
   savedPositions.push({ticker,type,strike,breakeven,entryPremium,expiration});
   savePositions(savedPositions);
@@ -350,47 +166,29 @@ function addPosition(){
   document.getElementById("posEntryPremium").value="";
   document.getElementById("posExpiration").value="";
 }
+function removePosition(index){ savedPositions.splice(index,1); savePositions(savedPositions); renderPositions(); }
 
-function removePosition(index){
-  savedPositions.splice(index,1);
-  savePositions(savedPositions);
-  renderPositions();
-}
-
-async function fetchJson(url){
-  const r = await fetch(url);
-  return await r.json();
-}
+async function fetchJson(url){ const r = await fetch(url); return await r.json(); }
 
 async function getHistory(symbol){
   try{
-    const url = `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`;
-    const d = await fetchJson(url);
+    const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`);
     const s = d["Time Series (Daily)"];
     if(!s) return null;
-    return Object.values(s)
-      .slice(0,60)
-      .map(v => parseFloat(v["4. close"]))
-      .filter(v => !Number.isNaN(v));
-  }catch(e){
-    return null;
-  }
+    return Object.values(s).slice(0,60).map(v => parseFloat(v["4. close"])).filter(v => !Number.isNaN(v));
+  }catch(e){ return null; }
 }
-
 async function getGlobalQuotePrice(symbol){
   try{
-    const quoteUrl = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`;
-    const qd = await fetchJson(quoteUrl);
+    const qd = await fetchJson(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`);
     const qp = parseFloat(qd?.["Global Quote"]?.["05. price"]);
     if(!Number.isNaN(qp) && qp > 0) return qp;
   }catch(e){}
   return null;
 }
-
 async function getIntradayPrice(symbol){
   try{
-    const intradayUrl = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=compact&apikey=${API_KEY}`;
-    const id = await fetchJson(intradayUrl);
+    const id = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=compact&apikey=${API_KEY}`);
     const series = id["Time Series (5min)"];
     if(!series) return null;
     const latestKey = Object.keys(series)[0];
@@ -399,20 +197,14 @@ async function getIntradayPrice(symbol){
   }catch(e){}
   return null;
 }
-
 async function getBestAvailablePrice(symbol, closes){
-  const q = await getGlobalQuotePrice(symbol);
-  if(q) return {price:q, source:"Global Quote"};
-  const i = await getIntradayPrice(symbol);
-  if(i) return {price:i, source:"Intraday"};
+  const q = await getGlobalQuotePrice(symbol); if(q) return {price:q, source:"Global Quote"};
+  const i = await getIntradayPrice(symbol); if(i) return {price:i, source:"Intraday"};
   if(closes && closes.length) return {price:closes[0], source:"Daily Close"};
   return {price:null, source:"Unavailable"};
 }
 
-function avg(arr){
-  return arr.reduce((a,b)=>a+b,0)/arr.length;
-}
-
+function avg(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
 function nextFridayFrom(date){
   const d = new Date(date);
   const day = d.getDay();
@@ -420,30 +212,22 @@ function nextFridayFrom(date){
   d.setDate(d.getDate() + (diff === 0 ? 7 : diff));
   return d;
 }
-
-function formatDate(d){
-  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
-}
+function formatDate(d){ return d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
 
 function getDTE(expiration){
   if(!expiration) return null;
-  const today = new Date();
-  today.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
   const exp = new Date(expiration + "T00:00:00");
-  const ms = exp - today;
-  return Math.ceil(ms / (1000 * 60 * 60 * 24));
+  return Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
 }
 
 function buildExpirationChoices(confidence, theta){
   const today = new Date();
   const weekly = nextFridayFrom(today);
-  const biweekly = new Date(weekly);
-  biweekly.setDate(weekly.getDate() + 7);
-
+  const biweekly = new Date(weekly); biweekly.setDate(weekly.getDate() + 7);
   let suggested = "5-10 Days";
   if(confidence === "High" && theta === "Low") suggested = "3-5 Days (Weekly)";
   if(theta === "High") suggested = "10-14 Days (Bi-Weekly)";
-
   return {
     suggested,
     weeklyLabel: `${formatDate(weekly)} (Weekly)`,
@@ -478,13 +262,10 @@ function buildContractLadder(price, direction, expectedMove, regime){
     {label:"1 OTM", strike:oneOtm, premium:premium1, ...oneStats},
     {label:"2 OTM", strike:twoOtm, premium:premium2, ...twoStats}
   ];
-
   all.forEach(c=>{ if(c.pop > best.pop) best = c; });
 
   let otmPreferred = all[1];
-  if(regime === "BREAKOUT" && all[2].pop >= all[1].pop - 4){
-    otmPreferred = all[2];
-  }
+  if(regime === "BREAKOUT" && all[2].pop >= all[1].pop - 4) otmPreferred = all[2];
 
   let otmGrade = "C";
   let profitPotential = Math.min(220, Math.round((expectedMove / otmPreferred.premium) * 100));
@@ -494,13 +275,50 @@ function buildContractLadder(price, direction, expectedMove, regime){
   return {
     all,
     best,
-    otmPreferred:{
-      ...otmPreferred,
-      distancePct: Math.abs((otmPreferred.strike - price) / price * 100).toFixed(1),
-      grade: otmGrade,
-      profitPotential
-    }
+    otmPreferred:{...otmPreferred,distancePct:Math.abs((otmPreferred.strike - price) / price * 100).toFixed(1),grade:otmGrade,profitPotential}
   };
+}
+
+function buildTimeToTarget(direction, price, breakeven, expectedMove, momentumEngine, dte){
+  const distance = Math.abs(breakeven - price);
+  const moveRatio = expectedMove > 0 ? expectedMove / Math.max(distance, 0.01) : 0;
+  let score = 30;
+
+  if(moveRatio >= 2) score += 32;
+  else if(moveRatio >= 1.4) score += 24;
+  else if(moveRatio >= 1.0) score += 16;
+  else if(moveRatio >= 0.7) score += 8;
+
+  if(direction === "BUY CALL"){
+    if(momentumEngine === "STRONG BULLISH") score += 24;
+    else if(momentumEngine === "BULLISH") score += 16;
+    else if(momentumEngine === "NEUTRAL") score += 6;
+    else score -= 12;
+  }else if(direction === "BUY PUT"){
+    if(momentumEngine === "STRONG BEARISH") score += 24;
+    else if(momentumEngine === "BEARISH") score += 16;
+    else if(momentumEngine === "NEUTRAL") score += 6;
+    else score -= 12;
+  }
+
+  if(dte !== null){
+    if(dte >= 10) score += 18;
+    else if(dte >= 6) score += 12;
+    else if(dte >= 3) score += 6;
+    else if(dte >= 1) score -= 8;
+    else score -= 18;
+  }
+
+  score = Math.max(5, Math.min(95, Math.round(score)));
+
+  let window = "Tight";
+  let bias = "Needs More Time";
+  if(score >= 75){ window = "Favorable"; bias = "Likely to Hit Before Expiration"; }
+  else if(score >= 55){ window = "Moderate"; bias = "Possible Before Expiration"; }
+  else if(score >= 40){ window = "Tight"; bias = "Needs Strong Follow-Through"; }
+  else { window = "Unfavorable"; bias = "Unlikely Before Expiration"; }
+
+  return {probability:score, window, bias};
 }
 
 function analyze(closes, livePrice){
@@ -571,12 +389,14 @@ function analyze(closes, livePrice){
 
   const expirationPack = buildExpirationChoices(confidence, theta);
   const ladder = buildContractLadder(price, direction, expectedMove, regime);
+  const timeTarget = buildTimeToTarget(direction, price, breakeven, expectedMove, momentumEngine, null);
 
   let score = 50;
   if(bias !== "Neutral") score += 10;
   if(confidence === "High") score += 20;
   if(edge === "Favorable") score += 15;
   if(volatility === "EXPANSION LIKELY") score += 10;
+  if(timeTarget.probability >= 70) score += 5;
   score = Math.min(100, score);
 
   let grade = "C";
@@ -587,50 +407,28 @@ function analyze(closes, livePrice){
   let tradeFilter = "PASS";
   if(grade === "C" || direction === "WAIT") tradeFilter = "FAIL";
 
-  let contracts = 1;
-  let allocation = "5%";
-  let risk = "Low";
-  if(grade === "A+" && confidence === "High"){
-    contracts = 5; allocation = "25%"; risk = "High";
-  }else if(grade === "A"){
-    contracts = 3; allocation = "18%"; risk = "Moderate";
-  }else if(grade === "B"){
-    contracts = 2; allocation = "10%"; risk = "Moderate";
-  }else{
-    contracts = 0; allocation = "0%"; risk = "Avoid";
-  }
+  let contracts = 1, allocation = "5%", risk = "Low";
+  if(grade === "A+" && confidence === "High"){ contracts = 5; allocation = "25%"; risk = "High"; }
+  else if(grade === "A"){ contracts = 3; allocation = "18%"; risk = "Moderate"; }
+  else if(grade === "B"){ contracts = 2; allocation = "10%"; risk = "Moderate"; }
+  else { contracts = 0; allocation = "0%"; risk = "Avoid"; }
 
   let optimalExit = confidence === "High" ? "+65%" : "+50%";
   let runnerTarget = confidence === "High" ? "+120%" : "+100%";
   let thetaKill = theta === "High" ? "1 Day" : "2-3 Days";
 
-  let liquidity = "Moderate";
-  let spreadRisk = "Medium";
-  let executionGrade = "B";
-  if(price > 50){
-    liquidity = "High"; spreadRisk = "Low"; executionGrade = "A";
-  }else if(price < 15){
-    liquidity = "Low"; spreadRisk = "High"; executionGrade = "C";
-  }
+  let liquidity = "Moderate", spreadRisk = "Medium", executionGrade = "B";
+  if(price > 50){ liquidity = "High"; spreadRisk = "Low"; executionGrade = "A"; }
+  else if(price < 15){ liquidity = "Low"; spreadRisk = "High"; executionGrade = "C"; }
 
   return {
-    price: price.toFixed(2),
-    bias,direction,confidence,score,grade,tradeFilter,
-    contracts,allocation,risk,
-    strike: atm,pop,
-    expiration: expirationPack.suggested,
-    weeklyLabel: expirationPack.weeklyLabel,
-    biweeklyLabel: expirationPack.biweeklyLabel,
-    bestContract: ladder.best,
-    otmPreferred: ladder.otmPreferred,
-    ladder: ladder.all,
-    breakeven: breakeven.toFixed(2),
-    dist: dist.toFixed(2),
-    expectedMove: expectedMove.toFixed(2),
-    edge,theta,
-    momentumEngine,gamma,smartMoney,volatility,flow,regime,
-    optimalExit,runnerTarget,thetaKill,
-    liquidity,spreadRisk,executionGrade
+    price: price.toFixed(2),bias,direction,confidence,score,grade,tradeFilter,
+    contracts,allocation,risk,strike:atm,pop,
+    expiration: expirationPack.suggested,weeklyLabel: expirationPack.weeklyLabel,biweeklyLabel: expirationPack.biweeklyLabel,
+    bestContract: ladder.best,otmPreferred: ladder.otmPreferred,ladder: ladder.all,
+    breakeven: breakeven.toFixed(2),dist: dist.toFixed(2),expectedMove: expectedMove.toFixed(2),
+    edge,theta,momentumEngine,gamma,smartMoney,volatility,flow,regime,
+    optimalExit,runnerTarget,thetaKill,liquidity,spreadRisk,executionGrade,timeTarget
   };
 }
 
@@ -652,108 +450,59 @@ function analyzePosition(position, livePrice, ai, priceSource){
   const throughTargetCall = type === "CALL" && price >= breakeven + expectedMoveNum * 0.35;
   const throughTargetPut = type === "PUT" && price <= breakeven - expectedMoveNum * 0.35;
 
-  let timeRisk = "Unknown";
-  let expirationFit = "Unknown";
-
+  let timeRisk = "Unknown", expirationFit = "Unknown";
   if(dte !== null){
-    if(dte <= 1){
-      timeRisk = "Extreme";
-      expirationFit = "Very Short";
-    }else if(dte <= 3){
-      timeRisk = "High";
-      expirationFit = "Tight";
-    }else if(dte <= 7){
-      timeRisk = "Moderate";
-      expirationFit = "Good";
-    }else{
-      timeRisk = "Low";
-      expirationFit = "Good";
-    }
+    if(dte <= 1){ timeRisk = "Extreme"; expirationFit = "Very Short"; }
+    else if(dte <= 3){ timeRisk = "High"; expirationFit = "Tight"; }
+    else if(dte <= 7){ timeRisk = "Moderate"; expirationFit = "Good"; }
+    else { timeRisk = "Low"; expirationFit = "Good"; }
   }
 
-  let status = "WEAK HOLD";
-  let reason = "Setup still active but needs close monitoring";
-  let cardClass = "weak-alert";
+  const direction = type === "CALL" ? "BUY CALL" : "BUY PUT";
+  const timeTarget = buildTimeToTarget(direction, price, breakeven, expectedMoveNum, ai.momentumEngine, dte);
+
+  let status = "WEAK HOLD", reason = "Setup still active but needs close monitoring", cardClass = "weak-alert";
 
   if(type === "CALL"){
-    if((dte !== null && dte <= 1 && price < breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL"){
-      status = "EXIT NOW";
-      reason = "Not enough time left for the call to reasonably work";
-      cardClass = "sell-alert";
+    if((dte !== null && dte <= 1 && price < breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL" || timeTarget.probability < 35){
+      status = "EXIT NOW"; reason = "Not enough time or probability left for the call to work"; cardClass = "sell-alert";
     }else if(throughTargetCall){
-      status = "TAKE PROFIT";
-      reason = "Price pushed through the call profit zone";
-      cardClass = "sell-alert";
-    }else if(price >= breakeven && ai.momentumEngine.includes("BULLISH") && (dte === null || dte > 2)){
-      status = "STRONG HOLD";
-      reason = "Above breakeven with time left and bullish momentum";
-      cardClass = "hold-alert";
+      status = "TAKE PROFIT"; reason = "Price pushed through the call profit zone"; cardClass = "sell-alert";
+    }else if(price >= breakeven && ai.momentumEngine.includes("BULLISH") && (dte === null || dte > 2) && timeTarget.probability >= 70){
+      status = "STRONG HOLD"; reason = "Above breakeven with time left and strong odds to keep working"; cardClass = "hold-alert";
     }else if(closeToBE && !ai.momentumEngine.includes("STRONG BEARISH")){
-      status = "WEAK HOLD";
-      reason = "Near breakeven, but still needs more follow-through";
-      cardClass = "weak-alert";
+      status = "WEAK HOLD"; reason = "Near breakeven, but still needs more follow-through"; cardClass = "weak-alert";
     }else if(ai.momentumEngine.includes("BEARISH") && dte !== null && dte <= 3){
-      status = "EXIT NOW";
-      reason = "Momentum turned against the call with little time remaining";
-      cardClass = "sell-alert";
+      status = "EXIT NOW"; reason = "Momentum turned against the call with little time remaining"; cardClass = "sell-alert";
     }
   }else{
-    if((dte !== null && dte <= 1 && price > breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL"){
-      status = "EXIT NOW";
-      reason = "Not enough time left for the put to reasonably work";
-      cardClass = "sell-alert";
+    if((dte !== null && dte <= 1 && price > breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL" || timeTarget.probability < 35){
+      status = "EXIT NOW"; reason = "Not enough time or probability left for the put to work"; cardClass = "sell-alert";
     }else if(throughTargetPut){
-      status = "TAKE PROFIT";
-      reason = "Price pushed through the put profit zone";
-      cardClass = "sell-alert";
-    }else if(price <= breakeven && ai.momentumEngine.includes("BEARISH") && (dte === null || dte > 2)){
-      status = "STRONG HOLD";
-      reason = "Below breakeven with time left and bearish momentum";
-      cardClass = "hold-alert";
+      status = "TAKE PROFIT"; reason = "Price pushed through the put profit zone"; cardClass = "sell-alert";
+    }else if(price <= breakeven && ai.momentumEngine.includes("BEARISH") && (dte === null || dte > 2) && timeTarget.probability >= 70){
+      status = "STRONG HOLD"; reason = "Below breakeven with time left and strong odds to keep working"; cardClass = "hold-alert";
     }else if(closeToBE && !ai.momentumEngine.includes("STRONG BULLISH")){
-      status = "WEAK HOLD";
-      reason = "Near breakeven, but still needs more downside follow-through";
-      cardClass = "weak-alert";
+      status = "WEAK HOLD"; reason = "Near breakeven, but still needs more downside follow-through"; cardClass = "weak-alert";
     }else if(ai.momentumEngine.includes("BULLISH") && dte !== null && dte <= 3){
-      status = "EXIT NOW";
-      reason = "Momentum turned against the put with little time remaining";
-      cardClass = "sell-alert";
+      status = "EXIT NOW"; reason = "Momentum turned against the put with little time remaining"; cardClass = "sell-alert";
     }
   }
 
-  if(dte !== null && dte <= 2 && status === "WEAK HOLD"){
-    reason = "Setup is still alive, but expiration is getting very close";
-  }
+  if(dte !== null && dte <= 2 && status === "WEAK HOLD") reason = "Setup is still alive, but expiration is getting very close";
 
   return {
-    ticker: position.ticker,
-    type,
-    strike,
-    breakeven,
-    expiration: position.expiration || "Not set",
-    dte: dte === null ? "N/A" : dte,
-    timeRisk,
-    expirationFit,
-    livePrice: price.toFixed(2),
-    status,
-    reason,
-    approxPnLPercent,
-    cardClass,
-    priceSource
+    ticker: position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",
+    dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),
+    status,reason,approxPnLPercent,cardClass,priceSource,timeTarget
   };
 }
 
 function signalClass(value){
   if(typeof value !== "string") return "blue";
-  if(value.includes("STRONG HOLD") || value.includes("BUY CALL") || value.includes("BULLISH") || value.includes("ACCUMULATION") || value.includes("PASS") || value === "A+" || value === "A" || value === "Favorable" || value === "Low"){
-    return "green";
-  }
-  if(value.includes("EXIT NOW") || value.includes("TAKE PROFIT") || value.includes("BUY PUT") || value.includes("BEARISH") || value.includes("SELLING") || value.includes("FAIL") || value === "C" || value === "Risky" || value.includes("Extreme") || value.includes("High")){
-    return "red";
-  }
-  if(value.includes("WEAK HOLD") || value.includes("WAIT") || value === "B" || value === "Medium" || value.includes("BALANCED") || value.includes("RANGE") || value.includes("NORMAL") || value.includes("Moderate") || value.includes("Good") || value.includes("Tight")){
-    return "yellow";
-  }
+  if(value.includes("STRONG HOLD") || value.includes("BUY CALL") || value.includes("BULLISH") || value.includes("ACCUMULATION") || value.includes("PASS") || value === "A+" || value === "A" || value === "Favorable" || value === "Low" || value.includes("Likely")) return "green";
+  if(value.includes("EXIT NOW") || value.includes("TAKE PROFIT") || value.includes("BUY PUT") || value.includes("BEARISH") || value.includes("SELLING") || value.includes("FAIL") || value === "C" || value === "Risky" || value.includes("Extreme") || value.includes("High") || value.includes("Unlikely")) return "red";
+  if(value.includes("WEAK HOLD") || value.includes("WAIT") || value === "B" || value === "Medium" || value.includes("BALANCED") || value.includes("RANGE") || value.includes("NORMAL") || value.includes("Moderate") || value.includes("Good") || value.includes("Tight") || value.includes("Possible")) return "yellow";
   return "blue";
 }
 
@@ -773,6 +522,14 @@ function renderFull(ticker, a){
     <div class="metric"><b>Trade Score:</b> ${a.score}/100 (<span class="${signalClass(a.grade)}">${a.grade}</span>)</div>
     <div class="bar"><div class="fill" style="width:${a.score}%"></div></div>
     <div class="metric"><b>Trade Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">Time-to-Target Engine</div>
+    <div class="metric"><b>Time-to-Target Probability:</b> ${a.timeTarget.probability}%</div>
+    <div class="bar"><div class="fill" style="width:${a.timeTarget.probability}%"></div></div>
+    <div class="metric"><b>Time Window:</b> <span class="${signalClass(a.timeTarget.window)}">${a.timeTarget.window}</span></div>
+    <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(a.timeTarget.bias)}">${a.timeTarget.bias}</span></div>
 
     <div class="divider"></div>
 
@@ -844,10 +601,10 @@ function renderCompact(ticker, a){
     <div class="metric"><b>${ticker}</b> â $${a.price}</div>
     <div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div>
     <div class="bar"><div class="fill" style="width:${a.score}%"></div></div>
+    <div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div>
+    <div class="metric"><b>Window:</b> ${a.timeTarget.window}</div>
     <div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div>
     <div class="metric"><b>Expiration:</b> ${a.expiration}</div>
-    <div class="metric"><b>Edge:</b> ${a.edge}</div>
-    <div class="metric"><b>Stop/Target:</b> ${a.optimalExit} / ${a.runnerTarget}</div>
     <div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div>
   </div>`;
 }
@@ -856,24 +613,14 @@ async function runAI(){
   const ticker = normalizeTicker(document.getElementById("ticker").value);
   const output = document.getElementById("output");
   const mode = document.getElementById("uiMode").value;
-
-  if(!ticker){
-    output.innerHTML = "<div class='card'>Enter a ticker first.</div>";
-    return;
-  }
+  if(!ticker){ output.innerHTML = "<div class='card'>Enter a ticker first.</div>"; return; }
 
   output.innerHTML = "<div class='card'>Analyzing...</div>";
   const closes = await getHistory(ticker);
-  if(!closes){
-    output.innerHTML = "<div class='card'>Data unavailable.</div>";
-    return;
-  }
+  if(!closes){ output.innerHTML = "<div class='card'>Data unavailable.</div>"; return; }
 
   const pricePack = await getBestAvailablePrice(ticker, closes);
-  if(pricePack.price === null){
-    output.innerHTML = "<div class='card'>Price unavailable.</div>";
-    return;
-  }
+  if(pricePack.price === null){ output.innerHTML = "<div class='card'>Price unavailable.</div>"; return; }
 
   const a = analyze(closes, pricePack.price);
   output.innerHTML = mode === "compact" ? renderCompact(ticker, a) : renderFull(ticker, a);
@@ -882,106 +629,61 @@ async function runAI(){
 async function scanList(list, title){
   const output = document.getElementById("output");
   output.innerHTML = "<div class='card'>Scanning...</div>";
-
   let results = [];
+
   for(let i=0; i<list.length; i++){
     const ticker = normalizeTicker(list[i]);
     const closes = await getHistory(ticker);
     if(!closes) continue;
-
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null) continue;
 
     const a = analyze(closes, pricePack.price);
-
     if(a.tradeFilter === "PASS"){
-      results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration});
+      results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability});
     }
-
     await new Promise(r => setTimeout(r, 15000));
   }
 
-  results.sort((a,b)=>b.score-a.score);
+  results.sort((a,b)=>b.score-a.score || b.timeTarget-a.timeTarget);
   results = results.slice(0,2);
 
-  if(results.length === 0){
-    output.innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`;
-    return;
-  }
+  if(results.length === 0){ output.innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`; return; }
 
   let html = `<div class='card'><div class='section-title'>${title}</div>`;
   results.forEach(r=>{
-    html += `<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Score ${r.score} â ${r.expiration}</div>`;
+    html += `<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Score ${r.score} â TTT ${r.timeTarget}% â ${r.expiration}</div>`;
   });
   html += `</div>`;
   output.innerHTML = html;
 }
 
-async function scanMarket(){
-  await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities");
-}
-
+async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
 async function scanMyWatchlist(){
-  if(!customWatchlist.length){
-    document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>";
-    return;
-  }
+  if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; }
   await scanList(customWatchlist, "Top Watchlist Opportunities");
 }
 
 async function scanMyPositions(){
   const output = document.getElementById("output");
-  if(!savedPositions.length){
-    output.innerHTML = "<div class='card'>No saved positions yet.</div>";
-    return;
-  }
+  if(!savedPositions.length){ output.innerHTML = "<div class='card'>No saved positions yet.</div>"; return; }
 
   output.innerHTML = "<div class='card'>Checking positions...</div>";
-
   let results = [];
+
   for(let i=0; i<savedPositions.length; i++){
     const p = savedPositions[i];
     const ticker = normalizeTicker(p.ticker);
 
     const closes = await getHistory(ticker);
     if(!closes){
-      results.push({
-        ticker,
-        type:p.type,
-        strike:p.strike,
-        breakeven:p.breakeven,
-        expiration:p.expiration || "Not set",
-        dte:"N/A",
-        timeRisk:"Unknown",
-        expirationFit:"Unknown",
-        livePrice:"N/A",
-        status:"UNAVAILABLE",
-        reason:"Could not load historical data",
-        approxPnLPercent:null,
-        cardClass:"sell-alert",
-        priceSource:"Unavailable"
-      });
+      results.push({ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"}});
       continue;
     }
 
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null){
-      results.push({
-        ticker,
-        type:p.type,
-        strike:p.strike,
-        breakeven:p.breakeven,
-        expiration:p.expiration || "Not set",
-        dte:"N/A",
-        timeRisk:"Unknown",
-        expirationFit:"Unknown",
-        livePrice:"N/A",
-        status:"UNAVAILABLE",
-        reason:"Could not load quote or fallback price",
-        approxPnLPercent:null,
-        cardClass:"sell-alert",
-        priceSource:"Unavailable"
-      });
+      results.push({ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"}});
       continue;
     }
 
@@ -990,11 +692,8 @@ async function scanMyPositions(){
     results.push(monitor);
 
     if(monitor.status !== "STRONG HOLD" && monitor.status !== "WEAK HOLD"){
-      try{
-        if(navigator.vibrate) navigator.vibrate([200,100,200]);
-      }catch(e){}
+      try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
     }
-
     await new Promise(r => setTimeout(r, 5000));
   }
 
@@ -1010,6 +709,9 @@ async function scanMyPositions(){
         <div class="metric"><b>DTE:</b> ${r.dte}</div>
         <div class="metric"><b>Time Risk:</b> <span class="${signalClass(r.timeRisk)}">${r.timeRisk}</span></div>
         <div class="metric"><b>Expiration Fit:</b> <span class="${signalClass(r.expirationFit)}">${r.expirationFit}</span></div>
+        <div class="metric"><b>Time-to-Target:</b> ${r.timeTarget.probability}${r.timeTarget.probability==="N/A"?"":"%"}</div>
+        <div class="metric"><b>Time Window:</b> <span class="${signalClass(r.timeTarget.window)}">${r.timeTarget.window}</span></div>
+        <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(r.timeTarget.bias)}">${r.timeTarget.bias}</span></div>
         <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
         <div class="metric"><b>Reason:</b> ${r.reason}</div>
         <div class="metric"><b>Price Source:</b> ${r.priceSource}</div>
@@ -1017,7 +719,6 @@ async function scanMyPositions(){
       </div>
     `;
   });
-
   output.innerHTML = html;
 }
 
