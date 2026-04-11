@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Signal Predator AI v34.3 Tactical Font Edition</title>
+  <title>Signal Predator AI v34.4 Confidence + Entry Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -206,7 +206,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v34.3 // tactical font edition // terminator-inspired command interface</div>
+  <div class="subtitle">v34.4 // confidence meter // best trade scanner // entry timing edition</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -242,6 +242,7 @@
     </div>
     <div id="watchlistContainer" style="margin-top:14px;"></div>
     <button onclick="scanMyWatchlist()">Scan My Watchlist</button>
+    <button class="secondary" onclick="findBestTrade()">Find Best Trade</button>
   </div>
 
   <div class="card">
@@ -446,7 +447,10 @@ function analyze(closes, livePrice){
   if(grade === "A+" && confidence === "High"){ contracts = 5; allocation = "25%"; risk = "High"; } else if(grade === "A"){ contracts = 3; allocation = "18%"; risk = "Moderate"; } else if(grade === "B"){ contracts = 2; allocation = "10%"; risk = "Moderate"; } else { contracts = 0; allocation = "0%"; risk = "Avoid"; }
   let optimalExit = confidence === "High" ? "+65%" : "+50%", runnerTarget = confidence === "High" ? "+120%" : "+100%", thetaKill = theta === "High" ? "1 Day" : "2-3 Days";
   let liquidity = "Moderate", spreadRisk = "Medium", executionGrade = "B"; if(price > 50){ liquidity = "High"; spreadRisk = "Low"; executionGrade = "A"; } else if(price < 15){ liquidity = "Low"; spreadRisk = "High"; executionGrade = "C"; }
-  return {price:price.toFixed(2),bias,direction,confidence,score,grade,tradeFilter,contracts,allocation,risk,strike:atm,pop,expiration:expirationPack.suggested,weeklyLabel:expirationPack.weeklyLabel,biweeklyLabel:expirationPack.biweeklyLabel,bestContract:ladder.best,otmPreferred:ladder.otmPreferred,ladder:ladder.all,breakeven:breakeven.toFixed(2),dist:dist.toFixed(2),expectedMove:expectedMove.toFixed(2),edge,theta,momentumEngine,gamma,smartMoney,volatility,flow,regime,optimalExit,runnerTarget,thetaKill,liquidity,spreadRisk,executionGrade,timeTarget};
+  const result = {price:price.toFixed(2),bias,direction,confidence,score,grade,tradeFilter,contracts,allocation,risk,strike:atm,pop,expiration:expirationPack.suggested,weeklyLabel:expirationPack.weeklyLabel,biweeklyLabel:expirationPack.biweeklyLabel,bestContract:ladder.best,otmPreferred:ladder.otmPreferred,ladder:ladder.all,breakeven:breakeven.toFixed(2),dist:dist.toFixed(2),expectedMove:expectedMove.toFixed(2),edge,theta,momentumEngine,gamma,smartMoney,volatility,flow,regime,optimalExit,runnerTarget,thetaKill,liquidity,spreadRisk,executionGrade,timeTarget};
+  result.confidenceMeter = getConfidenceMeter(result);
+  result.entryTiming = getEntryTiming(result);
+  return result;
 }
 
 function analyzePosition(position, livePrice, ai, priceSource){
@@ -521,6 +525,44 @@ function applyPortfolioAlertSummary(results, sourceLabel){
   else pushAlert(`${sourceLabel}: all saved targets look stable.`, "green");
 }
 
+
+function getConfidenceMeter(a){
+  let points = a.score;
+  if(a.timeTarget && typeof a.timeTarget.probability === "number") points = Math.round((a.score + a.timeTarget.probability) / 2);
+  if(points >= 82) return {label:"HIGH", color:"green"};
+  if(points >= 62) return {label:"MEDIUM", color:"yellow"};
+  return {label:"LOW", color:"red"};
+}
+
+function getEntryTiming(a){
+  let label = "WAIT";
+  let reason = "Setup is not ideal for entry yet.";
+  if(a.direction === "BUY CALL"){
+    if(a.momentumEngine === "STRONG BULLISH" && a.edge === "Favorable"){
+      label = "GOOD ENTRY ZONE";
+      reason = "Bullish pressure and favorable edge support entry.";
+    }else if(a.momentumEngine === "BULLISH"){
+      label = "WATCH FOR PULLBACK";
+      reason = "Trend is positive, but a cleaner dip could improve entry.";
+    }else{
+      label = "OVEREXTENDED / WAIT";
+      reason = "Momentum is not strong enough for a clean call entry.";
+    }
+  }else if(a.direction === "BUY PUT"){
+    if(a.momentumEngine === "STRONG BEARISH" && a.edge === "Favorable"){
+      label = "GOOD ENTRY ZONE";
+      reason = "Bearish pressure and favorable edge support entry.";
+    }else if(a.momentumEngine === "BEARISH"){
+      label = "WATCH FOR POP";
+      reason = "Trend is negative, but a bounce could improve put entry.";
+    }else{
+      label = "OVEREXTENDED / WAIT";
+      reason = "Momentum is not strong enough for a clean put entry.";
+    }
+  }
+  return {label, reason};
+}
+
 function renderFull(ticker, a){
   return `<div class="card">
     <div class="section-title">Predator Trade Setup</div>
@@ -540,6 +582,12 @@ function renderFull(ticker, a){
     <div class="bar"><div class="fill" style="width:${a.timeTarget.probability}%"></div></div>
     <div class="metric"><b>Time Window:</b> <span class="${signalClass(a.timeTarget.window)}">${a.timeTarget.window}</span></div>
     <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(a.timeTarget.bias)}">${a.timeTarget.bias}</span></div>
+    <div class="divider"></div>
+    <div class="section-title">Confidence Meter</div>
+    <div class="metric"><b>Confidence Meter:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div>
+    <div class="section-title">Entry Timing</div>
+    <div class="metric"><b>Entry Signal:</b> <span class="${signalClass(a.entryTiming.label)}">${a.entryTiming.label}</span></div>
+    <div class="metric"><b>Entry Read:</b> ${a.entryTiming.reason}</div>
     <div class="divider"></div>
     <div class="section-title">Position Sizing</div>
     <div class="metric"><b>Suggested Contracts:</b> ${a.contracts}</div>
@@ -585,7 +633,7 @@ function renderFull(ticker, a){
 }
 
 function renderCompact(ticker, a){
-  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 async function runAI(){
@@ -613,6 +661,52 @@ async function scanList(list, title){
   results = results.slice(0,2);
   if(results.length === 0){ document.getElementById("output").innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`; return; }
   document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Score ${r.score} â TTT ${r.timeTarget}% â ${r.expiration}</div>`).join("")}</div>`;
+}
+
+
+async function findBestTrade(){
+  if(!customWatchlist.length){
+    document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>";
+    return;
+  }
+  renderThinkingCard(["SCANNING WATCHLIST...","RANKING TOP TARGET...","LOCKING BEST TRADE..."]);
+  let best = null;
+
+  for(let i=0; i<customWatchlist.length; i++){
+    const ticker = normalizeTicker(customWatchlist[i]);
+    const closes = await getHistory(ticker);
+    if(!closes) continue;
+    const pricePack = await getBestAvailablePrice(ticker, closes);
+    if(pricePack.price === null) continue;
+    const a = analyze(closes, pricePack.price);
+    if(a.tradeFilter !== "PASS") continue;
+
+    const rankScore = a.score + (a.timeTarget?.probability || 0);
+    if(!best || rankScore > best.rankScore){
+      best = {ticker, a, rankScore};
+    }
+    await new Promise(r => setTimeout(r, 15000));
+  }
+
+  if(!best){
+    document.getElementById("output").innerHTML = "<div class='card'>No strong trade found in your watchlist right now.</div>";
+    return;
+  }
+
+  document.getElementById("output").innerHTML =
+    `<div class="card hold-alert">
+      <div class="section-title">Best Trade of the Day</div>
+      <div class="metric"><b>${best.ticker}</b> â <span class="${signalClass(best.a.direction)}">${best.a.direction}</span></div>
+      <div class="metric"><b>Price:</b> $${best.a.price}</div>
+      <div class="metric"><b>Trade Score:</b> ${best.a.score}/100</div>
+      <div class="metric"><b>Confidence Meter:</b> <span class="${best.a.confidenceMeter.color}">${best.a.confidenceMeter.label}</span></div>
+      <div class="metric"><b>Entry Timing:</b> <span class="${signalClass(best.a.entryTiming.label)}">${best.a.entryTiming.label}</span></div>
+      <div class="metric"><b>Entry Read:</b> ${best.a.entryTiming.reason}</div>
+      <div class="metric"><b>Time-to-Target:</b> ${best.a.timeTarget.probability}%</div>
+      <div class="metric"><b>Suggested Expiration:</b> ${best.a.expiration}</div>
+      <div class="metric"><b>Best Contract:</b> ${best.a.bestContract.label} ${best.a.bestContract.strike}</div>
+      <div class="metric"><b>OTM Grade:</b> <span class="${signalClass(best.a.otmPreferred.grade)}">${best.a.otmPreferred.grade}</span></div>
+    </div>` + (document.getElementById("uiMode").value === "compact" ? renderCompact(best.ticker, best.a) : renderFull(best.ticker, best.a));
 }
 
 async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
