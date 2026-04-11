@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>AI Options Terminal V33 Time-to-Target Engine</title>
+  <title>AI Options Terminal V34 Alerts Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body{font-family:Arial,sans-serif;background:linear-gradient(180deg,#050d1f,#071326);color:#fff;margin:0;padding:20px}
@@ -18,8 +18,9 @@
     button:active{transform:scale(.98)}
     .small-btn{width:auto;padding:8px 12px;font-size:14px;margin-top:0;margin-left:8px;border-radius:8px;background:linear-gradient(135deg,#2f5fa7,#244b84);box-shadow:none}
     .danger{background:linear-gradient(135deg,#a53030,#7b2020)}
+    .secondary{background:linear-gradient(135deg,#2a446d,#1d3150)}
     .row{display:flex;gap:10px;align-items:center}
-    .row input,.row select{margin-top:0;flex:1}
+    .row input,.row select,.row button{margin-top:0;flex:1}
     .watch-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)}
     .watch-item:last-child{border-bottom:none}
     .green{color:#3cff88}.red{color:#ff6b6b}.yellow{color:#ffd84d}.blue{color:#8ecbff}.muted{opacity:.82}
@@ -31,18 +32,23 @@
     .sell-alert{background:rgba(165,48,48,.2);border:1px solid rgba(255,107,107,.45);box-shadow:0 0 14px rgba(255,107,107,.18)}
     .hold-alert{background:rgba(35,85,35,.18);border:1px solid rgba(60,255,136,.35);box-shadow:0 0 14px rgba(60,255,136,.12)}
     .weak-alert{background:rgba(140,110,20,.18);border:1px solid rgba(255,216,77,.35);box-shadow:0 0 14px rgba(255,216,77,.10)}
-    @media (max-width:520px){.grid-2{grid-template-columns:1fr}}
+    .alert-banner{padding:14px;border-radius:12px;margin-top:12px;font-weight:bold;text-align:center}
+    .alert-red{background:rgba(165,48,48,.22);border:1px solid rgba(255,107,107,.55);box-shadow:0 0 14px rgba(255,107,107,.18)}
+    .alert-yellow{background:rgba(140,110,20,.22);border:1px solid rgba(255,216,77,.45);box-shadow:0 0 14px rgba(255,216,77,.12)}
+    .alert-green{background:rgba(35,85,35,.22);border:1px solid rgba(60,255,136,.45);box-shadow:0 0 14px rgba(60,255,136,.12)}
+    @media (max-width:520px){.grid-2{grid-template-columns:1fr}.row{flex-direction:column;align-items:stretch}.row button{width:100%;margin-left:0}}
   </style>
 </head>
 <body>
 <div class="container">
-  <div class="title">AI Options Terminal V33</div>
-  <div class="subtitle">Time-to-target engine â¢ watchlist â¢ calendar picker â¢ expiration-aware position monitor</div>
+  <div class="title">AI Options Terminal V34</div>
+  <div class="subtitle">Alerts engine â¢ time-to-target â¢ watchlist â¢ calendar picker â¢ expiration-aware position monitor</div>
 
   <div class="card">
     <div class="section-title">AI Market Dashboard</div>
     <div class="metric">Momentum Monitor <span class="blue">Active</span></div>
-    <div class="metric muted">Time-to-target probability engine enabled</div>
+    <div class="metric muted">V34 alerts engine enabled</div>
+    <div id="topAlertArea"></div>
   </div>
 
   <div class="card">
@@ -51,6 +57,17 @@
       <option value="full">Full Detail Mode</option>
       <option value="compact">Quick Glance Mode</option>
     </select>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Alert Settings</div>
+    <div class="metric">Alert Mode: <span id="alertModeLabel" class="blue">On-Page + Vibrate</span></div>
+    <div class="metric muted">Works while the page stays open.</div>
+    <div class="row" style="margin-top:12px;">
+      <button class="secondary" onclick="clearAlerts()">Clear Alert History</button>
+      <button class="secondary" onclick="testAlert()">Test Alert</button>
+    </div>
+    <div id="alertHistory" style="margin-top:14px;"></div>
   </div>
 
   <div class="card">
@@ -93,39 +110,24 @@
 const API_KEY = "OHCJWFQEFSXI8IJ3";
 const DEFAULT_WATCHLIST = ["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"];
 
-function getSavedWatchlist(){
-  const raw = localStorage.getItem("ai_options_watchlist");
-  if(!raw) return ["AAPL","NVDA","TSLA","SOFI"];
-  try{
-    const parsed = JSON.parse(raw);
-    if(Array.isArray(parsed) && parsed.length) return parsed;
-  }catch(e){}
-  return ["AAPL","NVDA","TSLA","SOFI"];
-}
+function getSavedWatchlist(){ const raw = localStorage.getItem("ai_options_watchlist"); if(!raw) return ["AAPL","NVDA","TSLA","SOFI"]; try{ const parsed = JSON.parse(raw); if(Array.isArray(parsed)&&parsed.length) return parsed; }catch(e){} return ["AAPL","NVDA","TSLA","SOFI"]; }
 function saveWatchlist(list){ localStorage.setItem("ai_options_watchlist", JSON.stringify(list)); }
 let customWatchlist = getSavedWatchlist();
 
-function getSavedPositions(){
-  const raw = localStorage.getItem("ai_options_positions");
-  if(!raw) return [];
-  try{
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  }catch(e){ return []; }
-}
+function getSavedPositions(){ const raw = localStorage.getItem("ai_options_positions"); if(!raw) return []; try{ const parsed = JSON.parse(raw); return Array.isArray(parsed)?parsed:[]; }catch(e){ return []; } }
 function savePositions(list){ localStorage.setItem("ai_options_positions", JSON.stringify(list)); }
 let savedPositions = getSavedPositions();
+
+function getAlertLog(){ const raw = localStorage.getItem("ai_options_alert_log"); if(!raw) return []; try{ const parsed = JSON.parse(raw); return Array.isArray(parsed)?parsed:[]; }catch(e){ return []; } }
+function saveAlertLog(list){ localStorage.setItem("ai_options_alert_log", JSON.stringify(list.slice(0,20))); }
+let alertLog = getAlertLog();
 
 function normalizeTicker(ticker){ return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,""); }
 
 function renderWatchlist(){
-  const container = document.getElementById("watchlistContainer");
-  if(!customWatchlist.length){ container.innerHTML = "<div class='muted'>No tickers saved yet.</div>"; return; }
-  let html = "";
-  customWatchlist.forEach((ticker, index) => {
-    html += `<div class="watch-item"><span>${ticker}</span><button class="small-btn danger" onclick="removeTicker(${index})">Remove</button></div>`;
-  });
-  container.innerHTML = html;
+  const c = document.getElementById("watchlistContainer");
+  if(!customWatchlist.length){ c.innerHTML = "<div class='muted'>No tickers saved yet.</div>"; return; }
+  c.innerHTML = customWatchlist.map((ticker, index)=>`<div class="watch-item"><span>${ticker}</span><button class="small-btn danger" onclick="removeTicker(${index})">Remove</button></div>`).join("");
 }
 function addTicker(){
   const input = document.getElementById("watchlistInput");
@@ -138,13 +140,9 @@ function addTicker(){
 function removeTicker(index){ customWatchlist.splice(index,1); saveWatchlist(customWatchlist); renderWatchlist(); }
 
 function renderPositions(){
-  const container = document.getElementById("positionsContainer");
-  if(!savedPositions.length){ container.innerHTML = "<div class='muted'>No saved positions yet.</div>"; return; }
-  let html = "";
-  savedPositions.forEach((p,index)=>{
-    html += `<div class="watch-item"><span>${p.ticker} ${p.strike} ${p.type} â¢ BE ${p.breakeven}${p.expiration ? " â¢ Exp " + p.expiration : ""}</span><button class="small-btn danger" onclick="removePosition(${index})">Remove</button></div>`;
-  });
-  container.innerHTML = html;
+  const c = document.getElementById("positionsContainer");
+  if(!savedPositions.length){ c.innerHTML = "<div class='muted'>No saved positions yet.</div>"; return; }
+  c.innerHTML = savedPositions.map((p,index)=>`<div class="watch-item"><span>${p.ticker} ${p.strike} ${p.type} â¢ BE ${p.breakeven}${p.expiration ? " â¢ Exp " + p.expiration : ""}</span><button class="small-btn danger" onclick="removePosition(${index})">Remove</button></div>`).join("");
 }
 function addPosition(){
   const ticker = normalizeTicker(document.getElementById("posTicker").value);
@@ -153,48 +151,49 @@ function addPosition(){
   const breakeven = parseFloat(document.getElementById("posBreakeven").value);
   const entryPremium = parseFloat(document.getElementById("posEntryPremium").value || "0");
   const expiration = document.getElementById("posExpiration").value;
-
   if(!ticker || Number.isNaN(strike) || Number.isNaN(breakeven)){ alert("Enter ticker, strike, and breakeven."); return; }
-
   savedPositions.push({ticker,type,strike,breakeven,entryPremium,expiration});
   savePositions(savedPositions);
   renderPositions();
-
-  document.getElementById("posTicker").value="";
-  document.getElementById("posStrike").value="";
-  document.getElementById("posBreakeven").value="";
-  document.getElementById("posEntryPremium").value="";
-  document.getElementById("posExpiration").value="";
+  ["posTicker","posStrike","posBreakeven","posEntryPremium","posExpiration"].forEach(id=>document.getElementById(id).value="");
 }
 function removePosition(index){ savedPositions.splice(index,1); savePositions(savedPositions); renderPositions(); }
 
-async function fetchJson(url){ const r = await fetch(url); return await r.json(); }
-
-async function getHistory(symbol){
+function renderAlertHistory(){
+  const container = document.getElementById("alertHistory");
+  const top = document.getElementById("topAlertArea");
+  if(!alertLog.length){ container.innerHTML = "<div class='muted'>No alerts yet.</div>"; top.innerHTML = ""; return; }
+  const latest = alertLog[0];
+  const cls = latest.level === "red" ? "alert-red" : latest.level === "green" ? "alert-green" : "alert-yellow";
+  top.innerHTML = `<div class="alert-banner ${cls}">${latest.message}</div>`;
+  container.innerHTML = alertLog.map(item=>`<div class="watch-item"><span>${item.time} â¢ ${item.message}</span></div>`).join("");
+}
+function pushAlert(message, level){
+  const now = new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  alertLog.unshift({message, level, time: now});
+  saveAlertLog(alertLog);
+  renderAlertHistory();
   try{
-    const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`);
-    const s = d["Time Series (Daily)"];
-    if(!s) return null;
-    return Object.values(s).slice(0,60).map(v => parseFloat(v["4. close"])).filter(v => !Number.isNaN(v));
-  }catch(e){ return null; }
+    if(navigator.vibrate){
+      if(level === "red") navigator.vibrate([250,100,250,100,250]);
+      else if(level === "yellow") navigator.vibrate([200,100,200]);
+      else navigator.vibrate(150);
+    }
+  }catch(e){}
+}
+function clearAlerts(){ alertLog = []; saveAlertLog(alertLog); renderAlertHistory(); }
+function testAlert(){ pushAlert("Test alert: V34 alerts engine is working.", "yellow"); }
+
+async function fetchJson(url){ const r = await fetch(url); return await r.json(); }
+async function getHistory(symbol){
+  try{ const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`); const s = d["Time Series (Daily)"]; if(!s) return null; return Object.values(s).slice(0,60).map(v=>parseFloat(v["4. close"])).filter(v=>!Number.isNaN(v)); }catch(e){ return null; }
 }
 async function getGlobalQuotePrice(symbol){
-  try{
-    const qd = await fetchJson(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`);
-    const qp = parseFloat(qd?.["Global Quote"]?.["05. price"]);
-    if(!Number.isNaN(qp) && qp > 0) return qp;
-  }catch(e){}
+  try{ const qd = await fetchJson(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`); const qp = parseFloat(qd?.["Global Quote"]?.["05. price"]); if(!Number.isNaN(qp) && qp > 0) return qp; }catch(e){}
   return null;
 }
 async function getIntradayPrice(symbol){
-  try{
-    const id = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=compact&apikey=${API_KEY}`);
-    const series = id["Time Series (5min)"];
-    if(!series) return null;
-    const latestKey = Object.keys(series)[0];
-    const ip = parseFloat(series[latestKey]["4. close"]);
-    if(!Number.isNaN(ip) && ip > 0) return ip;
-  }catch(e){}
+  try{ const id = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=compact&apikey=${API_KEY}`); const series = id["Time Series (5min)"]; if(!series) return null; const latestKey = Object.keys(series)[0]; const ip = parseFloat(series[latestKey]["4. close"]); if(!Number.isNaN(ip) && ip > 0) return ip; }catch(e){}
   return null;
 }
 async function getBestAvailablePrice(symbol, closes){
@@ -205,297 +204,109 @@ async function getBestAvailablePrice(symbol, closes){
 }
 
 function avg(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
-function nextFridayFrom(date){
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = (5 - day + 7) % 7;
-  d.setDate(d.getDate() + (diff === 0 ? 7 : diff));
-  return d;
-}
+function nextFridayFrom(date){ const d = new Date(date); const day = d.getDay(); const diff = (5 - day + 7) % 7; d.setDate(d.getDate() + (diff === 0 ? 7 : diff)); return d; }
 function formatDate(d){ return d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
-
-function getDTE(expiration){
-  if(!expiration) return null;
-  const today = new Date(); today.setHours(0,0,0,0);
-  const exp = new Date(expiration + "T00:00:00");
-  return Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
-}
+function getDTE(expiration){ if(!expiration) return null; const today = new Date(); today.setHours(0,0,0,0); const exp = new Date(expiration + "T00:00:00"); return Math.ceil((exp - today)/(1000*60*60*24)); }
 
 function buildExpirationChoices(confidence, theta){
-  const today = new Date();
-  const weekly = nextFridayFrom(today);
-  const biweekly = new Date(weekly); biweekly.setDate(weekly.getDate() + 7);
+  const today = new Date(); const weekly = nextFridayFrom(today); const biweekly = new Date(weekly); biweekly.setDate(weekly.getDate()+7);
   let suggested = "5-10 Days";
   if(confidence === "High" && theta === "Low") suggested = "3-5 Days (Weekly)";
   if(theta === "High") suggested = "10-14 Days (Bi-Weekly)";
-  return {
-    suggested,
-    weeklyLabel: `${formatDate(weekly)} (Weekly)`,
-    biweeklyLabel: `${formatDate(biweekly)} (Bi-Weekly)`
-  };
+  return { suggested, weeklyLabel:`${formatDate(weekly)} (Weekly)`, biweeklyLabel:`${formatDate(biweekly)} (Bi-Weekly)` };
 }
 
 function buildContractLadder(price, direction, expectedMove, regime){
-  const atm = Math.round(price);
-  const oneOtm = direction === "BUY PUT" ? atm - 1 : atm + 1;
-  const twoOtm = direction === "BUY PUT" ? atm - 2 : atm + 2;
-
-  const premiumATM = Math.max(0.35, atm * 0.015);
-  const premium1 = Math.max(0.25, Math.abs(oneOtm) * 0.013);
-  const premium2 = Math.max(0.18, Math.abs(twoOtm) * 0.011);
-
-  function contractPop(strike, premium){
-    const breakeven = direction === "BUY PUT" ? strike - premium : strike + premium;
-    const dist = Math.abs(price - breakeven);
-    let p = 72 - (dist / expectedMove * 22);
-    p = Math.max(25, Math.min(90, Math.round(p)));
-    return {breakeven, dist, pop:p};
-  }
-
-  const atmStats = contractPop(atm, premiumATM);
-  const oneStats = contractPop(oneOtm, premium1);
-  const twoStats = contractPop(twoOtm, premium2);
-
+  const atm = Math.round(price), oneOtm = direction === "BUY PUT" ? atm - 1 : atm + 1, twoOtm = direction === "BUY PUT" ? atm - 2 : atm + 2;
+  const premiumATM = Math.max(0.35, atm * 0.015), premium1 = Math.max(0.25, Math.abs(oneOtm) * 0.013), premium2 = Math.max(0.18, Math.abs(twoOtm) * 0.011);
+  function contractPop(strike, premium){ const breakeven = direction === "BUY PUT" ? strike - premium : strike + premium; const dist = Math.abs(price - breakeven); let p = 72 - (dist / expectedMove * 22); p = Math.max(25, Math.min(90, Math.round(p))); return {breakeven, dist, pop:p}; }
+  const atmStats = contractPop(atm, premiumATM), oneStats = contractPop(oneOtm, premium1), twoStats = contractPop(twoOtm, premium2);
   let best = {label:"ATM", strike:atm, premium:premiumATM, ...atmStats};
-  const all = [
-    {label:"ATM", strike:atm, premium:premiumATM, ...atmStats},
-    {label:"1 OTM", strike:oneOtm, premium:premium1, ...oneStats},
-    {label:"2 OTM", strike:twoOtm, premium:premium2, ...twoStats}
-  ];
+  const all = [{label:"ATM", strike:atm, premium:premiumATM, ...atmStats},{label:"1 OTM", strike:oneOtm, premium:premium1, ...oneStats},{label:"2 OTM", strike:twoOtm, premium:premium2, ...twoStats}];
   all.forEach(c=>{ if(c.pop > best.pop) best = c; });
-
   let otmPreferred = all[1];
   if(regime === "BREAKOUT" && all[2].pop >= all[1].pop - 4) otmPreferred = all[2];
-
   let otmGrade = "C";
   let profitPotential = Math.min(220, Math.round((expectedMove / otmPreferred.premium) * 100));
-  if(profitPotential > 130) otmGrade = "A";
-  else if(profitPotential > 90) otmGrade = "B";
-
-  return {
-    all,
-    best,
-    otmPreferred:{...otmPreferred,distancePct:Math.abs((otmPreferred.strike - price) / price * 100).toFixed(1),grade:otmGrade,profitPotential}
-  };
+  if(profitPotential > 130) otmGrade = "A"; else if(profitPotential > 90) otmGrade = "B";
+  return { all, best, otmPreferred:{...otmPreferred,distancePct:Math.abs((otmPreferred.strike - price) / price * 100).toFixed(1),grade:otmGrade,profitPotential} };
 }
 
 function buildTimeToTarget(direction, price, breakeven, expectedMove, momentumEngine, dte){
   const distance = Math.abs(breakeven - price);
   const moveRatio = expectedMove > 0 ? expectedMove / Math.max(distance, 0.01) : 0;
   let score = 30;
-
-  if(moveRatio >= 2) score += 32;
-  else if(moveRatio >= 1.4) score += 24;
-  else if(moveRatio >= 1.0) score += 16;
-  else if(moveRatio >= 0.7) score += 8;
-
+  if(moveRatio >= 2) score += 32; else if(moveRatio >= 1.4) score += 24; else if(moveRatio >= 1.0) score += 16; else if(moveRatio >= 0.7) score += 8;
   if(direction === "BUY CALL"){
-    if(momentumEngine === "STRONG BULLISH") score += 24;
-    else if(momentumEngine === "BULLISH") score += 16;
-    else if(momentumEngine === "NEUTRAL") score += 6;
-    else score -= 12;
+    if(momentumEngine === "STRONG BULLISH") score += 24; else if(momentumEngine === "BULLISH") score += 16; else if(momentumEngine === "Neutral") score += 6; else score -= 12;
   }else if(direction === "BUY PUT"){
-    if(momentumEngine === "STRONG BEARISH") score += 24;
-    else if(momentumEngine === "BEARISH") score += 16;
-    else if(momentumEngine === "NEUTRAL") score += 6;
-    else score -= 12;
+    if(momentumEngine === "STRONG BEARISH") score += 24; else if(momentumEngine === "BEARISH") score += 16; else if(momentumEngine === "Neutral") score += 6; else score -= 12;
   }
-
-  if(dte !== null){
-    if(dte >= 10) score += 18;
-    else if(dte >= 6) score += 12;
-    else if(dte >= 3) score += 6;
-    else if(dte >= 1) score -= 8;
-    else score -= 18;
-  }
-
+  if(dte !== null){ if(dte >= 10) score += 18; else if(dte >= 6) score += 12; else if(dte >= 3) score += 6; else if(dte >= 1) score -= 8; else score -= 18; }
   score = Math.max(5, Math.min(95, Math.round(score)));
-
-  let window = "Tight";
-  let bias = "Needs More Time";
+  let window = "Tight", bias = "Needs More Time";
   if(score >= 75){ window = "Favorable"; bias = "Likely to Hit Before Expiration"; }
   else if(score >= 55){ window = "Moderate"; bias = "Possible Before Expiration"; }
   else if(score >= 40){ window = "Tight"; bias = "Needs Strong Follow-Through"; }
   else { window = "Unfavorable"; bias = "Unlikely Before Expiration"; }
-
   return {probability:score, window, bias};
 }
 
 function analyze(closes, livePrice){
-  const price = livePrice ?? closes[0];
-  const avg20 = avg(closes.slice(0,20));
-  const avg50 = avg(closes.slice(0,50));
-  const momentum = (closes[0] - closes[5]) / closes[5];
-
-  let bias = "Neutral";
-  if(price > avg20 && avg20 > avg50) bias = "Bullish";
-  if(price < avg20 && avg20 < avg50) bias = "Bearish";
-
-  let direction = "WAIT";
-  if(momentum > 0.02 && bias === "Bullish") direction = "BUY CALL";
-  if(momentum < -0.02 && bias === "Bearish") direction = "BUY PUT";
-
-  let confidence = "Low";
-  if(Math.abs(momentum) > 0.03) confidence = "Medium";
-  if(Math.abs(momentum) > 0.05) confidence = "High";
-
+  const price = livePrice ?? closes[0], avg20 = avg(closes.slice(0,20)), avg50 = avg(closes.slice(0,50)), momentum = (closes[0] - closes[5]) / closes[5];
+  let bias = "Neutral"; if(price > avg20 && avg20 > avg50) bias = "Bullish"; if(price < avg20 && avg20 < avg50) bias = "Bearish";
+  let direction = "WAIT"; if(momentum > 0.02 && bias === "Bullish") direction = "BUY CALL"; if(momentum < -0.02 && bias === "Bearish") direction = "BUY PUT";
+  let confidence = "Low"; if(Math.abs(momentum) > 0.03) confidence = "Medium"; if(Math.abs(momentum) > 0.05) confidence = "High";
   const expectedMove = price * 0.04;
-
   let momentumEngine = "Neutral";
-  if(momentum > 0.04) momentumEngine = "STRONG BULLISH";
-  else if(momentum > 0.02) momentumEngine = "BULLISH";
-  else if(momentum < -0.04) momentumEngine = "STRONG BEARISH";
-  else if(momentum < -0.02) momentumEngine = "BEARISH";
-
-  let gamma = "BALANCED";
-  if(momentum > 0.03) gamma = "CALL DOMINANT";
-  if(momentum < -0.03) gamma = "PUT DOMINANT";
-
-  let smartMoney = "NEUTRAL";
-  if(price > avg20 && momentum > 0.02) smartMoney = "ACCUMULATING";
-  if(price < avg20 && momentum < -0.02) smartMoney = "DISTRIBUTION";
-
+  if(momentum > 0.04) momentumEngine = "STRONG BULLISH"; else if(momentum > 0.02) momentumEngine = "BULLISH"; else if(momentum < -0.04) momentumEngine = "STRONG BEARISH"; else if(momentum < -0.02) momentumEngine = "BEARISH";
+  let gamma = "BALANCED"; if(momentum > 0.03) gamma = "CALL DOMINANT"; if(momentum < -0.03) gamma = "PUT DOMINANT";
+  let smartMoney = "NEUTRAL"; if(price > avg20 && momentum > 0.02) smartMoney = "ACCUMULATING"; if(price < avg20 && momentum < -0.02) smartMoney = "DISTRIBUTION";
   const range5 = Math.max(...closes.slice(0,5)) - Math.min(...closes.slice(0,5));
   const range20 = Math.max(...closes.slice(0,20)) - Math.min(...closes.slice(0,20));
-
-  let volatility = "NORMAL";
-  if(range5 > range20 * 0.4) volatility = "EXPANSION LIKELY";
-  if(range5 < range20 * 0.2) volatility = "COMPRESSION";
-
-  let flow = "NEUTRAL";
-  if(momentum > 0.05 && price > avg20) flow = "STRONG ACCUMULATION";
-  else if(momentum > 0.02) flow = "ACCUMULATION";
-  else if(momentum < -0.05 && price < avg20) flow = "STRONG SELLING";
-  else if(momentum < -0.02) flow = "SELLING";
-
-  let regime = "RANGE";
-  if(volatility === "EXPANSION LIKELY" && Math.abs(momentum) > 0.03) regime = "BREAKOUT";
-  else if(Math.abs(momentum) > 0.02) regime = "TREND";
-
-  const atm = Math.round(price);
-  const premium = Math.max(0.35, atm * 0.015);
-  const breakeven = direction === "BUY PUT" ? atm - premium : atm + premium;
-  const dist = Math.abs(breakeven - price);
-
-  let pop = 70 - (dist / expectedMove * 20);
-  pop = Math.max(30, Math.min(90, Math.round(pop)));
-
-  let edge = "Neutral";
-  if(expectedMove > dist * 1.2) edge = "Favorable";
-  if(expectedMove < dist) edge = "Risky";
-
-  let theta = "Low";
-  if(edge === "Risky") theta = "High";
-
-  const expirationPack = buildExpirationChoices(confidence, theta);
-  const ladder = buildContractLadder(price, direction, expectedMove, regime);
-  const timeTarget = buildTimeToTarget(direction, price, breakeven, expectedMove, momentumEngine, null);
-
-  let score = 50;
-  if(bias !== "Neutral") score += 10;
-  if(confidence === "High") score += 20;
-  if(edge === "Favorable") score += 15;
-  if(volatility === "EXPANSION LIKELY") score += 10;
-  if(timeTarget.probability >= 70) score += 5;
-  score = Math.min(100, score);
-
-  let grade = "C";
-  if(score > 90) grade = "A+";
-  else if(score > 80) grade = "A";
-  else if(score > 70) grade = "B";
-
-  let tradeFilter = "PASS";
-  if(grade === "C" || direction === "WAIT") tradeFilter = "FAIL";
-
+  let volatility = "NORMAL"; if(range5 > range20 * 0.4) volatility = "EXPANSION LIKELY"; if(range5 < range20 * 0.2) volatility = "COMPRESSION";
+  let flow = "NEUTRAL"; if(momentum > 0.05 && price > avg20) flow = "STRONG ACCUMULATION"; else if(momentum > 0.02) flow = "ACCUMULATION"; else if(momentum < -0.05 && price < avg20) flow = "STRONG SELLING"; else if(momentum < -0.02) flow = "SELLING";
+  let regime = "RANGE"; if(volatility === "EXPANSION LIKELY" && Math.abs(momentum) > 0.03) regime = "BREAKOUT"; else if(Math.abs(momentum) > 0.02) regime = "TREND";
+  const atm = Math.round(price), premium = Math.max(0.35, atm * 0.015), breakeven = direction === "BUY PUT" ? atm - premium : atm + premium, dist = Math.abs(breakeven - price);
+  let pop = 70 - (dist / expectedMove * 20); pop = Math.max(30, Math.min(90, Math.round(pop)));
+  let edge = "Neutral"; if(expectedMove > dist * 1.2) edge = "Favorable"; if(expectedMove < dist) edge = "Risky";
+  let theta = "Low"; if(edge === "Risky") theta = "High";
+  const expirationPack = buildExpirationChoices(confidence, theta), ladder = buildContractLadder(price, direction, expectedMove, regime), timeTarget = buildTimeToTarget(direction, price, breakeven, expectedMove, momentumEngine, null);
+  let score = 50; if(bias !== "Neutral") score += 10; if(confidence === "High") score += 20; if(edge === "Favorable") score += 15; if(volatility === "EXPANSION LIKELY") score += 10; if(timeTarget.probability >= 70) score += 5; score = Math.min(100, score);
+  let grade = "C"; if(score > 90) grade = "A+"; else if(score > 80) grade = "A"; else if(score > 70) grade = "B";
+  let tradeFilter = "PASS"; if(grade === "C" || direction === "WAIT") tradeFilter = "FAIL";
   let contracts = 1, allocation = "5%", risk = "Low";
-  if(grade === "A+" && confidence === "High"){ contracts = 5; allocation = "25%"; risk = "High"; }
-  else if(grade === "A"){ contracts = 3; allocation = "18%"; risk = "Moderate"; }
-  else if(grade === "B"){ contracts = 2; allocation = "10%"; risk = "Moderate"; }
-  else { contracts = 0; allocation = "0%"; risk = "Avoid"; }
-
-  let optimalExit = confidence === "High" ? "+65%" : "+50%";
-  let runnerTarget = confidence === "High" ? "+120%" : "+100%";
-  let thetaKill = theta === "High" ? "1 Day" : "2-3 Days";
-
-  let liquidity = "Moderate", spreadRisk = "Medium", executionGrade = "B";
-  if(price > 50){ liquidity = "High"; spreadRisk = "Low"; executionGrade = "A"; }
-  else if(price < 15){ liquidity = "Low"; spreadRisk = "High"; executionGrade = "C"; }
-
-  return {
-    price: price.toFixed(2),bias,direction,confidence,score,grade,tradeFilter,
-    contracts,allocation,risk,strike:atm,pop,
-    expiration: expirationPack.suggested,weeklyLabel: expirationPack.weeklyLabel,biweeklyLabel: expirationPack.biweeklyLabel,
-    bestContract: ladder.best,otmPreferred: ladder.otmPreferred,ladder: ladder.all,
-    breakeven: breakeven.toFixed(2),dist: dist.toFixed(2),expectedMove: expectedMove.toFixed(2),
-    edge,theta,momentumEngine,gamma,smartMoney,volatility,flow,regime,
-    optimalExit,runnerTarget,thetaKill,liquidity,spreadRisk,executionGrade,timeTarget
-  };
+  if(grade === "A+" && confidence === "High"){ contracts = 5; allocation = "25%"; risk = "High"; } else if(grade === "A"){ contracts = 3; allocation = "18%"; risk = "Moderate"; } else if(grade === "B"){ contracts = 2; allocation = "10%"; risk = "Moderate"; } else { contracts = 0; allocation = "0%"; risk = "Avoid"; }
+  let optimalExit = confidence === "High" ? "+65%" : "+50%", runnerTarget = confidence === "High" ? "+120%" : "+100%", thetaKill = theta === "High" ? "1 Day" : "2-3 Days";
+  let liquidity = "Moderate", spreadRisk = "Medium", executionGrade = "B"; if(price > 50){ liquidity = "High"; spreadRisk = "Low"; executionGrade = "A"; } else if(price < 15){ liquidity = "Low"; spreadRisk = "High"; executionGrade = "C"; }
+  return {price:price.toFixed(2),bias,direction,confidence,score,grade,tradeFilter,contracts,allocation,risk,strike:atm,pop,expiration:expirationPack.suggested,weeklyLabel:expirationPack.weeklyLabel,biweeklyLabel:expirationPack.biweeklyLabel,bestContract:ladder.best,otmPreferred:ladder.otmPreferred,ladder:ladder.all,breakeven:breakeven.toFixed(2),dist:dist.toFixed(2),expectedMove:expectedMove.toFixed(2),edge,theta,momentumEngine,gamma,smartMoney,volatility,flow,regime,optimalExit,runnerTarget,thetaKill,liquidity,spreadRisk,executionGrade,timeTarget};
 }
 
 function analyzePosition(position, livePrice, ai, priceSource){
-  const price = livePrice;
-  const type = position.type;
-  const strike = position.strike;
-  const breakeven = position.breakeven;
-  const entryPremium = position.entryPremium || 0;
-  const dte = getDTE(position.expiration);
-
+  const price = livePrice, type = position.type, strike = position.strike, breakeven = position.breakeven, entryPremium = position.entryPremium || 0, dte = getDTE(position.expiration);
   const intrinsic = type === "CALL" ? Math.max(0, price - strike) : Math.max(0, strike - price);
   const approxOptionValue = intrinsic + (price * 0.01);
   const approxPnLPercent = entryPremium > 0 ? Math.round(((approxOptionValue - entryPremium) / entryPremium) * 100) : null;
-
-  const distanceToBE = Math.abs(breakeven - price);
-  const expectedMoveNum = parseFloat(ai.expectedMove);
-  const closeToBE = distanceToBE <= expectedMoveNum * 0.35;
-  const throughTargetCall = type === "CALL" && price >= breakeven + expectedMoveNum * 0.35;
-  const throughTargetPut = type === "PUT" && price <= breakeven - expectedMoveNum * 0.35;
-
+  const distanceToBE = Math.abs(breakeven - price), expectedMoveNum = parseFloat(ai.expectedMove), closeToBE = distanceToBE <= expectedMoveNum * 0.35, throughTargetCall = type === "CALL" && price >= breakeven + expectedMoveNum * 0.35, throughTargetPut = type === "PUT" && price <= breakeven - expectedMoveNum * 0.35;
   let timeRisk = "Unknown", expirationFit = "Unknown";
-  if(dte !== null){
-    if(dte <= 1){ timeRisk = "Extreme"; expirationFit = "Very Short"; }
-    else if(dte <= 3){ timeRisk = "High"; expirationFit = "Tight"; }
-    else if(dte <= 7){ timeRisk = "Moderate"; expirationFit = "Good"; }
-    else { timeRisk = "Low"; expirationFit = "Good"; }
-  }
-
-  const direction = type === "CALL" ? "BUY CALL" : "BUY PUT";
-  const timeTarget = buildTimeToTarget(direction, price, breakeven, expectedMoveNum, ai.momentumEngine, dte);
-
+  if(dte !== null){ if(dte <= 1){ timeRisk = "Extreme"; expirationFit = "Very Short"; } else if(dte <= 3){ timeRisk = "High"; expirationFit = "Tight"; } else if(dte <= 7){ timeRisk = "Moderate"; expirationFit = "Good"; } else { timeRisk = "Low"; expirationFit = "Good"; } }
+  const direction = type === "CALL" ? "BUY CALL" : "BUY PUT", timeTarget = buildTimeToTarget(direction, price, breakeven, expectedMoveNum, ai.momentumEngine, dte);
   let status = "WEAK HOLD", reason = "Setup still active but needs close monitoring", cardClass = "weak-alert";
-
   if(type === "CALL"){
-    if((dte !== null && dte <= 1 && price < breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL" || timeTarget.probability < 35){
-      status = "EXIT NOW"; reason = "Not enough time or probability left for the call to work"; cardClass = "sell-alert";
-    }else if(throughTargetCall){
-      status = "TAKE PROFIT"; reason = "Price pushed through the call profit zone"; cardClass = "sell-alert";
-    }else if(price >= breakeven && ai.momentumEngine.includes("BULLISH") && (dte === null || dte > 2) && timeTarget.probability >= 70){
-      status = "STRONG HOLD"; reason = "Above breakeven with time left and strong odds to keep working"; cardClass = "hold-alert";
-    }else if(closeToBE && !ai.momentumEngine.includes("STRONG BEARISH")){
-      status = "WEAK HOLD"; reason = "Near breakeven, but still needs more follow-through"; cardClass = "weak-alert";
-    }else if(ai.momentumEngine.includes("BEARISH") && dte !== null && dte <= 3){
-      status = "EXIT NOW"; reason = "Momentum turned against the call with little time remaining"; cardClass = "sell-alert";
-    }
+    if((dte !== null && dte <= 1 && price < breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL" || timeTarget.probability < 35){ status = "EXIT NOW"; reason = "Not enough time or probability left for the call to work"; cardClass = "sell-alert"; }
+    else if(throughTargetCall){ status = "TAKE PROFIT"; reason = "Price pushed through the call profit zone"; cardClass = "sell-alert"; }
+    else if(price >= breakeven && ai.momentumEngine.includes("BULLISH") && (dte === null || dte > 2) && timeTarget.probability >= 70){ status = "STRONG HOLD"; reason = "Above breakeven with time left and strong odds to keep working"; cardClass = "hold-alert"; }
+    else if(closeToBE && !ai.momentumEngine.includes("STRONG BEARISH")){ status = "WEAK HOLD"; reason = "Near breakeven, but still needs more follow-through"; cardClass = "weak-alert"; }
+    else if(ai.momentumEngine.includes("BEARISH") && dte !== null && dte <= 3){ status = "EXIT NOW"; reason = "Momentum turned against the call with little time remaining"; cardClass = "sell-alert"; }
   }else{
-    if((dte !== null && dte <= 1 && price > breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL" || timeTarget.probability < 35){
-      status = "EXIT NOW"; reason = "Not enough time or probability left for the put to work"; cardClass = "sell-alert";
-    }else if(throughTargetPut){
-      status = "TAKE PROFIT"; reason = "Price pushed through the put profit zone"; cardClass = "sell-alert";
-    }else if(price <= breakeven && ai.momentumEngine.includes("BEARISH") && (dte === null || dte > 2) && timeTarget.probability >= 70){
-      status = "STRONG HOLD"; reason = "Below breakeven with time left and strong odds to keep working"; cardClass = "hold-alert";
-    }else if(closeToBE && !ai.momentumEngine.includes("STRONG BULLISH")){
-      status = "WEAK HOLD"; reason = "Near breakeven, but still needs more downside follow-through"; cardClass = "weak-alert";
-    }else if(ai.momentumEngine.includes("BULLISH") && dte !== null && dte <= 3){
-      status = "EXIT NOW"; reason = "Momentum turned against the put with little time remaining"; cardClass = "sell-alert";
-    }
+    if((dte !== null && dte <= 1 && price > breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL" || timeTarget.probability < 35){ status = "EXIT NOW"; reason = "Not enough time or probability left for the put to work"; cardClass = "sell-alert"; }
+    else if(throughTargetPut){ status = "TAKE PROFIT"; reason = "Price pushed through the put profit zone"; cardClass = "sell-alert"; }
+    else if(price <= breakeven && ai.momentumEngine.includes("BEARISH") && (dte === null || dte > 2) && timeTarget.probability >= 70){ status = "STRONG HOLD"; reason = "Below breakeven with time left and strong odds to keep working"; cardClass = "hold-alert"; }
+    else if(closeToBE && !ai.momentumEngine.includes("STRONG BULLISH")){ status = "WEAK HOLD"; reason = "Near breakeven, but still needs more downside follow-through"; cardClass = "weak-alert"; }
+    else if(ai.momentumEngine.includes("BULLISH") && dte !== null && dte <= 3){ status = "EXIT NOW"; reason = "Momentum turned against the put with little time remaining"; cardClass = "sell-alert"; }
   }
-
   if(dte !== null && dte <= 2 && status === "WEAK HOLD") reason = "Setup is still alive, but expiration is getting very close";
-
-  return {
-    ticker: position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",
-    dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),
-    status,reason,approxPnLPercent,cardClass,priceSource,timeTarget
-  };
+  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget};
 }
 
 function signalClass(value){
@@ -507,39 +318,30 @@ function signalClass(value){
 }
 
 function renderFull(ticker, a){
-  return `
-  <div class="card">
+  return `<div class="card">
     <div class="section-title">AI Trade Setup</div>
     <div class="metric"><b>Ticker:</b> ${ticker}</div>
     <div class="metric"><b>Price:</b> $${a.price}</div>
     <div class="metric"><b>Market Bias:</b> <span class="${signalClass(a.bias)}">${a.bias}</span></div>
-
     <div class="divider"></div>
-
     <div class="section-title">Trade Decision</div>
     <div class="metric"><b>Direction:</b> <span class="${signalClass(a.direction)}">${a.direction}</span></div>
     <div class="metric"><b>Confidence:</b> <span class="${signalClass(a.confidence)}">${a.confidence}</span></div>
     <div class="metric"><b>Trade Score:</b> ${a.score}/100 (<span class="${signalClass(a.grade)}">${a.grade}</span>)</div>
     <div class="bar"><div class="fill" style="width:${a.score}%"></div></div>
     <div class="metric"><b>Trade Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div>
-
     <div class="divider"></div>
-
     <div class="section-title">Time-to-Target Engine</div>
     <div class="metric"><b>Time-to-Target Probability:</b> ${a.timeTarget.probability}%</div>
     <div class="bar"><div class="fill" style="width:${a.timeTarget.probability}%"></div></div>
     <div class="metric"><b>Time Window:</b> <span class="${signalClass(a.timeTarget.window)}">${a.timeTarget.window}</span></div>
     <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(a.timeTarget.bias)}">${a.timeTarget.bias}</span></div>
-
     <div class="divider"></div>
-
     <div class="section-title">Position Sizing</div>
     <div class="metric"><b>Suggested Contracts:</b> ${a.contracts}</div>
     <div class="metric"><b>Capital Allocation:</b> ${a.allocation}</div>
     <div class="metric"><b>Risk Level:</b> <span class="${signalClass(a.risk)}">${a.risk}</span></div>
-
     <div class="divider"></div>
-
     <div class="section-title">Market Intelligence</div>
     <div class="metric"><b>Momentum Engine:</b> <span class="${signalClass(a.momentumEngine)}">${a.momentumEngine}</span></div>
     <div class="metric"><b>Gamma Pressure:</b> <span class="${signalClass(a.gamma)}">${a.gamma}</span></div>
@@ -547,43 +349,27 @@ function renderFull(ticker, a){
     <div class="metric"><b>Volatility Signal:</b> <span class="${signalClass(a.volatility)}">${a.volatility}</span></div>
     <div class="metric"><b>Institutional Flow:</b> <span class="${signalClass(a.flow)}">${a.flow}</span></div>
     <div class="metric"><b>Market Regime:</b> <span class="${signalClass(a.regime)}">${a.regime}</span></div>
-
     <div class="divider"></div>
-
     <div class="section-title">Live Options Range</div>
     <div class="metric"><b>Suggested Expiration:</b> ${a.expiration}</div>
     <div class="metric"><b>Weekly Choice:</b> ${a.weeklyLabel}</div>
     <div class="metric"><b>Bi-Weekly Choice:</b> ${a.biweeklyLabel}</div>
-
     <div class="grid-2" style="margin-top:10px;">
-      ${a.ladder.map(c => `
-        <div class="card" style="margin-top:0;padding:12px;">
-          <div><b>${c.label}</b></div>
-          <div>Strike: ${c.strike}</div>
-          <div>Premium Est: $${c.premium.toFixed(2)}</div>
-          <div>BE: $${c.breakeven.toFixed(2)}</div>
-          <div>POP: ${c.pop}%</div>
-        </div>
-      `).join("")}
+      ${a.ladder.map(c => `<div class="card" style="margin-top:0;padding:12px;"><div><b>${c.label}</b></div><div>Strike: ${c.strike}</div><div>Premium Est: $${c.premium.toFixed(2)}</div><div>BE: $${c.breakeven.toFixed(2)}</div><div>POP: ${c.pop}%</div></div>`).join("")}
     </div>
-
     <div class="metric" style="margin-top:10px;"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div>
     <div class="metric"><b>Best OTM Strike:</b> ${a.otmPreferred.strike}</div>
     <div class="metric"><b>OTM Distance:</b> ${a.otmPreferred.distancePct}%</div>
     <div class="metric"><b>OTM Grade:</b> <span class="${signalClass(a.otmPreferred.grade)}">${a.otmPreferred.grade}</span></div>
     <div class="metric"><b>Profit Potential:</b> +${a.otmPreferred.profitPotential}%</div>
-
     <div class="divider"></div>
-
     <div class="section-title">Breakeven & Edge</div>
     <div class="metric"><b>Base Breakeven:</b> $${a.breakeven}</div>
     <div class="metric"><b>Distance to BE:</b> $${a.dist}</div>
     <div class="metric"><b>Expected Move:</b> $${a.expectedMove}</div>
     <div class="metric"><b>Edge:</b> <span class="${signalClass(a.edge)}">${a.edge}</span></div>
     <div class="metric"><b>Theta Risk:</b> <span class="${signalClass(a.theta)}">${a.theta}</span></div>
-
     <div class="divider"></div>
-
     <div class="section-title">Exit & Execution</div>
     <div class="metric"><b>Optimal Exit:</b> ${a.optimalExit}</div>
     <div class="metric"><b>Runner Target:</b> ${a.runnerTarget}</div>
@@ -595,33 +381,15 @@ function renderFull(ticker, a){
 }
 
 function renderCompact(ticker, a){
-  return `
-  <div class="card">
-    <div class="section-title">Quick Glance</div>
-    <div class="metric"><b>${ticker}</b> â $${a.price}</div>
-    <div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div>
-    <div class="bar"><div class="fill" style="width:${a.score}%"></div></div>
-    <div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div>
-    <div class="metric"><b>Window:</b> ${a.timeTarget.window}</div>
-    <div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div>
-    <div class="metric"><b>Expiration:</b> ${a.expiration}</div>
-    <div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div>
-  </div>`;
+  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 async function runAI(){
-  const ticker = normalizeTicker(document.getElementById("ticker").value);
-  const output = document.getElementById("output");
-  const mode = document.getElementById("uiMode").value;
+  const ticker = normalizeTicker(document.getElementById("ticker").value), output = document.getElementById("output"), mode = document.getElementById("uiMode").value;
   if(!ticker){ output.innerHTML = "<div class='card'>Enter a ticker first.</div>"; return; }
-
   output.innerHTML = "<div class='card'>Analyzing...</div>";
-  const closes = await getHistory(ticker);
-  if(!closes){ output.innerHTML = "<div class='card'>Data unavailable.</div>"; return; }
-
-  const pricePack = await getBestAvailablePrice(ticker, closes);
-  if(pricePack.price === null){ output.innerHTML = "<div class='card'>Price unavailable.</div>"; return; }
-
+  const closes = await getHistory(ticker); if(!closes){ output.innerHTML = "<div class='card'>Data unavailable.</div>"; return; }
+  const pricePack = await getBestAvailablePrice(ticker, closes); if(pricePack.price === null){ output.innerHTML = "<div class='card'>Price unavailable.</div>"; return; }
   const a = analyze(closes, pricePack.price);
   output.innerHTML = mode === "compact" ? renderCompact(ticker, a) : renderFull(ticker, a);
 }
@@ -630,100 +398,69 @@ async function scanList(list, title){
   const output = document.getElementById("output");
   output.innerHTML = "<div class='card'>Scanning...</div>";
   let results = [];
-
   for(let i=0; i<list.length; i++){
     const ticker = normalizeTicker(list[i]);
-    const closes = await getHistory(ticker);
-    if(!closes) continue;
-    const pricePack = await getBestAvailablePrice(ticker, closes);
-    if(pricePack.price === null) continue;
-
+    const closes = await getHistory(ticker); if(!closes) continue;
+    const pricePack = await getBestAvailablePrice(ticker, closes); if(pricePack.price === null) continue;
     const a = analyze(closes, pricePack.price);
-    if(a.tradeFilter === "PASS"){
-      results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability});
-    }
+    if(a.tradeFilter === "PASS") results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability});
     await new Promise(r => setTimeout(r, 15000));
   }
-
   results.sort((a,b)=>b.score-a.score || b.timeTarget-a.timeTarget);
   results = results.slice(0,2);
-
   if(results.length === 0){ output.innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`; return; }
-
-  let html = `<div class='card'><div class='section-title'>${title}</div>`;
-  results.forEach(r=>{
-    html += `<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Score ${r.score} â TTT ${r.timeTarget}% â ${r.expiration}</div>`;
-  });
-  html += `</div>`;
-  output.innerHTML = html;
+  output.innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Score ${r.score} â TTT ${r.timeTarget}% â ${r.expiration}</div>`).join("")}</div>`;
 }
 
 async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
-async function scanMyWatchlist(){
-  if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; }
-  await scanList(customWatchlist, "Top Watchlist Opportunities");
-}
+async function scanMyWatchlist(){ if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; } await scanList(customWatchlist, "Top Watchlist Opportunities"); }
 
 async function scanMyPositions(){
   const output = document.getElementById("output");
   if(!savedPositions.length){ output.innerHTML = "<div class='card'>No saved positions yet.</div>"; return; }
-
   output.innerHTML = "<div class='card'>Checking positions...</div>";
-  let results = [];
+  let results = [], redAlerts = 0, yellowAlerts = 0;
 
   for(let i=0; i<savedPositions.length; i++){
-    const p = savedPositions[i];
-    const ticker = normalizeTicker(p.ticker);
-
+    const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
     const closes = await getHistory(ticker);
-    if(!closes){
-      results.push({ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"}});
-      continue;
-    }
-
+    if(!closes){ results.push({ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"}}); redAlerts++; continue; }
     const pricePack = await getBestAvailablePrice(ticker, closes);
-    if(pricePack.price === null){
-      results.push({ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"}});
-      continue;
-    }
-
-    const ai = analyze(closes, pricePack.price);
-    const monitor = analyzePosition(p, pricePack.price, ai, pricePack.source);
+    if(pricePack.price === null){ results.push({ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"}}); redAlerts++; continue; }
+    const ai = analyze(closes, pricePack.price), monitor = analyzePosition(p, pricePack.price, ai, pricePack.source);
     results.push(monitor);
-
-    if(monitor.status !== "STRONG HOLD" && monitor.status !== "WEAK HOLD"){
-      try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
-    }
+    if(monitor.status === "EXIT NOW" || monitor.status === "TAKE PROFIT") redAlerts++; else if(monitor.status === "WEAK HOLD") yellowAlerts++;
     await new Promise(r => setTimeout(r, 5000));
   }
 
-  let html = "";
-  results.forEach(r=>{
-    html += `
-      <div class="card ${r.cardClass}">
-        <div class="section-title">AI Sell Signal</div>
-        <div class="metric"><b>${r.ticker}</b> ${r.strike} ${r.type}</div>
-        <div class="metric"><b>Live Price:</b> ${r.livePrice === "N/A" ? "N/A" : "$" + r.livePrice}</div>
-        <div class="metric"><b>Breakeven:</b> $${r.breakeven}</div>
-        <div class="metric"><b>Expiration:</b> ${r.expiration}</div>
-        <div class="metric"><b>DTE:</b> ${r.dte}</div>
-        <div class="metric"><b>Time Risk:</b> <span class="${signalClass(r.timeRisk)}">${r.timeRisk}</span></div>
-        <div class="metric"><b>Expiration Fit:</b> <span class="${signalClass(r.expirationFit)}">${r.expirationFit}</span></div>
-        <div class="metric"><b>Time-to-Target:</b> ${r.timeTarget.probability}${r.timeTarget.probability==="N/A"?"":"%"}</div>
-        <div class="metric"><b>Time Window:</b> <span class="${signalClass(r.timeTarget.window)}">${r.timeTarget.window}</span></div>
-        <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(r.timeTarget.bias)}">${r.timeTarget.bias}</span></div>
-        <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
-        <div class="metric"><b>Reason:</b> ${r.reason}</div>
-        <div class="metric"><b>Price Source:</b> ${r.priceSource}</div>
-        ${r.approxPnLPercent !== null ? `<div class="metric"><b>Approx P/L:</b> ${r.approxPnLPercent > 0 ? "+" : ""}${r.approxPnLPercent}%</div>` : ""}
-      </div>
-    `;
-  });
-  output.innerHTML = html;
+  if(redAlerts > 0) pushAlert(`V34 Alert: ${redAlerts} position${redAlerts>1?'s':''} need immediate attention.`, "red");
+  else if(yellowAlerts > 0) pushAlert(`V34 Alert: ${yellowAlerts} position${yellowAlerts>1?'s':''} are weak hold.`, "yellow");
+  else pushAlert("V34 Alert: All saved positions currently look stable.", "green");
+
+  output.innerHTML = results.map(r=>`
+    <div class="card ${r.cardClass}">
+      <div class="section-title">AI Sell Signal</div>
+      <div class="metric"><b>${r.ticker}</b> ${r.strike} ${r.type}</div>
+      <div class="metric"><b>Live Price:</b> ${r.livePrice === "N/A" ? "N/A" : "$" + r.livePrice}</div>
+      <div class="metric"><b>Breakeven:</b> $${r.breakeven}</div>
+      <div class="metric"><b>Expiration:</b> ${r.expiration}</div>
+      <div class="metric"><b>DTE:</b> ${r.dte}</div>
+      <div class="metric"><b>Time Risk:</b> <span class="${signalClass(r.timeRisk)}">${r.timeRisk}</span></div>
+      <div class="metric"><b>Expiration Fit:</b> <span class="${signalClass(r.expirationFit)}">${r.expirationFit}</span></div>
+      <div class="metric"><b>Time-to-Target:</b> ${r.timeTarget.probability}${r.timeTarget.probability==="N/A"?"":"%"}</div>
+      <div class="metric"><b>Time Window:</b> <span class="${signalClass(r.timeTarget.window)}">${r.timeTarget.window}</span></div>
+      <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(r.timeTarget.bias)}">${r.timeTarget.bias}</span></div>
+      <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
+      <div class="metric"><b>Reason:</b> ${r.reason}</div>
+      <div class="metric"><b>Price Source:</b> ${r.priceSource}</div>
+      ${r.approxPnLPercent !== null ? `<div class="metric"><b>Approx P/L:</b> ${r.approxPnLPercent > 0 ? "+" : ""}${r.approxPnLPercent}%</div>` : ""}
+    </div>
+  `).join("");
 }
 
 renderWatchlist();
 renderPositions();
+renderAlertHistory();
 </script>
 </body>
 </html>
