@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Signal Predator AI v34.5 Smart Alerts Edition</title>
+  <title>Signal Predator AI v34.6 Predictive Engine Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -206,7 +206,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v34.5 // smart trigger alerts // confidence meter // best trade scanner</div>
+  <div class="subtitle">v34.6 // predictive engine // pressure gauge // trap warnings</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -445,6 +445,83 @@ function buildTimeToTarget(direction, price, breakeven, expectedMove, momentumEn
   return {probability:score, window, bias};
 }
 
+
+function getPressureGauge(momentum, bias, flow){
+  let bull = 50, bear = 50;
+  if(momentum > 0) bull += Math.min(25, Math.round(momentum * 300));
+  if(momentum < 0) bear += Math.min(25, Math.round(Math.abs(momentum) * 300));
+  if(bias === "Bullish") bull += 12;
+  if(bias === "Bearish") bear += 12;
+  if(flow.includes("ACCUMULATION")) bull += 10;
+  if(flow.includes("SELLING")) bear += 10;
+  bull = Math.max(5, Math.min(95, bull));
+  bear = Math.max(5, Math.min(95, bear));
+  return {bull, bear};
+}
+
+function getPredictiveEngine(direction, momentumEngine, regime, timeTarget, volatility){
+  let likelyMove = "CHOP";
+  let moveStrength = "WEAK";
+  let timingWindow = "MEDIUM (3-5 DAYS)";
+
+  if(direction === "BUY CALL"){
+    likelyMove = "UP";
+  }else if(direction === "BUY PUT"){
+    likelyMove = "DOWN";
+  }
+
+  if(timeTarget && timeTarget.probability >= 75) moveStrength = "STRONG";
+  else if(timeTarget && timeTarget.probability >= 55) moveStrength = "MODERATE";
+
+  if(volatility === "EXPANSION LIKELY" && moveStrength !== "WEAK") timingWindow = "SHORT (1-2 DAYS)";
+  else if(regime === "BREAKOUT") timingWindow = "SHORT (1-2 DAYS)";
+  else if(regime === "RANGE") timingWindow = "EXTENDED (1-2 WEEKS)";
+
+  if(momentumEngine === "Neutral"){
+    likelyMove = "CHOP";
+    moveStrength = "WEAK";
+  }
+
+  return {likelyMove, moveStrength, timingWindow};
+}
+
+function getTrapWarning(direction, momentumEngine, regime, edge, volatility, timeTarget){
+  if(edge === "Risky" && timeTarget && timeTarget.probability < 45) return "LOW EDGE SETUP";
+  if(regime === "RANGE" && volatility === "COMPRESSION") return "CHOP ZONE";
+  if(direction === "BUY CALL" && momentumEngine === "BULLISH" && edge !== "Favorable") return "BULL TRAP RISK";
+  if(direction === "BUY PUT" && momentumEngine === "BEARISH" && edge !== "Favorable") return "BEAR TRAP RISK";
+  return "CLEAR";
+}
+
+function getActionEntryTiming(a){
+  let label = "WAIT";
+  let reason = "Setup is not ideal for immediate entry.";
+  if(a.direction === "BUY CALL"){
+    if(a.momentumEngine === "STRONG BULLISH" && a.edge === "Favorable" && a.timeTarget.probability >= 65){
+      label = "ENTER NOW";
+      reason = "Bullish pressure and probability support immediate entry.";
+    }else if(a.momentumEngine.includes("BULLISH")){
+      label = "WAIT FOR RETEST";
+      reason = "Trend is positive, but a cleaner dip could improve entry.";
+    }else{
+      label = "DO NOT CHASE";
+      reason = "Momentum does not support a clean call entry.";
+    }
+  }else if(a.direction === "BUY PUT"){
+    if(a.momentumEngine === "STRONG BEARISH" && a.edge === "Favorable" && a.timeTarget.probability >= 65){
+      label = "ENTER NOW";
+      reason = "Bearish pressure and probability support immediate entry.";
+    }else if(a.momentumEngine.includes("BEARISH")){
+      label = "WAIT FOR RETEST";
+      reason = "Trend is negative, but a bounce could improve put entry.";
+    }else{
+      label = "DO NOT CHASE";
+      reason = "Momentum does not support a clean put entry.";
+    }
+  }
+  return {label, reason};
+}
+
 function analyze(closes, livePrice){
   const price = livePrice ?? closes[0], avg20 = avg(closes.slice(0,20)), avg50 = avg(closes.slice(0,50)), momentum = (closes[0] - closes[5]) / closes[5];
   let bias = "Neutral"; if(price > avg20 && avg20 > avg50) bias = "Bullish"; if(price < avg20 && avg20 < avg50) bias = "Bearish";
@@ -474,7 +551,10 @@ function analyze(closes, livePrice){
   let liquidity = "Moderate", spreadRisk = "Medium", executionGrade = "B"; if(price > 50){ liquidity = "High"; spreadRisk = "Low"; executionGrade = "A"; } else if(price < 15){ liquidity = "Low"; spreadRisk = "High"; executionGrade = "C"; }
   const result = {price:price.toFixed(2),bias,direction,confidence,score,grade,tradeFilter,contracts,allocation,risk,strike:atm,pop,expiration:expirationPack.suggested,weeklyLabel:expirationPack.weeklyLabel,biweeklyLabel:expirationPack.biweeklyLabel,bestContract:ladder.best,otmPreferred:ladder.otmPreferred,ladder:ladder.all,breakeven:breakeven.toFixed(2),dist:dist.toFixed(2),expectedMove:expectedMove.toFixed(2),edge,theta,momentumEngine,gamma,smartMoney,volatility,flow,regime,optimalExit,runnerTarget,thetaKill,liquidity,spreadRisk,executionGrade,timeTarget};
   result.confidenceMeter = getConfidenceMeter(result);
-  result.entryTiming = getEntryTiming(result);
+  result.pressureGauge = getPressureGauge(momentum, bias, flow);
+  result.predictiveEngine = getPredictiveEngine(direction, momentumEngine, regime, timeTarget, volatility);
+  result.trapWarning = getTrapWarning(direction, momentumEngine, regime, edge, volatility, timeTarget);
+  result.entryTiming = getActionEntryTiming(result);
   return result;
 }
 
@@ -502,7 +582,7 @@ function analyzePosition(position, livePrice, ai, priceSource){
     else if(ai.momentumEngine.includes("BULLISH") && dte !== null && dte <= 3){ status = "STRIKE NOW"; reason = "Momentum turned against the put with little time remaining"; cardClass = "sell-alert"; }
   }
   if(dte !== null && dte <= 2 && status === "STALKING") reason = "Setup is still alive, but expiration is getting very close";
-  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget};
+  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine};
 }
 
 function signalClass(value){
@@ -551,6 +631,9 @@ function buildSmartAlerts(results){
     if(ttt !== null && ttt < 40){
       alerts.push({level:"red", message:`PROBABILITY DROP ALERT // ${r.ticker} time-to-target fell to ${ttt}%.`});
     }
+    if(r.trapWarning && r.trapWarning !== "CLEAR"){
+      alerts.push({level:"yellow", message:`TRAP WARNING // ${r.ticker} ${r.trapWarning}.`});
+    }
   });
 
   const seen = new Set();
@@ -575,6 +658,8 @@ function renderPositionCards(results){
       <div class="metric"><b>Time-to-Target:</b> ${r.timeTarget.probability}${r.timeTarget.probability==="N/A"?"":"%"}</div>
       <div class="metric"><b>Time Window:</b> <span class="${signalClass(r.timeTarget.window)}">${r.timeTarget.window}</span></div>
       <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(r.timeTarget.bias)}">${r.timeTarget.bias}</span></div>
+      <div class="metric"><b>Likely Move:</b> ${r.predictiveEngine ? r.predictiveEngine.likelyMove : "N/A"}</div>
+      <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning || "CLEAR")}">${r.trapWarning || "CLEAR"}</span></div>
       <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
       <div class="metric"><b>Reason:</b> ${r.reason}</div>
       <div class="metric"><b>Price Source:</b> ${r.priceSource}</div>
@@ -659,6 +744,18 @@ function renderFull(ticker, a){
     <div class="metric"><b>Entry Signal:</b> <span class="${signalClass(a.entryTiming.label)}">${a.entryTiming.label}</span></div>
     <div class="metric"><b>Entry Read:</b> ${a.entryTiming.reason}</div>
     <div class="divider"></div>
+    <div class="section-title">Predictive Engine</div>
+    <div class="metric"><b>Likely Move:</b> <span class="${signalClass(a.predictiveEngine.likelyMove)}">${a.predictiveEngine.likelyMove}</span></div>
+    <div class="metric"><b>Move Strength:</b> <span class="${signalClass(a.predictiveEngine.moveStrength)}">${a.predictiveEngine.moveStrength}</span></div>
+    <div class="metric"><b>Timing Window:</b> ${a.predictiveEngine.timingWindow}</div>
+    <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(a.trapWarning)}">${a.trapWarning}</span></div>
+    <div class="divider"></div>
+    <div class="section-title">Pressure Gauge</div>
+    <div class="metric"><b>Bull Pressure:</b> ${a.pressureGauge.bull}%</div>
+    <div class="bar"><div class="fill" style="width:${a.pressureGauge.bull}%"></div></div>
+    <div class="metric"><b>Bear Pressure:</b> ${a.pressureGauge.bear}%</div>
+    <div class="bar"><div class="fill" style="width:${a.pressureGauge.bear}%"></div></div>
+    <div class="divider"></div>
     <div class="section-title">Position Sizing</div>
     <div class="metric"><b>Suggested Contracts:</b> ${a.contracts}</div>
     <div class="metric"><b>Capital Allocation:</b> ${a.allocation}</div>
@@ -703,7 +800,7 @@ function renderFull(ticker, a){
 }
 
 function renderCompact(ticker, a){
-  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 async function runAI(){
@@ -772,6 +869,9 @@ async function findBestTrade(){
       <div class="metric"><b>Confidence Meter:</b> <span class="${best.a.confidenceMeter.color}">${best.a.confidenceMeter.label}</span></div>
       <div class="metric"><b>Entry Timing:</b> <span class="${signalClass(best.a.entryTiming.label)}">${best.a.entryTiming.label}</span></div>
       <div class="metric"><b>Entry Read:</b> ${best.a.entryTiming.reason}</div>
+      <div class="metric"><b>Likely Move:</b> ${best.a.predictiveEngine.likelyMove}</div>
+      <div class="metric"><b>Move Strength:</b> ${best.a.predictiveEngine.moveStrength}</div>
+      <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(best.a.trapWarning)}">${best.a.trapWarning}</span></div>
       <div class="metric"><b>Time-to-Target:</b> ${best.a.timeTarget.probability}%</div>
       <div class="metric"><b>Suggested Expiration:</b> ${best.a.expiration}</div>
       <div class="metric"><b>Best Contract:</b> ${best.a.bestContract.label} ${best.a.bestContract.strike}</div>
@@ -793,12 +893,12 @@ async function scanMyPositions(){
     const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
     const closes = await getHistory(ticker);
     if(!closes){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
     const ai = analyze(closes, pricePack.price), monitor = analyzePosition(p, pricePack.price, ai, pricePack.source);
