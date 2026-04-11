@@ -1,27 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Signal Predator AI v34.2</title>
+  <title>Signal Predator AI v34.3 Tactical Font Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Oxanium:wght@400;600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
   <style>
     :root{
       --bg1:#030711;
       --bg2:#071326;
       --card:rgba(10,20,38,.88);
-      --line:rgba(86,156,255,.22);
-      --glow:rgba(60,180,255,.18);
+      --line:rgba(55,255,159,.18);
+      --glow:rgba(55,255,159,.14);
       --green:#37ff9f;
+      --green-soft:#6dffd6;
       --red:#ff6262;
       --yellow:#ffd84f;
       --blue:#8ecbff;
       --text:#ffffff;
       --muted:rgba(255,255,255,.74);
+      --input:#0b1830;
     }
     *{box-sizing:border-box}
     body{
-      font-family:Arial,sans-serif;
+      font-family:'Oxanium',Arial,sans-serif;
       background:
-        radial-gradient(circle at top, rgba(35,82,180,.15), transparent 35%),
+        radial-gradient(circle at top, rgba(55,255,159,.08), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(90,180,255,.06), transparent 28%),
         linear-gradient(180deg,var(--bg1),var(--bg2));
       color:var(--text);
       margin:0;
@@ -31,17 +39,21 @@
     .container{max-width:520px;margin:auto}
     .title{
       text-align:center;
+      font-family:'Orbitron',Arial,sans-serif;
       font-size:30px;
       font-weight:800;
-      letter-spacing:.8px;
+      letter-spacing:1.2px;
       margin-bottom:6px;
-      text-shadow:0 0 14px rgba(55,255,159,.22),0 0 24px rgba(58,139,253,.24);
+      text-transform:uppercase;
+      text-shadow:0 0 14px rgba(55,255,159,.24),0 0 26px rgba(90,180,255,.18);
     }
     .subtitle{
       text-align:center;
-      font-size:13px;
+      font-size:12px;
       color:var(--muted);
       margin-bottom:16px;
+      letter-spacing:.6px;
+      font-family:'Share Tech Mono',monospace;
     }
     .card{
       background:var(--card);
@@ -50,22 +62,26 @@
       border-radius:16px;
       padding:16px;
       margin-top:14px;
+      line-height:1.45;
       backdrop-filter:blur(8px);
     }
     .section-title{
       font-size:15px;
       font-weight:800;
-      color:var(--blue);
+      color:var(--green-soft);
       text-transform:uppercase;
-      letter-spacing:.8px;
+      letter-spacing:1px;
       margin-bottom:10px;
+      font-family:'Orbitron',Arial,sans-serif;
     }
     .field-label{
       font-size:12px;
-      color:var(--blue);
+      color:var(--green-soft);
       margin-top:10px;
       margin-bottom:3px;
-      letter-spacing:.4px;
+      letter-spacing:.5px;
+      font-family:'Oxanium',Arial,sans-serif;
+      text-transform:uppercase;
     }
     input,select{
       width:100%;
@@ -73,10 +89,11 @@
       margin-top:10px;
       border-radius:12px;
       border:none;
-      background:#0b1830;
+      background:var(--input);
       color:#fff;
-      font-size:18px;
-      box-shadow:inset 0 0 0 1px rgba(86,156,255,.20);
+      font-size:17px;
+      font-family:'Oxanium',Arial,sans-serif;
+      box-shadow:inset 0 0 0 1px rgba(55,255,159,.16);
       -webkit-appearance:none;
       appearance:none;
     }
@@ -88,28 +105,35 @@
       margin-top:12px;
       border:none;
       border-radius:12px;
-      font-size:17px;
+      font-size:16px;
       font-weight:700;
       color:#fff;
-      background:linear-gradient(135deg,#2d8cff,#175fdc);
-      box-shadow:0 0 16px rgba(45,140,255,.25);
+      font-family:'Oxanium',Arial,sans-serif;
+      letter-spacing:.6px;
+      text-transform:uppercase;
+      background:linear-gradient(135deg,#27d987,#179f69);
+      box-shadow:0 0 16px rgba(39,217,135,.20);
       cursor:pointer;
       transition:transform .08s ease, box-shadow .2s ease;
     }
     button:active{transform:scale(.985)}
-    .secondary{background:linear-gradient(135deg,#223e68,#182b49)}
+    .secondary{background:linear-gradient(135deg,#244152,#17303f)}
     .danger{background:linear-gradient(135deg,#b43838,#7a1f1f)}
     .small-btn{
       width:auto;
       padding:8px 12px;
       margin:0 0 0 8px;
-      font-size:14px;
+      font-size:13px;
       border-radius:9px;
     }
     .row{display:flex;gap:10px;align-items:center}
     .row input,.row select,.row button{margin-top:0;flex:1}
     .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .metric{margin:4px 0}
+    .metric{
+      margin:4px 0;
+      font-family:'Share Tech Mono',monospace;
+      font-size:14px;
+    }
     .muted{color:var(--muted)}
     .divider{height:1px;background:rgba(255,255,255,.08);margin:12px 0}
     .watch-item{
@@ -121,13 +145,15 @@
       display:inline-block;
       padding:6px 10px;
       border-radius:999px;
-      font-size:12px;
+      font-size:11px;
       font-weight:800;
-      letter-spacing:.4px;
+      letter-spacing:.7px;
       margin-top:6px;
       margin-right:6px;
       background:#11213f;
       border:1px solid rgba(255,255,255,.06);
+      font-family:'Orbitron',Arial,sans-serif;
+      text-transform:uppercase;
     }
     .green{color:var(--green)}
     .red{color:var(--red)}
@@ -144,7 +170,7 @@
     .fill{
       height:100%;
       border-radius:999px;
-      background:linear-gradient(90deg,var(--green),#3a8bfd);
+      background:linear-gradient(90deg,var(--green),#67ffd0);
       animation:grow .7s ease;
     }
     @keyframes grow{from{width:0}}
@@ -155,13 +181,17 @@
       font-weight:800;
       margin-top:12px;
       animation:pulse 2s infinite;
+      font-family:'Orbitron',Arial,sans-serif;
+      letter-spacing:.8px;
+      text-transform:uppercase;
+      font-size:13px;
     }
     .alert-red{background:rgba(180,56,56,.20);border:1px solid rgba(255,98,98,.55);box-shadow:0 0 18px rgba(255,98,98,.18)}
     .alert-yellow{background:rgba(155,121,18,.20);border:1px solid rgba(255,216,79,.45);box-shadow:0 0 18px rgba(255,216,79,.12)}
     .alert-green{background:rgba(31,112,74,.20);border:1px solid rgba(55,255,159,.38);box-shadow:0 0 18px rgba(55,255,159,.13)}
     @keyframes pulse{
-      0%,100%{box-shadow:0 0 12px rgba(58,139,253,.10)}
-      50%{box-shadow:0 0 22px rgba(58,139,253,.22)}
+      0%,100%{box-shadow:0 0 12px rgba(55,255,159,.10)}
+      50%{box-shadow:0 0 22px rgba(55,255,159,.22)}
     }
     .sell-alert{background:rgba(165,48,48,.18);border:1px solid rgba(255,98,98,.45)}
     .hold-alert{background:rgba(35,85,35,.18);border:1px solid rgba(55,255,159,.30)}
@@ -175,13 +205,13 @@
 </head>
 <body>
 <div class="container">
-  <div class="title">SIGNAL PREDATOR AI</div>
-  <div class="subtitle">v34.2 â¢ futuristic predator UI â¢ alerts engine â¢ quick recheck â¢ time-to-target</div>
+  <div class="title">Signal Predator AI</div>
+  <div class="subtitle">v34.3 // tactical font edition // terminator-inspired command interface</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
-    <div class="metric">Hunt Engine <span class="blue">ONLINE</span></div>
-    <div class="metric muted">Predator theme active â¢ iPhone mode optimized</div>
+    <div class="metric">HUNT ENGINE <span class="blue">ONLINE</span></div>
+    <div class="metric muted">Tactical font system active â¢ iPhone mode optimized</div>
     <div id="topAlertArea"></div>
   </div>
 
@@ -195,7 +225,7 @@
 
   <div class="card">
     <div class="section-title">Alert Settings</div>
-    <div class="metric">Alert Mode: <span class="blue">On-Page + Vibrate</span></div>
+    <div class="metric">ALERT MODE: <span class="blue">ON-PAGE + VIBRATE</span></div>
     <div class="metric muted">Quick Recheck uses your most recent live position scan and does not call the API.</div>
     <div class="row" style="margin-top:12px;">
       <button class="secondary" onclick="clearAlerts()">Clear Alert History</button>
@@ -320,7 +350,7 @@ function pushAlert(message, level){
   }catch(e){}
 }
 function clearAlerts(){ alertLog = []; saveAlertLog(alertLog); renderAlertHistory(); }
-function testAlert(){ pushAlert("â ï¸ PREDATOR TEST ALERT â systems are live.", "yellow"); }
+function testAlert(){ pushAlert("TACTICAL TEST ALERT â SYSTEMS ARE LIVE.", "yellow"); }
 
 async function fetchJson(url){ const r = await fetch(url); return await r.json(); }
 async function getHistory(symbol){
@@ -486,9 +516,9 @@ function applyPortfolioAlertSummary(results, sourceLabel){
     if(m.status === "STRIKE NOW" || m.status === "LOCK PROFITS" || m.status === "UNAVAILABLE") redAlerts++;
     else if(m.status === "STALKING") yellowAlerts++;
   });
-  if(redAlerts > 0) pushAlert(`â ï¸ ${sourceLabel}: ${redAlerts} target${redAlerts>1?'s':''} need immediate action.`, "red");
-  else if(yellowAlerts > 0) pushAlert(`â ï¸ ${sourceLabel}: ${yellowAlerts} target${yellowAlerts>1?'s':''} are stalking.`, "yellow");
-  else pushAlert(`â ${sourceLabel}: all saved targets look stable.`, "green");
+  if(redAlerts > 0) pushAlert(`${sourceLabel}: ${redAlerts} target${redAlerts>1?'s':''} need immediate action.`, "red");
+  else if(yellowAlerts > 0) pushAlert(`${sourceLabel}: ${yellowAlerts} target${yellowAlerts>1?'s':''} are stalking.`, "yellow");
+  else pushAlert(`${sourceLabel}: all saved targets look stable.`, "green");
 }
 
 function renderFull(ticker, a){
@@ -561,7 +591,7 @@ function renderCompact(ticker, a){
 async function runAI(){
   const ticker = normalizeTicker(document.getElementById("ticker").value), output = document.getElementById("output"), mode = document.getElementById("uiMode").value;
   if(!ticker){ output.innerHTML = "<div class='card'>Enter a ticker first.</div>"; return; }
-  renderThinkingCard(["ð§  Tracking market movement...","ð¯ Locking onto target...","â¡ Calculating strike probability..."]);
+  renderThinkingCard(["TRACKING MARKET MOVEMENT...","LOCKING ONTO TARGET...","CALCULATING STRIKE PROBABILITY..."]);
   const closes = await getHistory(ticker); if(!closes){ output.innerHTML = "<div class='card'>Data unavailable.</div>"; return; }
   const pricePack = await getBestAvailablePrice(ticker, closes); if(pricePack.price === null){ output.innerHTML = "<div class='card'>Price unavailable.</div>"; return; }
   const a = analyze(closes, pricePack.price);
@@ -569,7 +599,7 @@ async function runAI(){
 }
 
 async function scanList(list, title){
-  renderThinkingCard(["ð§  Tracking market movement...","ð¯ Locking onto targets...","ð Ranking the cleanest setups..."]);
+  renderThinkingCard(["TRACKING MARKET MOVEMENT...","LOCKING ONTO TARGETS...","RANKING CLEANEST SETUPS..."]);
   let results = [];
   for(let i=0; i<list.length; i++){
     const ticker = normalizeTicker(list[i]);
@@ -591,7 +621,7 @@ async function scanMyWatchlist(){ if(!customWatchlist.length){ document.getEleme
 async function scanMyPositions(){
   const output = document.getElementById("output");
   if(!savedPositions.length){ output.innerHTML = "<div class='card'>No saved positions yet.</div>"; return; }
-  renderThinkingCard(["ð§  Tracking saved positions...","ð¯ Recalculating target odds...","â ï¸ Checking for strike alerts..."]);
+  renderThinkingCard(["TRACKING SAVED POSITIONS...","RECALCULATING TARGET ODDS...","CHECKING FOR STRIKE ALERTS..."]);
   let results = [];
   let cache = { scannedAt: new Date().toISOString(), results: [] };
 
@@ -613,7 +643,7 @@ async function scanMyPositions(){
   }
 
   saveLatestScanCache(cache);
-  applyPortfolioAlertSummary(results, "PREDATOR LIVE SCAN");
+  applyPortfolioAlertSummary(results, "TACTICAL LIVE SCAN");
   output.innerHTML = renderPositionCards(results);
 }
 
@@ -645,7 +675,7 @@ function quickRecheckPositions(){
     copy.priceSource = String(copy.priceSource || "Cached") + " / Quick Recheck";
     return copy;
   });
-  applyPortfolioAlertSummary(refreshed, "PREDATOR QUICK RECHECK");
+  applyPortfolioAlertSummary(refreshed, "TACTICAL QUICK RECHECK");
   output.innerHTML = `<div class='card'><div class='section-title'>Quick Recheck</div><div class='metric'>Using your most recent live scan from ${new Date(cache.scannedAt).toLocaleString()}.</div><div class='metric muted'>No new API calls were used.</div><div class="pill blue">CACHE MODE</div><div class="pill green">API SAFE</div></div>` + renderPositionCards(refreshed);
 }
 
