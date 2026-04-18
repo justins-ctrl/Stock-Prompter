@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v36 // stable clean build // tactical interface // dependable core systems</div>
+  <div class="subtitle">v36.1 // grade filter control // stable clean build // dependable core systems</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -182,6 +182,18 @@
       <option value="full">Full Detail Mode</option>
       <option value="compact">Quick Glance Mode</option>
     </select>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Grade Filter Control</div>
+    <div class="metric muted">Choose which trade grades the scanners are allowed to show.</div>
+    <select id="gradeFilter">
+      <option value="A_AND_APLUS">A and A+ Only</option>
+      <option value="APLUS_ONLY">A+ Only</option>
+      <option value="A_B_AND_APLUS">A, A+, and Selective B</option>
+    </select>
+    <button class="secondary" onclick="saveGradeFilter()">Save Grade Filter</button>
+    <div id="gradeFilterSummary" style="margin-top:12px;"></div>
   </div>
 
   <div class="card">
@@ -342,6 +354,32 @@ function renderActiveAlertsPanel(alerts){
   }).join("");
 }
 function clearActiveAlertsPanel(){ renderActiveAlertsPanel([]); }
+
+
+let gradeFilterSetting = getStore("signal_predator_grade_filter", "A_AND_APLUS");
+
+function saveGradeFilter(){
+  gradeFilterSetting = document.getElementById("gradeFilter").value;
+  setStore("signal_predator_grade_filter", gradeFilterSetting);
+  renderGradeFilterSummary();
+}
+
+function passesGradeFilter(a){
+  const grade = String(a.grade || "");
+  if(gradeFilterSetting === "APLUS_ONLY") return grade === "A+";
+  if(gradeFilterSetting === "A_B_AND_APLUS") return grade === "A+" || grade === "A" || grade === "B";
+  return grade === "A+" || grade === "A";
+}
+
+function renderGradeFilterSummary(){
+  const el = document.getElementById("gradeFilterSummary");
+  if(!el) return;
+  document.getElementById("gradeFilter").value = gradeFilterSetting;
+  let label = "A and A+ Only";
+  if(gradeFilterSetting === "APLUS_ONLY") label = "A+ Only";
+  if(gradeFilterSetting === "A_B_AND_APLUS") label = "A, A+, and Selective B";
+  el.innerHTML = `<div class="metric"><b>Current Filter:</b> ${label}</div>`;
+}
 
 function renderAlertHistory(){
   const container = document.getElementById("alertHistory");
@@ -1094,13 +1132,13 @@ async function scanList(list, title){
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null) continue;
     const a = analyze(closes, pricePack.price);
-    if(a.tradeFilter === "PASS") results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability});
+    if(a.tradeFilter === "PASS" && passesGradeFilter(a)) results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability, grade:a.grade});
     await new Promise(r => setTimeout(r, 15000));
   }
   results.sort((a,b)=>b.score-a.score || b.timeTarget-a.timeTarget);
   results = results.slice(0,2);
   if(results.length === 0){ document.getElementById("output").innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`; return; }
-  document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Score ${r.score} â TTT ${r.timeTarget}% â ${r.expiration}</div>`).join("")}</div>`;
+  document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Grade ${r.grade} â Score ${r.score} â TTT ${r.timeTarget}% â ${r.expiration}</div>`).join("")}</div>`;
 }
 async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
 async function scanMyWatchlist(){
@@ -1119,7 +1157,7 @@ async function findBestTrade(){
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null) continue;
     const a = analyze(closes, pricePack.price);
-    if(a.tradeFilter !== "PASS") continue;
+    if(a.tradeFilter !== "PASS" || !passesGradeFilter(a)) continue;
     const rankScore = a.score + (a.timeTarget?.probability || 0);
     if(!best || rankScore > best.rankScore) best = {ticker, a, rankScore};
     await new Promise(r => setTimeout(r, 15000));
@@ -1270,6 +1308,7 @@ renderPerformanceTracker();
 renderRiskControlSummary();
 renderAlertHistory();
 clearActiveAlertsPanel();
+renderGradeFilterSummary();
 </script>
 </body>
 </html>
