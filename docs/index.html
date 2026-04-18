@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Signal Predator AI v35.2 Risk Control Engine Edition</title>
+  <meta charset="UTF-8">
+  <title>Signal Predator AI v36 Stable Build</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,7 +13,7 @@
     :root{
       --bg1:#030711;
       --bg2:#071326;
-      --card:rgba(10,20,38,.88);
+      --card:rgba(10,20,38,.90);
       --line:rgba(55,255,159,.18);
       --glow:rgba(55,255,159,.14);
       --green:#37ff9f;
@@ -119,80 +120,34 @@
     button:active{transform:scale(.985)}
     .secondary{background:linear-gradient(135deg,#244152,#17303f)}
     .danger{background:linear-gradient(135deg,#b43838,#7a1f1f)}
-    .small-btn{
-      width:auto;
-      padding:8px 12px;
-      margin:0 0 0 8px;
-      font-size:13px;
-      border-radius:9px;
-    }
+    .small-btn{width:auto;padding:8px 12px;margin:0 0 0 8px;font-size:13px;border-radius:9px}
     .row{display:flex;gap:10px;align-items:center}
     .row input,.row select,.row button{margin-top:0;flex:1}
     .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .metric{
-      margin:4px 0;
-      font-family:'Share Tech Mono',monospace;
-      font-size:14px;
-    }
+    .metric{margin:4px 0;font-family:'Share Tech Mono',monospace;font-size:14px}
     .muted{color:var(--muted)}
     .divider{height:1px;background:rgba(255,255,255,.08);margin:12px 0}
-    .watch-item{
-      display:flex;justify-content:space-between;align-items:center;
-      padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)
-    }
+    .watch-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}
     .watch-item:last-child{border-bottom:none}
     .pill{
-      display:inline-block;
-      padding:6px 10px;
-      border-radius:999px;
-      font-size:11px;
-      font-weight:800;
-      letter-spacing:.7px;
-      margin-top:6px;
-      margin-right:6px;
-      background:#11213f;
-      border:1px solid rgba(255,255,255,.06);
-      font-family:'Orbitron',Arial,sans-serif;
-      text-transform:uppercase;
+      display:inline-block;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.7px;
+      margin-top:6px;margin-right:6px;background:#11213f;border:1px solid rgba(255,255,255,.06);
+      font-family:'Orbitron',Arial,sans-serif;text-transform:uppercase;
     }
     .green{color:var(--green)}
     .red{color:var(--red)}
     .yellow{color:var(--yellow)}
     .blue{color:var(--blue)}
-    .bar{
-      height:10px;
-      background:#0b1830;
-      border-radius:999px;
-      overflow:hidden;
-      box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);
-      margin-top:8px;
-    }
-    .fill{
-      height:100%;
-      border-radius:999px;
-      background:linear-gradient(90deg,var(--green),#67ffd0);
-      animation:grow .7s ease;
-    }
+    .bar{height:10px;background:#0b1830;border-radius:999px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);margin-top:8px}
+    .fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),#67ffd0);animation:grow .7s ease}
     @keyframes grow{from{width:0}}
     .alert-banner{
-      padding:14px;
-      border-radius:12px;
-      text-align:center;
-      font-weight:800;
-      margin-top:12px;
-      animation:pulse 2s infinite;
-      font-family:'Orbitron',Arial,sans-serif;
-      letter-spacing:.8px;
-      text-transform:uppercase;
-      font-size:13px;
+      padding:14px;border-radius:12px;text-align:center;font-weight:800;margin-top:12px;
+      font-family:'Orbitron',Arial,sans-serif;letter-spacing:.8px;text-transform:uppercase;font-size:13px
     }
     .alert-red{background:rgba(180,56,56,.20);border:1px solid rgba(255,98,98,.55);box-shadow:0 0 18px rgba(255,98,98,.18)}
     .alert-yellow{background:rgba(155,121,18,.20);border:1px solid rgba(255,216,79,.45);box-shadow:0 0 18px rgba(255,216,79,.12)}
     .alert-green{background:rgba(31,112,74,.20);border:1px solid rgba(55,255,159,.38);box-shadow:0 0 18px rgba(55,255,159,.13)}
-    @keyframes pulse{
-      0%,100%{box-shadow:0 0 12px rgba(55,255,159,.10)}
-      50%{box-shadow:0 0 22px rgba(55,255,159,.22)}
-    }
     .sell-alert{background:rgba(165,48,48,.18);border:1px solid rgba(255,98,98,.45)}
     .hold-alert{background:rgba(35,85,35,.18);border:1px solid rgba(55,255,159,.30)}
     .weak-alert{background:rgba(140,110,20,.16);border:1px solid rgba(255,216,79,.30)}
@@ -206,18 +161,18 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v35.2 // risk control engine // spread manager // income mode // performance tracker</div>
+  <div class="subtitle">v36 // stable clean build // tactical interface // dependable core systems</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
     <div class="metric">HUNT ENGINE <span class="blue">ONLINE</span></div>
-    <div class="metric muted">Tactical font system active â¢ iPhone mode optimized</div>
+    <div class="metric muted">Stable rebuild active â¢ iPhone mode optimized</div>
     <div id="topAlertArea"></div>
   </div>
 
   <div class="card">
     <div class="section-title">Active Alerts Panel</div>
-    <div class="metric muted">Triggered alerts appear here during live scans and quick rechecks.</div>
+    <div class="metric muted">Triggered alerts appear here during scans and rechecks.</div>
     <div id="activeAlertsPanel" style="margin-top:12px;"></div>
   </div>
 
@@ -249,7 +204,7 @@
         <option value="WIN">Win</option>
         <option value="LOSS">Loss</option>
       </select>
-      <input id="perfEntrySignal" placeholder="Entry Signal (ENTER NOW)">
+      <input id="perfEntrySignal" placeholder="Entry Signal">
       <input id="perfTTT" placeholder="Time-to-Target %">
       <input id="perfDTE" placeholder="DTE at Entry">
       <input id="perfNotes" placeholder="Notes (optional)">
@@ -261,9 +216,22 @@
   </div>
 
   <div class="card">
+    <div class="section-title">Risk Control Engine</div>
+    <div class="metric muted">Protect your account with max risk rules, streak protection, and exposure tracking.</div>
+    <div class="grid-2">
+      <input id="maxRiskPerTrade" placeholder="Max Risk Per Trade ($)">
+      <input id="dailyProfitLock" placeholder="Daily Profit Lock %">
+      <input id="maxPortfolioRisk" placeholder="Max Portfolio Risk %">
+      <input id="maxActiveTrades" placeholder="Max Active Trades">
+    </div>
+    <button onclick="saveRiskSettings()">Save Risk Settings</button>
+    <div id="riskControlSummary" style="margin-top:14px;"></div>
+  </div>
+
+  <div class="card">
     <div class="section-title">Income Mode</div>
-    <div class="metric muted">Switch between buying premium and defined-risk premium selling.</div>
-    <div class="metric">Use this for chop / range / lower-edge setups while waiting for stronger buy entries.</div>
+    <div class="metric muted">Use defined-risk premium selling during chop / range conditions.</div>
+    <div class="metric">Signals support BUY PREMIUM and SELL PREMIUM ideas.</div>
   </div>
 
   <div class="card">
@@ -298,19 +266,6 @@
   </div>
 
   <div class="card">
-    <div class="section-title">Risk Control Engine</div>
-    <div class="metric muted">Protect your account with max risk rules, streak protection, and portfolio exposure tracking.</div>
-    <div class="grid-2">
-      <input id="maxRiskPerTrade" placeholder="Max Risk Per Trade ($)">
-      <input id="dailyProfitLock" placeholder="Daily Profit Lock %">
-      <input id="maxPortfolioRisk" placeholder="Max Portfolio Risk %">
-      <input id="maxActiveTrades" placeholder="Max Active Trades">
-    </div>
-    <button onclick="saveRiskSettings()">Save Risk Settings</button>
-    <div id="riskControlSummary" style="margin-top:14px;"></div>
-  </div>
-
-  <div class="card">
     <div class="section-title">Spread Position Manager</div>
     <div class="metric muted">Track live bull put and bear call spreads you actually entered.</div>
     <div class="grid-2">
@@ -340,446 +295,83 @@
 const API_KEY = "OHCJWFQEFSXI8IJ3";
 const DEFAULT_WATCHLIST = ["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"];
 
-function getSavedWatchlist(){ const raw = localStorage.getItem("ai_options_watchlist"); if(!raw) return ["AAPL","NVDA","TSLA","SOFI"]; try{ const parsed = JSON.parse(raw); if(Array.isArray(parsed)&&parsed.length) return parsed; }catch(e){} return ["AAPL","NVDA","TSLA","SOFI"]; }
-function saveWatchlist(list){ localStorage.setItem("ai_options_watchlist", JSON.stringify(list)); }
-let customWatchlist = getSavedWatchlist();
+function normalizeTicker(ticker){
+  return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,"");
+}
 
-function getSavedPositions(){ const raw = localStorage.getItem("ai_options_positions"); if(!raw) return []; try{ const parsed = JSON.parse(raw); return Array.isArray(parsed)?parsed:[]; }catch(e){ return []; } }
-function savePositions(list){ localStorage.setItem("ai_options_positions", JSON.stringify(list)); }
-let savedPositions = getSavedPositions();
-
-function getAlertLog(){ const raw = localStorage.getItem("ai_options_alert_log"); if(!raw) return []; try{ const parsed = JSON.parse(raw); return Array.isArray(parsed)?parsed:[]; }catch(e){ return []; } }
-function saveAlertLog(list){ localStorage.setItem("ai_options_alert_log", JSON.stringify(list.slice(0,20))); }
-let alertLog = getAlertLog();
-
-function getLatestScanCache(){ const raw = localStorage.getItem("ai_options_last_scan_cache"); if(!raw) return null; try{ return JSON.parse(raw); }catch(e){ return null; } }
-function saveLatestScanCache(data){ localStorage.setItem("ai_options_last_scan_cache", JSON.stringify(data)); }
-
-
-function getPerformanceTrades(){
-  const raw = localStorage.getItem("signal_predator_performance_log");
-  if(!raw) return [];
+function getStore(key, fallback){
   try{
+    const raw = localStorage.getItem(key);
+    if(!raw) return fallback;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  }catch(e){
-    return [];
-  }
+    return parsed ?? fallback;
+  }catch(e){ return fallback; }
 }
-function savePerformanceTrades(list){
-  localStorage.setItem("signal_predator_performance_log", JSON.stringify(list.slice(0,100)));
+function setStore(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+
+let customWatchlist = getStore("ai_options_watchlist", ["AAPL","NVDA","TSLA","SOFI"]);
+let savedPositions = getStore("ai_options_positions", []);
+let alertLog = getStore("ai_options_alert_log", []);
+let performanceTrades = getStore("signal_predator_performance_log", []);
+let savedSpreadPositions = getStore("signal_predator_spread_positions", []);
+let lastScanCache = getStore("ai_options_last_scan_cache", null);
+let riskSettings = getStore("signal_predator_risk_settings", {maxRiskPerTrade:100,dailyProfitLock:20,maxPortfolioRisk:25,maxActiveTrades:3});
+
+function signalClass(value){
+  value = String(value || "");
+  if(["TARGET LOCKED","TAKE PROFIT","BUY CALL","BULLISH","STRONG BULLISH","ACCUMULATION","PASS","A+","A","FAVORABLE","LOW","LIKELY TO HIT BEFORE EXPIRATION","CLEAR","ENTER NOW"].includes(value)) return "green";
+  if(["STRIKE NOW","CUT LOSS","LOCK PROFITS","BUY PUT","BEARISH","STRONG BEARISH","SELLING","FAIL","C","RISKY","EXTREME","HIGH","UNLIKELY BEFORE EXPIRATION","BULL TRAP RISK","BEAR TRAP RISK","DO NOT CHASE","DOWN"].includes(value)) return "red";
+  if(["STALKING","WAIT","B","MEDIUM","BALANCED","RANGE","NORMAL","MODERATE","GOOD","TIGHT","POSSIBLE BEFORE EXPIRATION","CHOP ZONE","LOW EDGE SETUP","CHOP","UP","WAIT FOR RETEST"].includes(value)) return "yellow";
+  return "blue";
 }
-let performanceTrades = getPerformanceTrades();
 
-function addPerformanceTrade(){
-  const ticker = normalizeTicker(document.getElementById("perfTicker").value);
-  const outcome = document.getElementById("perfOutcome").value;
-  const entrySignal = String(document.getElementById("perfEntrySignal").value || "").trim().toUpperCase();
-  const ttt = parseFloat(document.getElementById("perfTTT").value || "");
-  const dte = parseFloat(document.getElementById("perfDTE").value || "");
-  const notes = String(document.getElementById("perfNotes").value || "").trim();
+function renderThinkingCard(lines){
+  document.getElementById("output").innerHTML =
+    `<div class="card"><div class="section-title">Predator Engine</div>${lines.map(x=>`<div class="metric">${x}</div>`).join("")}</div>`;
+}
 
-  if(!ticker || !entrySignal){
-    alert("Enter ticker and entry signal.");
+function renderActiveAlertsPanel(alerts){
+  const panel = document.getElementById("activeAlertsPanel");
+  if(!alerts || !alerts.length){
+    panel.innerHTML = "<div class='muted'>No active triggers right now.</div>";
     return;
   }
-
-  performanceTrades.unshift({
-    ticker,
-    outcome,
-    entrySignal,
-    ttt: Number.isNaN(ttt) ? null : ttt,
-    dte: Number.isNaN(dte) ? null : dte,
-    notes,
-    loggedAt: new Date().toISOString()
-  });
-  savePerformanceTrades(performanceTrades);
-  renderPerformanceTracker();
-  renderRiskControlSummary();
-renderSpreadPositions();
-
-  ["perfTicker","perfEntrySignal","perfTTT","perfDTE","perfNotes"].forEach(id => {
-    document.getElementById(id).value = "";
-  });
-  document.getElementById("perfOutcome").value = "WIN";
+  panel.innerHTML = alerts.map(a=>{
+    const cls = a.level === "red" ? "alert-red" : a.level === "green" ? "alert-green" : "alert-yellow";
+    return `<div class="alert-banner ${cls}" style="margin-top:8px;">${a.message}</div>`;
+  }).join("");
 }
+function clearActiveAlertsPanel(){ renderActiveAlertsPanel([]); }
 
-function clearPerformanceTrades(){
-  performanceTrades = [];
-  savePerformanceTrades(performanceTrades);
-  renderPerformanceTracker();
-  renderRiskControlSummary();
-renderSpreadPositions();
-}
-
-function pct(n, d){
-  if(!d) return "0%";
-  return Math.round((n / d) * 100) + "%";
-}
-
-function renderPerformanceTracker(){
-  const summary = document.getElementById("performanceSummary");
-  const log = document.getElementById("performanceLog");
-  if(!summary || !log) return;
-
-  if(!performanceTrades.length){
-    summary.innerHTML = "<div class='muted'>No trade results logged yet.</div>";
-    log.innerHTML = "";
+function renderAlertHistory(){
+  const container = document.getElementById("alertHistory");
+  const top = document.getElementById("topAlertArea");
+  if(!alertLog.length){
+    container.innerHTML = "<div class='muted'>No alerts yet.</div>";
+    top.innerHTML = "";
     return;
   }
-
-  const total = performanceTrades.length;
-  const wins = performanceTrades.filter(t => t.outcome === "WIN").length;
-  const losses = performanceTrades.filter(t => t.outcome === "LOSS").length;
-  const enterNow = performanceTrades.filter(t => t.entrySignal.includes("ENTER NOW"));
-  const retest = performanceTrades.filter(t => t.entrySignal.includes("WAIT FOR RETEST"));
-  const chase = performanceTrades.filter(t => t.entrySignal.includes("DO NOT CHASE"));
-  const avgTTT = performanceTrades.filter(t => typeof t.ttt === "number").reduce((a,b)=>a+b.ttt,0) / Math.max(1, performanceTrades.filter(t => typeof t.ttt === "number").length);
-  const avgDTE = performanceTrades.filter(t => typeof t.dte === "number").reduce((a,b)=>a+b.dte,0) / Math.max(1, performanceTrades.filter(t => typeof t.dte === "number").length);
-
-  summary.innerHTML = `
-    <div class="metric"><b>Total Trades:</b> ${total}</div>
-    <div class="metric"><b>Wins:</b> <span class="green">${wins}</span></div>
-    <div class="metric"><b>Losses:</b> <span class="red">${losses}</span></div>
-    <div class="metric"><b>Win Rate:</b> <span class="blue">${pct(wins,total)}</span></div>
-    <div class="divider"></div>
-    <div class="metric"><b>ENTER NOW Win Rate:</b> ${pct(enterNow.filter(t => t.outcome === "WIN").length, enterNow.length)}</div>
-    <div class="metric"><b>WAIT FOR RETEST Win Rate:</b> ${pct(retest.filter(t => t.outcome === "WIN").length, retest.length)}</div>
-    <div class="metric"><b>DO NOT CHASE Win Rate:</b> ${pct(chase.filter(t => t.outcome === "WIN").length, chase.length)}</div>
-    <div class="divider"></div>
-    <div class="metric"><b>Average Time-to-Target at Entry:</b> ${Number.isFinite(avgTTT) ? Math.round(avgTTT) + "%" : "N/A"}</div>
-    <div class="metric"><b>Average DTE at Entry:</b> ${Number.isFinite(avgDTE) ? avgDTE.toFixed(1) : "N/A"}</div>
-  `;
-
-  log.innerHTML = performanceTrades.slice(0,10).map(t => `
-    <div class="watch-item">
-      <span>${t.ticker} â¢ ${t.outcome} â¢ ${t.entrySignal}${typeof t.ttt === "number" ? " â¢ TTT " + t.ttt + "%" : ""}${typeof t.dte === "number" ? " â¢ DTE " + t.dte : ""}</span>
-    </div>
-  `).join("");
+  const latest = alertLog[0];
+  const cls = latest.level === "red" ? "alert-red" : latest.level === "green" ? "alert-green" : "alert-yellow";
+  top.innerHTML = `<div class="alert-banner ${cls}">${latest.message}</div>`;
+  container.innerHTML = alertLog.map(item=>`<div class="watch-item"><span>${item.time} â¢ ${item.message}</span></div>`).join("");
 }
-
-
-function getSavedSpreadPositions(){
-  const raw = localStorage.getItem("signal_predator_spread_positions");
-  if(!raw) return [];
+function pushAlert(message, level){
+  const now = new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  alertLog.unshift({message, level, time: now});
+  alertLog = alertLog.slice(0,20);
+  setStore("ai_options_alert_log", alertLog);
+  renderAlertHistory();
   try{
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  }catch(e){
-    return [];
-  }
-}
-function saveSpreadPositions(list){
-  localStorage.setItem("signal_predator_spread_positions", JSON.stringify(list));
-}
-let savedSpreadPositions = getSavedSpreadPositions();
-
-function renderSpreadPositions(){
-  const c = document.getElementById("spreadPositionsContainer");
-  if(!c) return;
-  if(!savedSpreadPositions.length){
-    c.innerHTML = "<div class='muted'>No saved spreads yet.</div>";
-    return;
-  }
-  c.innerHTML = savedSpreadPositions.map((p,index)=>`<div class="watch-item"><span>${p.ticker} â¢ ${p.type} â¢ ${p.shortStrike}/${p.longStrike} â¢ Credit ${p.credit}${p.expiration ? " â¢ Exp " + p.expiration : ""}</span><button class="small-btn danger" onclick="removeSpreadPosition(${index})">Remove</button></div>`).join("");
-}
-
-function addSpreadPosition(){
-  const ticker = normalizeTicker(document.getElementById("spreadTicker").value);
-  const type = document.getElementById("spreadType").value;
-  const shortStrike = parseFloat(document.getElementById("spreadShortStrike").value);
-  const longStrike = parseFloat(document.getElementById("spreadLongStrike").value);
-  const credit = parseFloat(document.getElementById("spreadCredit").value);
-  const expiration = document.getElementById("spreadExpiration").value;
-
-  if(!ticker || Number.isNaN(shortStrike) || Number.isNaN(longStrike) || Number.isNaN(credit)){
-    alert("Enter ticker, short strike, long strike, and credit.");
-    return;
-  }
-
-  savedSpreadPositions.push({ticker,type,shortStrike,longStrike,credit,expiration});
-  saveSpreadPositions(savedSpreadPositions);
-  renderSpreadPositions();
-renderRiskControlSummary();
-
-  ["spreadTicker","spreadShortStrike","spreadLongStrike","spreadCredit","spreadExpiration"].forEach(id=>document.getElementById(id).value="");
-  document.getElementById("spreadType").value = "BULL PUT SPREAD";
-}
-
-function removeSpreadPosition(index){
-  savedSpreadPositions.splice(index,1);
-  saveSpreadPositions(savedSpreadPositions);
-  renderSpreadPositions();
-renderRiskControlSummary();
-}
-
-function analyzeSpreadPosition(position, livePrice, ai){
-  const width = Math.abs(position.shortStrike - position.longStrike);
-  const dte = getDTE(position.expiration);
-  let spreadValue = position.credit;
-  let status = "HOLD";
-  let reason = "Spread remains in a workable range.";
-  let cardClass = "weak-alert";
-  let profitPct = 0;
-  let maxProfit = position.credit;
-  let maxLoss = Math.max(0.01, width - position.credit);
-
-  if(position.type === "BULL PUT SPREAD"){
-    if(livePrice > position.shortStrike){
-      spreadValue = Math.max(0.05, position.credit * 0.2);
-      status = "TAKE PROFIT";
-      reason = "Price is above the short put strike and the spread is likely decaying in your favor.";
-      cardClass = "hold-alert";
-    }else if(livePrice <= position.shortStrike && livePrice > position.longStrike){
-      spreadValue = Math.min(width, Math.max(position.credit, width * 0.55));
-      status = "HOLD";
-      reason = "Price is between the strikes. Spread is under pressure but not broken.";
-      cardClass = "weak-alert";
-    }else{
-      spreadValue = width;
-      status = "CUT LOSS";
-      reason = "Price moved through the long strike and max spread risk is near.";
-      cardClass = "sell-alert";
+    if(navigator.vibrate){
+      if(level === "red") navigator.vibrate([250,100,250,100,250]);
+      else if(level === "yellow") navigator.vibrate([200,100,200]);
+      else navigator.vibrate(150);
     }
-  }else if(position.type === "BEAR CALL SPREAD"){
-    if(livePrice < position.shortStrike){
-      spreadValue = Math.max(0.05, position.credit * 0.2);
-      status = "TAKE PROFIT";
-      reason = "Price is below the short call strike and the spread is likely decaying in your favor.";
-      cardClass = "hold-alert";
-    }else if(livePrice >= position.shortStrike && livePrice < position.longStrike){
-      spreadValue = Math.min(width, Math.max(position.credit, width * 0.55));
-      status = "HOLD";
-      reason = "Price is between the strikes. Spread is under pressure but not broken.";
-      cardClass = "weak-alert";
-    }else{
-      spreadValue = width;
-      status = "CUT LOSS";
-      reason = "Price moved through the long strike and max spread risk is near.";
-      cardClass = "sell-alert";
-    }
-  }
-
-  const currentPnL = position.credit - spreadValue;
-  profitPct = Math.round((currentPnL / Math.max(0.01, maxProfit)) * 100);
-
-  if(status === "TAKE PROFIT" && profitPct < 50){
-    reason = "Spread is favorable, but profit capture is still modest.";
-  }
-  if(dte !== null && dte <= 2 && status === "HOLD"){
-    reason = "Expiration is close. Consider closing if you want to avoid late risk.";
-  }
-  if(dte !== null && dte <= 1 && status !== "TAKE PROFIT"){
-    status = "CUT LOSS";
-    reason = "Expiration is too close to comfortably hold this spread.";
-    cardClass = "sell-alert";
-  }
-
-  return {
-    ticker: position.ticker,
-    type: position.type,
-    shortStrike: position.shortStrike,
-    longStrike: position.longStrike,
-    credit: position.credit,
-    expiration: position.expiration || "Not set",
-    dte: dte === null ? "N/A" : dte,
-    livePrice: livePrice.toFixed(2),
-    estSpreadValue: spreadValue.toFixed(2),
-    maxProfit: maxProfit.toFixed(2),
-    maxLoss: maxLoss.toFixed(2),
-    profitPct,
-    status,
-    reason,
-    cardClass,
-    predictiveEngine: ai.predictiveEngine,
-    trapWarning: ai.trapWarning
-  };
+  }catch(e){}
 }
-
-async function scanSpreadPositions(){
-  const output = document.getElementById("output");
-  if(!savedSpreadPositions.length){
-    output.innerHTML = "<div class='card'>No saved spreads yet.</div>";
-    return;
-  }
-
-  renderThinkingCard(["TRACKING SPREAD POSITIONS...","CHECKING CREDIT SPREAD RISK...","CALCULATING EXIT SIGNALS..."]);
-  let results = [];
-
-  for(let i=0; i<savedSpreadPositions.length; i++){
-    const p = savedSpreadPositions[i];
-    const closes = await getHistory(p.ticker);
-    if(!closes){
-      results.push({
-        ticker:p.ticker,type:p.type,shortStrike:p.shortStrike,longStrike:p.longStrike,credit:p.credit,expiration:p.expiration || "Not set",dte:"N/A",livePrice:"N/A",estSpreadValue:"N/A",maxProfit:"N/A",maxLoss:"N/A",profitPct:0,status:"UNAVAILABLE",reason:"Could not load historical data for this spread.",cardClass:"sell-alert",predictiveEngine:{likelyMove:"N/A"},trapWarning:"CLEAR"
-      });
-      continue;
-    }
-    const pricePack = await getBestAvailablePrice(p.ticker, closes);
-    if(pricePack.price === null){
-      results.push({
-        ticker:p.ticker,type:p.type,shortStrike:p.shortStrike,longStrike:p.longStrike,credit:p.credit,expiration:p.expiration || "Not set",dte:"N/A",livePrice:"N/A",estSpreadValue:"N/A",maxProfit:"N/A",maxLoss:"N/A",profitPct:0,status:"UNAVAILABLE",reason:"Could not load price for this spread.",cardClass:"sell-alert",predictiveEngine:{likelyMove:"N/A"},trapWarning:"CLEAR"
-      });
-      continue;
-    }
-    const ai = analyze(closes, pricePack.price);
-    results.push(analyzeSpreadPosition(p, pricePack.price, ai));
-    await new Promise(r => setTimeout(r, 5000));
-  }
-
-  const spreadAlerts = [];
-  results.forEach(r=>{
-    if(r.status === "CUT LOSS") spreadAlerts.push({level:"red", message:`SPREAD EXIT ALERT // ${r.ticker} ${r.type} cut loss.`});
-    if(r.status === "TAKE PROFIT") spreadAlerts.push({level:"green", message:`SPREAD PROFIT ALERT // ${r.ticker} ${r.type} take profit.`});
-  });
-  renderActiveAlertsPanel(spreadAlerts.concat(getRiskControlAdvice()));
-  if(spreadAlerts.length){
-    spreadAlerts.slice(0,3).forEach(a=>pushAlert(a.message, a.level));
-  }
-
-  output.innerHTML = results.map(r=>`
-    <div class="card ${r.cardClass}">
-      <div class="section-title">Spread Position Readout</div>
-      <div class="metric"><b>${r.ticker}</b> ${r.type}</div>
-      <div class="metric"><b>Strikes:</b> ${r.shortStrike} / ${r.longStrike}</div>
-      <div class="metric"><b>Credit Received:</b> ${r.credit}</div>
-      <div class="metric"><b>Live Price:</b> ${r.livePrice === "N/A" ? "N/A" : "$" + r.livePrice}</div>
-      <div class="metric"><b>Est. Spread Value:</b> ${r.estSpreadValue === "N/A" ? "N/A" : "$" + r.estSpreadValue}</div>
-      <div class="metric"><b>Max Profit:</b> ${r.maxProfit === "N/A" ? "N/A" : "$" + r.maxProfit}</div>
-      <div class="metric"><b>Max Loss:</b> ${r.maxLoss === "N/A" ? "N/A" : "$" + r.maxLoss}</div>
-      <div class="metric"><b>Profit Capture:</b> ${r.profitPct}%</div>
-      <div class="metric"><b>Expiration:</b> ${r.expiration}</div>
-      <div class="metric"><b>DTE:</b> ${r.dte}</div>
-      <div class="metric"><b>Likely Move:</b> ${r.predictiveEngine ? r.predictiveEngine.likelyMove : "N/A"}</div>
-      <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning || "CLEAR")}">${r.trapWarning || "CLEAR"}</span></div>
-      <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
-      <div class="metric"><b>Reason:</b> ${r.reason}</div>
-    </div>
-  `).join("");
-}
-
-
-function getRiskSettings(){
-  const raw = localStorage.getItem("signal_predator_risk_settings");
-  if(!raw){
-    return {maxRiskPerTrade:100,dailyProfitLock:20,maxPortfolioRisk:25,maxActiveTrades:3};
-  }
-  try{
-    const parsed = JSON.parse(raw);
-    return {
-      maxRiskPerTrade: Number(parsed.maxRiskPerTrade || 100),
-      dailyProfitLock: Number(parsed.dailyProfitLock || 20),
-      maxPortfolioRisk: Number(parsed.maxPortfolioRisk || 25),
-      maxActiveTrades: Number(parsed.maxActiveTrades || 3)
-    };
-  }catch(e){
-    return {maxRiskPerTrade:100,dailyProfitLock:20,maxPortfolioRisk:25,maxActiveTrades:3};
-  }
-}
-function saveRiskSettingsToStorage(settings){
-  localStorage.setItem("signal_predator_risk_settings", JSON.stringify(settings));
-}
-let riskSettings = getRiskSettings();
-
-function saveRiskSettings(){
-  riskSettings = {
-    maxRiskPerTrade: Number(document.getElementById("maxRiskPerTrade").value || 100),
-    dailyProfitLock: Number(document.getElementById("dailyProfitLock").value || 20),
-    maxPortfolioRisk: Number(document.getElementById("maxPortfolioRisk").value || 25),
-    maxActiveTrades: Number(document.getElementById("maxActiveTrades").value || 3)
-  };
-  saveRiskSettingsToStorage(riskSettings);
-  renderRiskControlSummary();
-}
-
-function estimatePortfolioRisk(){
-  let buySideRisk = savedPositions.length * riskSettings.maxRiskPerTrade;
-  let spreadRisk = savedSpreadPositions.reduce((sum,p)=>{
-    const width = Math.abs(Number(p.shortStrike) - Number(p.longStrike));
-    const credit = Number(p.credit || 0);
-    return sum + Math.max(0, width - credit) * 100;
-  },0);
-  return buySideRisk + spreadRisk;
-}
-
-function getLossStreak(){
-  let streak = 0;
-  for(const t of performanceTrades){
-    if(t.outcome === "LOSS") streak += 1;
-    else break;
-  }
-  return streak;
-}
-
-function getTodayWinRate(){
-  const today = new Date().toISOString().slice(0,10);
-  const todays = performanceTrades.filter(t => String(t.loggedAt || "").slice(0,10) === today);
-  if(!todays.length) return null;
-  const wins = todays.filter(t => t.outcome === "WIN").length;
-  return Math.round((wins / todays.length) * 100);
-}
-
-function renderRiskControlSummary(){
-  const el = document.getElementById("riskControlSummary");
-  if(!el) return;
-
-  document.getElementById("maxRiskPerTrade").value = riskSettings.maxRiskPerTrade;
-  document.getElementById("dailyProfitLock").value = riskSettings.dailyProfitLock;
-  document.getElementById("maxPortfolioRisk").value = riskSettings.maxPortfolioRisk;
-  document.getElementById("maxActiveTrades").value = riskSettings.maxActiveTrades;
-
-  const activeTrades = savedPositions.length + savedSpreadPositions.length;
-  const estRiskDollars = estimatePortfolioRisk();
-  const estPortfolioRiskPct = Math.round((activeTrades / Math.max(1, riskSettings.maxActiveTrades)) * riskSettings.maxPortfolioRisk);
-  const lossStreak = getLossStreak();
-  const todayWinRate = getTodayWinRate();
-
-  let warnings = [];
-  if(activeTrades > riskSettings.maxActiveTrades){
-    warnings.push("TOO MANY ACTIVE TRADES");
-  }
-  if(estPortfolioRiskPct > riskSettings.maxPortfolioRisk){
-    warnings.push("PORTFOLIO RISK TOO HIGH");
-  }
-  if(lossStreak >= 2){
-    warnings.push("LOSS STREAK PROTECTION");
-  }
-  if(todayWinRate !== null && todayWinRate >= riskSettings.dailyProfitLock){
-    warnings.push("DAILY PROFIT LOCK CONSIDER PAUSING");
-  }
-
-  el.innerHTML = `
-    <div class="metric"><b>Max Risk Per Trade:</b> $${riskSettings.maxRiskPerTrade}</div>
-    <div class="metric"><b>Daily Profit Lock:</b> ${riskSettings.dailyProfitLock}%</div>
-    <div class="metric"><b>Max Portfolio Risk:</b> ${riskSettings.maxPortfolioRisk}%</div>
-    <div class="metric"><b>Max Active Trades:</b> ${riskSettings.maxActiveTrades}</div>
-    <div class="divider"></div>
-    <div class="metric"><b>Active Trades:</b> ${activeTrades}</div>
-    <div class="metric"><b>Estimated Portfolio Risk ($):</b> $${Math.round(estRiskDollars)}</div>
-    <div class="metric"><b>Portfolio Risk Meter:</b> ${estPortfolioRiskPct}%</div>
-    <div class="bar"><div class="fill" style="width:${Math.min(100,estPortfolioRiskPct)}%"></div></div>
-    <div class="metric"><b>Loss Streak:</b> ${lossStreak}</div>
-    <div class="metric"><b>Today Win Rate:</b> ${todayWinRate === null ? "N/A" : todayWinRate + "%"}</div>
-    <div class="divider"></div>
-    <div class="metric"><b>Risk Warnings:</b> ${warnings.length ? warnings.join(" â¢ ") : "NONE"}</div>
-  `;
-}
-
-function getRiskControlAdvice(){
-  const activeTrades = savedPositions.length + savedSpreadPositions.length;
-  const estPortfolioRiskPct = Math.round((activeTrades / Math.max(1, riskSettings.maxActiveTrades)) * riskSettings.maxPortfolioRisk);
-  const lossStreak = getLossStreak();
-  const todayWinRate = getTodayWinRate();
-  const advice = [];
-
-  if(activeTrades > riskSettings.maxActiveTrades) advice.push({level:"red", message:"RISK CONTROL // Too many active trades. Focus and reduce exposure."});
-  if(estPortfolioRiskPct > riskSettings.maxPortfolioRisk) advice.push({level:"red", message:"RISK CONTROL // Portfolio risk meter is above your limit."});
-  if(lossStreak >= 2) advice.push({level:"yellow", message:"RISK CONTROL // Loss streak protection suggests slowing down."});
-  if(todayWinRate !== null && todayWinRate >= riskSettings.dailyProfitLock) advice.push({level:"green", message:"RISK CONTROL // Daily profit lock reached. Consider stopping for the day."});
-  return advice;
-}
-
-function normalizeTicker(ticker){ return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,""); }
+function clearAlerts(){ alertLog = []; setStore("ai_options_alert_log", alertLog); renderAlertHistory(); clearActiveAlertsPanel(); }
+function testAlert(){ pushAlert("TACTICAL TEST ALERT â SYSTEMS ARE LIVE.", "yellow"); }
 
 function renderWatchlist(){
   const c = document.getElementById("watchlistContainer");
@@ -790,11 +382,18 @@ function addTicker(){
   const input = document.getElementById("watchlistInput");
   const ticker = normalizeTicker(input.value);
   if(!ticker) return;
-  if(customWatchlist.includes(ticker)){ input.value=""; return; }
+  if(customWatchlist.includes(ticker)){ input.value = ""; return; }
   if(customWatchlist.length >= 15){ alert("Keep your watchlist at 15 or fewer tickers for faster scans."); return; }
-  customWatchlist.push(ticker); saveWatchlist(customWatchlist); renderWatchlist(); input.value="";
+  customWatchlist.push(ticker);
+  setStore("ai_options_watchlist", customWatchlist);
+  renderWatchlist();
+  input.value = "";
 }
-function removeTicker(index){ customWatchlist.splice(index,1); saveWatchlist(customWatchlist); renderWatchlist(); }
+function removeTicker(index){
+  customWatchlist.splice(index,1);
+  setStore("ai_options_watchlist", customWatchlist);
+  renderWatchlist();
+}
 
 function renderPositions(){
   const c = document.getElementById("positionsContainer");
@@ -810,94 +409,265 @@ function addPosition(){
   const expiration = document.getElementById("posExpiration").value;
   if(!ticker || Number.isNaN(strike) || Number.isNaN(breakeven)){ alert("Enter ticker, strike, and breakeven."); return; }
   savedPositions.push({ticker,type,strike,breakeven,entryPremium,expiration});
-  savePositions(savedPositions);
+  setStore("ai_options_positions", savedPositions);
   renderPositions();
   ["posTicker","posStrike","posBreakeven","posEntryPremium","posExpiration"].forEach(id=>document.getElementById(id).value="");
+  renderRiskControlSummary();
 }
-function removePosition(index){ savedPositions.splice(index,1); savePositions(savedPositions); renderPositions(); }
-
-function renderAlertHistory(){
-  const container = document.getElementById("alertHistory");
-  const top = document.getElementById("topAlertArea");
-  if(!alertLog.length){ container.innerHTML = "<div class='muted'>No alerts yet.</div>"; top.innerHTML = ""; return; }
-  const latest = alertLog[0];
-  const cls = latest.level === "red" ? "alert-red" : latest.level === "green" ? "alert-green" : "alert-yellow";
-  top.innerHTML = `<div class="alert-banner ${cls}">${latest.message}</div>`;
-  container.innerHTML = alertLog.map(item=>`<div class="watch-item"><span>${item.time} â¢ ${item.message}</span></div>`).join("");
+function removePosition(index){
+  savedPositions.splice(index,1);
+  setStore("ai_options_positions", savedPositions);
+  renderPositions();
+  renderRiskControlSummary();
 }
 
-function renderActiveAlertsPanel(alerts){
-  const panel = document.getElementById("activeAlertsPanel");
-  if(!panel) return;
-  if(!alerts || !alerts.length){
-    panel.innerHTML = "<div class='muted'>No active triggers right now.</div>";
+function renderSpreadPositions(){
+  const c = document.getElementById("spreadPositionsContainer");
+  if(!savedSpreadPositions.length){ c.innerHTML = "<div class='muted'>No saved spreads yet.</div>"; return; }
+  c.innerHTML = savedSpreadPositions.map((p,index)=>`<div class="watch-item"><span>${p.ticker} â¢ ${p.type} â¢ ${p.shortStrike}/${p.longStrike} â¢ Credit ${p.credit}${p.expiration ? " â¢ Exp " + p.expiration : ""}</span><button class="small-btn danger" onclick="removeSpreadPosition(${index})">Remove</button></div>`).join("");
+}
+function addSpreadPosition(){
+  const ticker = normalizeTicker(document.getElementById("spreadTicker").value);
+  const type = document.getElementById("spreadType").value;
+  const shortStrike = parseFloat(document.getElementById("spreadShortStrike").value);
+  const longStrike = parseFloat(document.getElementById("spreadLongStrike").value);
+  const credit = parseFloat(document.getElementById("spreadCredit").value);
+  const expiration = document.getElementById("spreadExpiration").value;
+  if(!ticker || Number.isNaN(shortStrike) || Number.isNaN(longStrike) || Number.isNaN(credit)){ alert("Enter ticker, short strike, long strike, and credit."); return; }
+  savedSpreadPositions.push({ticker,type,shortStrike,longStrike,credit,expiration});
+  setStore("signal_predator_spread_positions", savedSpreadPositions);
+  renderSpreadPositions();
+  ["spreadTicker","spreadShortStrike","spreadLongStrike","spreadCredit","spreadExpiration"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("spreadType").value = "BULL PUT SPREAD";
+  renderRiskControlSummary();
+}
+function removeSpreadPosition(index){
+  savedSpreadPositions.splice(index,1);
+  setStore("signal_predator_spread_positions", savedSpreadPositions);
+  renderSpreadPositions();
+  renderRiskControlSummary();
+}
+
+function addPerformanceTrade(){
+  const ticker = normalizeTicker(document.getElementById("perfTicker").value);
+  const outcome = document.getElementById("perfOutcome").value;
+  const entrySignal = String(document.getElementById("perfEntrySignal").value || "").trim().toUpperCase();
+  const ttt = parseFloat(document.getElementById("perfTTT").value || "");
+  const dte = parseFloat(document.getElementById("perfDTE").value || "");
+  const notes = String(document.getElementById("perfNotes").value || "").trim();
+  if(!ticker || !entrySignal){ alert("Enter ticker and entry signal."); return; }
+
+  performanceTrades.unshift({
+    ticker, outcome, entrySignal,
+    ttt: Number.isNaN(ttt) ? null : ttt,
+    dte: Number.isNaN(dte) ? null : dte,
+    notes,
+    loggedAt:new Date().toISOString()
+  });
+  performanceTrades = performanceTrades.slice(0,100);
+  setStore("signal_predator_performance_log", performanceTrades);
+  renderPerformanceTracker();
+  renderRiskControlSummary();
+  ["perfTicker","perfEntrySignal","perfTTT","perfDTE","perfNotes"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("perfOutcome").value = "WIN";
+}
+function clearPerformanceTrades(){
+  performanceTrades = [];
+  setStore("signal_predator_performance_log", performanceTrades);
+  renderPerformanceTracker();
+  renderRiskControlSummary();
+}
+function pct(n,d){ return !d ? "0%" : Math.round((n/d)*100) + "%"; }
+function renderPerformanceTracker(){
+  const summary = document.getElementById("performanceSummary");
+  const log = document.getElementById("performanceLog");
+  if(!performanceTrades.length){
+    summary.innerHTML = "<div class='muted'>No trade results logged yet.</div>";
+    log.innerHTML = "";
     return;
   }
-  panel.innerHTML = alerts.map(a=>{
-    const cls = a.level === "red" ? "alert-red" : a.level === "green" ? "alert-green" : "alert-yellow";
-    return `<div class="alert-banner ${cls}" style="margin-top:8px;">${a.message}</div>`;
-  }).join("");
+  const total = performanceTrades.length;
+  const wins = performanceTrades.filter(t=>t.outcome==="WIN").length;
+  const losses = performanceTrades.filter(t=>t.outcome==="LOSS").length;
+  const enterNow = performanceTrades.filter(t=>t.entrySignal.includes("ENTER NOW"));
+  const retest = performanceTrades.filter(t=>t.entrySignal.includes("WAIT FOR RETEST"));
+  const chase = performanceTrades.filter(t=>t.entrySignal.includes("DO NOT CHASE"));
+  const tttRows = performanceTrades.filter(t=>typeof t.ttt==="number");
+  const dteRows = performanceTrades.filter(t=>typeof t.dte==="number");
+  const avgTTT = tttRows.reduce((a,b)=>a+b.ttt,0) / Math.max(1,tttRows.length);
+  const avgDTE = dteRows.reduce((a,b)=>a+b.dte,0) / Math.max(1,dteRows.length);
+
+  summary.innerHTML = `
+    <div class="metric"><b>Total Trades:</b> ${total}</div>
+    <div class="metric"><b>Wins:</b> <span class="green">${wins}</span></div>
+    <div class="metric"><b>Losses:</b> <span class="red">${losses}</span></div>
+    <div class="metric"><b>Win Rate:</b> <span class="blue">${pct(wins,total)}</span></div>
+    <div class="divider"></div>
+    <div class="metric"><b>ENTER NOW Win Rate:</b> ${pct(enterNow.filter(t=>t.outcome==="WIN").length, enterNow.length)}</div>
+    <div class="metric"><b>WAIT FOR RETEST Win Rate:</b> ${pct(retest.filter(t=>t.outcome==="WIN").length, retest.length)}</div>
+    <div class="metric"><b>DO NOT CHASE Win Rate:</b> ${pct(chase.filter(t=>t.outcome==="WIN").length, chase.length)}</div>
+    <div class="divider"></div>
+    <div class="metric"><b>Average Time-to-Target at Entry:</b> ${Number.isFinite(avgTTT) ? Math.round(avgTTT) + "%" : "N/A"}</div>
+    <div class="metric"><b>Average DTE at Entry:</b> ${Number.isFinite(avgDTE) ? avgDTE.toFixed(1) : "N/A"}</div>
+  `;
+  log.innerHTML = performanceTrades.slice(0,10).map(t=>`<div class="watch-item"><span>${t.ticker} â¢ ${t.outcome} â¢ ${t.entrySignal}${typeof t.ttt==="number" ? " â¢ TTT " + t.ttt + "%" : ""}${typeof t.dte==="number" ? " â¢ DTE " + t.dte : ""}</span></div>`).join("");
 }
 
-function clearActiveAlertsPanel(){
-  renderActiveAlertsPanel([]);
+function getLossStreak(){
+  let streak = 0;
+  for(const t of performanceTrades){
+    if(t.outcome === "LOSS") streak += 1;
+    else break;
+  }
+  return streak;
+}
+function getTodayWinRate(){
+  const today = new Date().toISOString().slice(0,10);
+  const todays = performanceTrades.filter(t => String(t.loggedAt || "").slice(0,10) === today);
+  if(!todays.length) return null;
+  const wins = todays.filter(t => t.outcome === "WIN").length;
+  return Math.round((wins / todays.length) * 100);
+}
+function estimatePortfolioRisk(){
+  let buySideRisk = savedPositions.length * Number(riskSettings.maxRiskPerTrade || 100);
+  let spreadRisk = savedSpreadPositions.reduce((sum,p)=>{
+    const width = Math.abs(Number(p.shortStrike) - Number(p.longStrike));
+    const credit = Number(p.credit || 0);
+    return sum + Math.max(0, width - credit) * 100;
+  },0);
+  return buySideRisk + spreadRisk;
+}
+function saveRiskSettings(){
+  riskSettings = {
+    maxRiskPerTrade: Number(document.getElementById("maxRiskPerTrade").value || 100),
+    dailyProfitLock: Number(document.getElementById("dailyProfitLock").value || 20),
+    maxPortfolioRisk: Number(document.getElementById("maxPortfolioRisk").value || 25),
+    maxActiveTrades: Number(document.getElementById("maxActiveTrades").value || 3)
+  };
+  setStore("signal_predator_risk_settings", riskSettings);
+  renderRiskControlSummary();
+}
+function renderRiskControlSummary(){
+  const el = document.getElementById("riskControlSummary");
+  document.getElementById("maxRiskPerTrade").value = riskSettings.maxRiskPerTrade;
+  document.getElementById("dailyProfitLock").value = riskSettings.dailyProfitLock;
+  document.getElementById("maxPortfolioRisk").value = riskSettings.maxPortfolioRisk;
+  document.getElementById("maxActiveTrades").value = riskSettings.maxActiveTrades;
+
+  const activeTrades = savedPositions.length + savedSpreadPositions.length;
+  const estRiskDollars = estimatePortfolioRisk();
+  const estPortfolioRiskPct = Math.round((activeTrades / Math.max(1, riskSettings.maxActiveTrades)) * riskSettings.maxPortfolioRisk);
+  const lossStreak = getLossStreak();
+  const todayWinRate = getTodayWinRate();
+  let warnings = [];
+  if(activeTrades > riskSettings.maxActiveTrades) warnings.push("TOO MANY ACTIVE TRADES");
+  if(estPortfolioRiskPct > riskSettings.maxPortfolioRisk) warnings.push("PORTFOLIO RISK TOO HIGH");
+  if(lossStreak >= 2) warnings.push("LOSS STREAK PROTECTION");
+  if(todayWinRate !== null && todayWinRate >= riskSettings.dailyProfitLock) warnings.push("DAILY PROFIT LOCK CONSIDER PAUSING");
+
+  el.innerHTML = `
+    <div class="metric"><b>Max Risk Per Trade:</b> $${riskSettings.maxRiskPerTrade}</div>
+    <div class="metric"><b>Daily Profit Lock:</b> ${riskSettings.dailyProfitLock}%</div>
+    <div class="metric"><b>Max Portfolio Risk:</b> ${riskSettings.maxPortfolioRisk}%</div>
+    <div class="metric"><b>Max Active Trades:</b> ${riskSettings.maxActiveTrades}</div>
+    <div class="divider"></div>
+    <div class="metric"><b>Active Trades:</b> ${activeTrades}</div>
+    <div class="metric"><b>Estimated Portfolio Risk ($):</b> $${Math.round(estRiskDollars)}</div>
+    <div class="metric"><b>Portfolio Risk Meter:</b> ${estPortfolioRiskPct}%</div>
+    <div class="bar"><div class="fill" style="width:${Math.min(100, estPortfolioRiskPct)}%"></div></div>
+    <div class="metric"><b>Loss Streak:</b> ${lossStreak}</div>
+    <div class="metric"><b>Today Win Rate:</b> ${todayWinRate === null ? "N/A" : todayWinRate + "%"}</div>
+    <div class="divider"></div>
+    <div class="metric"><b>Risk Warnings:</b> ${warnings.length ? warnings.join(" â¢ ") : "NONE"}</div>
+  `;
+}
+function getRiskControlAdvice(){
+  const activeTrades = savedPositions.length + savedSpreadPositions.length;
+  const estPortfolioRiskPct = Math.round((activeTrades / Math.max(1, riskSettings.maxActiveTrades)) * riskSettings.maxPortfolioRisk);
+  const lossStreak = getLossStreak();
+  const todayWinRate = getTodayWinRate();
+  const advice = [];
+  if(activeTrades > riskSettings.maxActiveTrades) advice.push({level:"red", message:"RISK CONTROL // Too many active trades. Focus and reduce exposure."});
+  if(estPortfolioRiskPct > riskSettings.maxPortfolioRisk) advice.push({level:"red", message:"RISK CONTROL // Portfolio risk meter is above your limit."});
+  if(lossStreak >= 2) advice.push({level:"yellow", message:"RISK CONTROL // Loss streak protection suggests slowing down."});
+  if(todayWinRate !== null && todayWinRate >= riskSettings.dailyProfitLock) advice.push({level:"green", message:"RISK CONTROL // Daily profit lock reached. Consider stopping for the day."});
+  return advice;
 }
 
-function pushAlert(message, level){
-  const now = new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
-  alertLog.unshift({message, level, time: now});
-  saveAlertLog(alertLog);
-  renderAlertHistory();
-clearActiveAlertsPanel();
-renderPerformanceTracker();
-renderSpreadPositions();
-  try{
-    if(navigator.vibrate){
-      if(level === "red") navigator.vibrate([250,100,250,100,250]);
-      else if(level === "yellow") navigator.vibrate([200,100,200]);
-      else navigator.vibrate(150);
-    }
-  }catch(e){}
+async function fetchJson(url){
+  const r = await fetch(url);
+  return await r.json();
 }
-function clearAlerts(){ alertLog = []; saveAlertLog(alertLog); renderAlertHistory(); clearActiveAlertsPanel(); }
-function testAlert(){ pushAlert("TACTICAL TEST ALERT â SYSTEMS ARE LIVE.", "yellow"); }
-
-async function fetchJson(url){ const r = await fetch(url); return await r.json(); }
 async function getHistory(symbol){
-  try{ const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`); const s = d["Time Series (Daily)"]; if(!s) return null; return Object.values(s).slice(0,60).map(v=>parseFloat(v["4. close"])).filter(v=>!Number.isNaN(v)); }catch(e){ return null; }
+  try{
+    const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`);
+    const s = d["Time Series (Daily)"];
+    if(!s) return null;
+    return Object.values(s).slice(0,60).map(v=>parseFloat(v["4. close"])).filter(v=>!Number.isNaN(v));
+  }catch(e){ return null; }
 }
 async function getGlobalQuotePrice(symbol){
-  try{ const qd = await fetchJson(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`); const qp = parseFloat(qd?.["Global Quote"]?.["05. price"]); if(!Number.isNaN(qp) && qp > 0) return qp; }catch(e){}
+  try{
+    const qd = await fetchJson(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`);
+    const qp = parseFloat(qd?.["Global Quote"]?.["05. price"]);
+    if(!Number.isNaN(qp) && qp > 0) return qp;
+  }catch(e){}
   return null;
 }
 async function getIntradayPrice(symbol){
-  try{ const id = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=compact&apikey=${API_KEY}`); const series = id["Time Series (5min)"]; if(!series) return null; const latestKey = Object.keys(series)[0]; const ip = parseFloat(series[latestKey]["4. close"]); if(!Number.isNaN(ip) && ip > 0) return ip; }catch(e){}
+  try{
+    const id = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=compact&apikey=${API_KEY}`);
+    const series = id["Time Series (5min)"];
+    if(!series) return null;
+    const latestKey = Object.keys(series)[0];
+    const ip = parseFloat(series[latestKey]["4. close"]);
+    if(!Number.isNaN(ip) && ip > 0) return ip;
+  }catch(e){}
   return null;
 }
 async function getBestAvailablePrice(symbol, closes){
-  const q = await getGlobalQuotePrice(symbol); if(q) return {price:q, source:"Global Quote"};
-  const i = await getIntradayPrice(symbol); if(i) return {price:i, source:"Intraday"};
+  const q = await getGlobalQuotePrice(symbol);
+  if(q) return {price:q, source:"Global Quote"};
+  const i = await getIntradayPrice(symbol);
+  if(i) return {price:i, source:"Intraday"};
   if(closes && closes.length) return {price:closes[0], source:"Daily Close"};
   return {price:null, source:"Unavailable"};
 }
 
 function avg(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
-function nextFridayFrom(date){ const d = new Date(date); const day = d.getDay(); const diff = (5 - day + 7) % 7; d.setDate(d.getDate() + (diff === 0 ? 7 : diff)); return d; }
+function nextFridayFrom(date){
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = (5 - day + 7) % 7;
+  d.setDate(d.getDate() + (diff === 0 ? 7 : diff));
+  return d;
+}
 function formatDate(d){ return d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
-function getDTE(expiration){ if(!expiration) return null; const today = new Date(); today.setHours(0,0,0,0); const exp = new Date(expiration + "T00:00:00"); return Math.ceil((exp - today)/(1000*60*60*24)); }
-
+function getDTE(expiration){
+  if(!expiration) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const exp = new Date(expiration + "T00:00:00");
+  return Math.ceil((exp - today)/(1000*60*60*24));
+}
 function buildExpirationChoices(confidence, theta){
-  const today = new Date(); const weekly = nextFridayFrom(today); const biweekly = new Date(weekly); biweekly.setDate(weekly.getDate()+7);
+  const today = new Date();
+  const weekly = nextFridayFrom(today);
+  const biweekly = new Date(weekly); biweekly.setDate(weekly.getDate()+7);
   let suggested = "5-10 Days";
   if(confidence === "High" && theta === "Low") suggested = "3-5 Days (Weekly)";
   if(theta === "High") suggested = "10-14 Days (Bi-Weekly)";
   return { suggested, weeklyLabel:`${formatDate(weekly)} (Weekly)`, biweeklyLabel:`${formatDate(biweekly)} (Bi-Weekly)` };
 }
-
 function buildContractLadder(price, direction, expectedMove, regime){
   const atm = Math.round(price), oneOtm = direction === "BUY PUT" ? atm - 1 : atm + 1, twoOtm = direction === "BUY PUT" ? atm - 2 : atm + 2;
   const premiumATM = Math.max(0.35, atm * 0.015), premium1 = Math.max(0.25, Math.abs(oneOtm) * 0.013), premium2 = Math.max(0.18, Math.abs(twoOtm) * 0.011);
-  function contractPop(strike, premium){ const breakeven = direction === "BUY PUT" ? strike - premium : strike + premium; const dist = Math.abs(price - breakeven); let p = 72 - (dist / expectedMove * 22); p = Math.max(25, Math.min(90, Math.round(p))); return {breakeven, dist, pop:p}; }
+  function contractPop(strike, premium){
+    const breakeven = direction === "BUY PUT" ? strike - premium : strike + premium;
+    const dist = Math.abs(price - breakeven);
+    let p = 72 - (dist / expectedMove * 22);
+    p = Math.max(25, Math.min(90, Math.round(p)));
+    return {breakeven, dist, pop:p};
+  }
   const atmStats = contractPop(atm, premiumATM), oneStats = contractPop(oneOtm, premium1), twoStats = contractPop(twoOtm, premium2);
   let best = {label:"ATM", strike:atm, premium:premiumATM, ...atmStats};
   const all = [{label:"ATM", strike:atm, premium:premiumATM, ...atmStats},{label:"1 OTM", strike:oneOtm, premium:premium1, ...oneStats},{label:"2 OTM", strike:twoOtm, premium:premium2, ...twoStats}];
@@ -908,7 +678,6 @@ function buildContractLadder(price, direction, expectedMove, regime){
   if(profitPotential > 130) otmGrade = "A"; else if(profitPotential > 90) otmGrade = "B";
   return { all, best, otmPreferred:{...otmPreferred,distancePct:Math.abs((otmPreferred.strike - price) / price * 100).toFixed(1),grade:otmGrade,profitPotential} };
 }
-
 function buildTimeToTarget(direction, price, breakeven, expectedMove, momentumEngine, dte){
   const distance = Math.abs(breakeven - price);
   const moveRatio = expectedMove > 0 ? expectedMove / Math.max(distance, 0.01) : 0;
@@ -928,8 +697,13 @@ function buildTimeToTarget(direction, price, breakeven, expectedMove, momentumEn
   else { window = "Unfavorable"; bias = "Unlikely Before Expiration"; }
   return {probability:score, window, bias};
 }
-
-
+function getConfidenceMeter(a){
+  let points = a.score;
+  if(a.timeTarget && typeof a.timeTarget.probability === "number") points = Math.round((a.score + a.timeTarget.probability) / 2);
+  if(points >= 82) return {label:"HIGH", color:"green"};
+  if(points >= 62) return {label:"MEDIUM", color:"yellow"};
+  return {label:"LOW", color:"red"};
+}
 function getPressureGauge(momentum, bias, flow){
   let bull = 50, bear = 50;
   if(momentum > 0) bull += Math.min(25, Math.round(momentum * 300));
@@ -942,33 +716,20 @@ function getPressureGauge(momentum, bias, flow){
   bear = Math.max(5, Math.min(95, bear));
   return {bull, bear};
 }
-
 function getPredictiveEngine(direction, momentumEngine, regime, timeTarget, volatility){
   let likelyMove = "CHOP";
   let moveStrength = "WEAK";
   let timingWindow = "MEDIUM (3-5 DAYS)";
-
-  if(direction === "BUY CALL"){
-    likelyMove = "UP";
-  }else if(direction === "BUY PUT"){
-    likelyMove = "DOWN";
-  }
-
+  if(direction === "BUY CALL") likelyMove = "UP";
+  else if(direction === "BUY PUT") likelyMove = "DOWN";
   if(timeTarget && timeTarget.probability >= 75) moveStrength = "STRONG";
   else if(timeTarget && timeTarget.probability >= 55) moveStrength = "MODERATE";
-
   if(volatility === "EXPANSION LIKELY" && moveStrength !== "WEAK") timingWindow = "SHORT (1-2 DAYS)";
   else if(regime === "BREAKOUT") timingWindow = "SHORT (1-2 DAYS)";
   else if(regime === "RANGE") timingWindow = "EXTENDED (1-2 WEEKS)";
-
-  if(momentumEngine === "Neutral"){
-    likelyMove = "CHOP";
-    moveStrength = "WEAK";
-  }
-
+  if(momentumEngine === "Neutral"){ likelyMove = "CHOP"; moveStrength = "WEAK"; }
   return {likelyMove, moveStrength, timingWindow};
 }
-
 function getTrapWarning(direction, momentumEngine, regime, edge, volatility, timeTarget){
   if(edge === "Risky" && timeTarget && timeTarget.probability < 45) return "LOW EDGE SETUP";
   if(regime === "RANGE" && volatility === "COMPRESSION") return "CHOP ZONE";
@@ -976,80 +737,63 @@ function getTrapWarning(direction, momentumEngine, regime, edge, volatility, tim
   if(direction === "BUY PUT" && momentumEngine === "BEARISH" && edge !== "Favorable") return "BEAR TRAP RISK";
   return "CLEAR";
 }
-
 function getActionEntryTiming(a){
   let label = "WAIT";
   let reason = "Setup is not ideal for immediate entry.";
   if(a.direction === "BUY CALL"){
-    if(a.momentumEngine === "STRONG BULLISH" && a.edge === "Favorable" && a.timeTarget.probability >= 65){
-      label = "ENTER NOW";
-      reason = "Bullish pressure and probability support immediate entry.";
-    }else if(a.momentumEngine.includes("BULLISH")){
-      label = "WAIT FOR RETEST";
-      reason = "Trend is positive, but a cleaner dip could improve entry.";
-    }else{
-      label = "DO NOT CHASE";
-      reason = "Momentum does not support a clean call entry.";
-    }
+    if(a.momentumEngine === "STRONG BULLISH" && a.edge === "Favorable" && a.timeTarget.probability >= 65){ label = "ENTER NOW"; reason = "Bullish pressure and probability support immediate entry."; }
+    else if(a.momentumEngine.includes("BULLISH")){ label = "WAIT FOR RETEST"; reason = "Trend is positive, but a cleaner dip could improve entry."; }
+    else { label = "DO NOT CHASE"; reason = "Momentum does not support a clean call entry."; }
   }else if(a.direction === "BUY PUT"){
-    if(a.momentumEngine === "STRONG BEARISH" && a.edge === "Favorable" && a.timeTarget.probability >= 65){
-      label = "ENTER NOW";
-      reason = "Bearish pressure and probability support immediate entry.";
-    }else if(a.momentumEngine.includes("BEARISH")){
-      label = "WAIT FOR RETEST";
-      reason = "Trend is negative, but a bounce could improve put entry.";
-    }else{
-      label = "DO NOT CHASE";
-      reason = "Momentum does not support a clean put entry.";
-    }
+    if(a.momentumEngine === "STRONG BEARISH" && a.edge === "Favorable" && a.timeTarget.probability >= 65){ label = "ENTER NOW"; reason = "Bearish pressure and probability support immediate entry."; }
+    else if(a.momentumEngine.includes("BEARISH")){ label = "WAIT FOR RETEST"; reason = "Trend is negative, but a bounce could improve put entry."; }
+    else { label = "DO NOT CHASE"; reason = "Momentum does not support a clean put entry."; }
   }
   return {label, reason};
 }
-
-
 function getIncomeMode(a){
-  let strategy = "BUY PREMIUM";
-  let incomeSignal = "OFF";
-  let spreadType = "NONE";
-  let rationale = "Momentum setup favors buying options.";
-  let maxRisk = "Use existing buy-side sizing.";
-  let maxProfit = "Open-ended";
-  let pop = a.pop + "%";
-  let shortStrike = "N/A";
-  let longStrike = "N/A";
-
+  let strategy = "BUY PREMIUM", incomeSignal = "OFF", spreadType = "NONE";
+  let rationale = "Momentum setup favors buying options.", maxRisk = "Use existing buy-side sizing.", maxProfit = "Open-ended";
+  let pop = a.pop + "%", shortStrike = "N/A", longStrike = "N/A";
   const strike = a.strike;
   const isChop = a.trapWarning === "CHOP ZONE" || a.predictiveEngine?.likelyMove === "CHOP" || a.regime === "RANGE";
   const lowEdge = a.trapWarning === "LOW EDGE SETUP";
   const mediumConf = a.confidenceMeter?.label === "MEDIUM" || a.confidenceMeter?.label === "LOW";
-
   if((isChop || lowEdge) && mediumConf){
-    strategy = "SELL PREMIUM";
-    incomeSignal = "ON";
+    strategy = "SELL PREMIUM"; incomeSignal = "ON";
     pop = Math.max(55, Math.min(88, a.timeTarget?.probability || 60)) + "%";
-
     if(a.bias === "Bullish" || a.direction === "BUY CALL"){
-      spreadType = "BULL PUT SPREAD";
-      shortStrike = Math.max(1, strike - 1);
-      longStrike = Math.max(1, strike - 3);
+      spreadType = "BULL PUT SPREAD"; shortStrike = Math.max(1, strike - 1); longStrike = Math.max(1, strike - 3);
       rationale = "Bullish-to-neutral setup with chop/range conditions favors premium selling.";
     }else if(a.bias === "Bearish" || a.direction === "BUY PUT"){
-      spreadType = "BEAR CALL SPREAD";
-      shortStrike = strike + 1;
-      longStrike = strike + 3;
+      spreadType = "BEAR CALL SPREAD"; shortStrike = strike + 1; longStrike = strike + 3;
       rationale = "Bearish-to-neutral setup with chop/range conditions favors premium selling.";
     }else{
-      spreadType = "WAIT / NO SPREAD";
-      rationale = "Income mode found no clean directional edge for a spread.";
+      spreadType = "WAIT / NO SPREAD"; rationale = "Income mode found no clean directional edge for a spread.";
     }
-
-    if(spreadType !== "WAIT / NO SPREAD"){
-      maxRisk = "~ width of spread minus credit";
-      maxProfit = "~ credit received upfront";
-    }
+    if(spreadType !== "WAIT / NO SPREAD"){ maxRisk = "~ width of spread minus credit"; maxProfit = "~ credit received upfront"; }
   }
-
   return {strategy, incomeSignal, spreadType, rationale, maxRisk, maxProfit, pop, shortStrike, longStrike};
+}
+function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
+  const pnl = typeof approxPnLPercent === "number" ? approxPnLPercent : null;
+  const ttt = typeof timeTarget?.probability === "number" ? timeTarget.probability : null;
+  let action = "HOLD FULL POSITION", reason = "No scaling action needed yet.", runnerPlan = "No runner plan yet.", color = "blue";
+  if(status === "LOCK PROFITS"){
+    if(pnl !== null && pnl >= 300){ action = "SELL 75% / HOLD 25% RUNNER"; reason = "Large gain is on the table. Lock most of it and leave a runner."; runnerPlan = "Keep 25% only if momentum stays aligned."; color = "green"; }
+    else if(pnl !== null && pnl >= 100){ action = "SELL 50% / HOLD 50% RUNNER"; reason = "Strong gain reached. Bank partial profits and let some ride."; runnerPlan = "Keep half only while price stays above the profit zone."; color = "green"; }
+    else { action = "SELL 33% / WATCH CLOSELY"; reason = "Trade entered profit zone, but move is not yet extended."; runnerPlan = "Keep the rest only if time-to-target stays healthy."; color = "yellow"; }
+  }else if(status === "TARGET LOCKED"){
+    if(pnl !== null && pnl >= 150){ action = "SELL 25% / HOLD 75%"; reason = "You have a strong winner. Trim a little and keep most on."; runnerPlan = "Keep 75% as long as momentum and time still support the move."; color = "green"; }
+    else if(ttt !== null && ttt >= 70){ action = "HOLD / NO SCALE YET"; reason = "Probability remains strong. Let the position work."; runnerPlan = "No trim needed unless momentum weakens."; color = "green"; }
+    else { action = "SELL 25% / REDUCE RISK"; reason = "Setup still works, but taking a little off reduces risk."; runnerPlan = "Keep the rest only while the signal stays strong."; color = "yellow"; }
+  }else if(status === "STALKING"){
+    if(dte !== null && dte <= 2){ action = "NO ADDING / TIGHT WATCH"; reason = "Expiration is close. Avoid adding size here."; runnerPlan = "Exit quickly if the setup weakens."; color = "yellow"; }
+    else { action = "HOLD SMALL / NO SCALE"; reason = "Position still needs confirmation before scaling out."; runnerPlan = "Wait for stronger confirmation before trimming or adding."; color = "blue"; }
+  }else if(status === "STRIKE NOW"){
+    action = "EXIT POSITION"; reason = "The app is warning that the risk now outweighs the upside."; runnerPlan = "No runner suggested."; color = "red";
+  }
+  return {action, reason, runnerPlan, color};
 }
 
 function analyze(closes, livePrice){
@@ -1067,18 +811,26 @@ function analyze(closes, livePrice){
   let volatility = "NORMAL"; if(range5 > range20 * 0.4) volatility = "EXPANSION LIKELY"; if(range5 < range20 * 0.2) volatility = "COMPRESSION";
   let flow = "NEUTRAL"; if(momentum > 0.05 && price > avg20) flow = "STRONG ACCUMULATION"; else if(momentum > 0.02) flow = "ACCUMULATION"; else if(momentum < -0.05 && price < avg20) flow = "STRONG SELLING"; else if(momentum < -0.02) flow = "SELLING";
   let regime = "RANGE"; if(volatility === "EXPANSION LIKELY" && Math.abs(momentum) > 0.03) regime = "BREAKOUT"; else if(Math.abs(momentum) > 0.02) regime = "TREND";
+
   const atm = Math.round(price), premium = Math.max(0.35, atm * 0.015), breakeven = direction === "BUY PUT" ? atm - premium : atm + premium, dist = Math.abs(breakeven - price);
   let pop = 70 - (dist / expectedMove * 20); pop = Math.max(30, Math.min(90, Math.round(pop)));
   let edge = "Neutral"; if(expectedMove > dist * 1.2) edge = "Favorable"; if(expectedMove < dist) edge = "Risky";
   let theta = "Low"; if(edge === "Risky") theta = "High";
+
   const expirationPack = buildExpirationChoices(confidence, theta), ladder = buildContractLadder(price, direction, expectedMove, regime), timeTarget = buildTimeToTarget(direction, price, breakeven, expectedMove, momentumEngine, null);
   let score = 50; if(bias !== "Neutral") score += 10; if(confidence === "High") score += 20; if(edge === "Favorable") score += 15; if(volatility === "EXPANSION LIKELY") score += 10; if(timeTarget.probability >= 70) score += 5; score = Math.min(100, score);
   let grade = "C"; if(score > 90) grade = "A+"; else if(score > 80) grade = "A"; else if(score > 70) grade = "B";
   let tradeFilter = "PASS"; if(grade === "C" || direction === "WAIT") tradeFilter = "FAIL";
+
   let contracts = 1, allocation = "5%", risk = "Low";
-  if(grade === "A+" && confidence === "High"){ contracts = 5; allocation = "25%"; risk = "High"; } else if(grade === "A"){ contracts = 3; allocation = "18%"; risk = "Moderate"; } else if(grade === "B"){ contracts = 2; allocation = "10%"; risk = "Moderate"; } else { contracts = 0; allocation = "0%"; risk = "Avoid"; }
+  if(grade === "A+" && confidence === "High"){ contracts = 5; allocation = "25%"; risk = "High"; }
+  else if(grade === "A"){ contracts = 3; allocation = "18%"; risk = "Moderate"; }
+  else if(grade === "B"){ contracts = 2; allocation = "10%"; risk = "Moderate"; }
+  else { contracts = 0; allocation = "0%"; risk = "Avoid"; }
+
   let optimalExit = confidence === "High" ? "+65%" : "+50%", runnerTarget = confidence === "High" ? "+120%" : "+100%", thetaKill = theta === "High" ? "1 Day" : "2-3 Days";
   let liquidity = "Moderate", spreadRisk = "Medium", executionGrade = "B"; if(price > 50){ liquidity = "High"; spreadRisk = "Low"; executionGrade = "A"; } else if(price < 15){ liquidity = "Low"; spreadRisk = "High"; executionGrade = "C"; }
+
   const result = {price:price.toFixed(2),bias,direction,confidence,score,grade,tradeFilter,contracts,allocation,risk,strike:atm,pop,expiration:expirationPack.suggested,weeklyLabel:expirationPack.weeklyLabel,biweeklyLabel:expirationPack.biweeklyLabel,bestContract:ladder.best,otmPreferred:ladder.otmPreferred,ladder:ladder.all,breakeven:breakeven.toFixed(2),dist:dist.toFixed(2),expectedMove:expectedMove.toFixed(2),edge,theta,momentumEngine,gamma,smartMoney,volatility,flow,regime,optimalExit,runnerTarget,thetaKill,liquidity,spreadRisk,executionGrade,timeTarget};
   result.confidenceMeter = getConfidenceMeter(result);
   result.pressureGauge = getPressureGauge(momentum, bias, flow);
@@ -1089,74 +841,30 @@ function analyze(closes, livePrice){
   return result;
 }
 
+function buildSmartAlerts(results){
+  const alerts = [];
+  results.forEach(r=>{
+    const live = parseFloat(String(r.livePrice).replace("$",""));
+    const breakeven = parseFloat(r.breakeven);
+    const dteNum = typeof r.dte === "number" ? r.dte : parseInt(r.dte,10);
+    const ttt = typeof r.timeTarget?.probability === "number" ? r.timeTarget.probability : null;
 
-function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
-  const pnl = typeof approxPnLPercent === "number" ? approxPnLPercent : null;
-  const ttt = typeof timeTarget?.probability === "number" ? timeTarget.probability : null;
-  let action = "HOLD FULL POSITION";
-  let reason = "No scaling action needed yet.";
-  let runnerPlan = "No runner plan yet.";
-  let color = "blue";
-
-  if(status === "LOCK PROFITS"){
-    if(pnl !== null && pnl >= 300){
-      action = "SELL 75% / HOLD 25% RUNNER";
-      reason = "Large gain is on the table. Lock most of it and leave a runner.";
-      runnerPlan = "Keep 25% only if momentum stays aligned.";
-      color = "green";
-    }else if(pnl !== null && pnl >= 100){
-      action = "SELL 50% / HOLD 50% RUNNER";
-      reason = "Strong gain reached. Bank partial profits and let some ride.";
-      runnerPlan = "Keep half only while price stays above the profit zone.";
-      color = "green";
-    }else{
-      action = "SELL 33% / WATCH CLOSELY";
-      reason = "Trade entered profit zone, but move is not yet extended.";
-      runnerPlan = "Keep the rest only if time-to-target stays healthy.";
-      color = "yellow";
+    if(!Number.isNaN(live) && !Number.isNaN(breakeven)){
+      const hitBE = (r.type === "CALL" && live >= breakeven) || (r.type === "PUT" && live <= breakeven);
+      if(hitBE) alerts.push({level:"green", message:`BREAKEVEN ALERT // ${r.ticker} reached breakeven.`});
     }
-  }else if(status === "TARGET LOCKED"){
-    if(pnl !== null && pnl >= 150){
-      action = "SELL 25% / HOLD 75%";
-      reason = "You have a strong winner. Trim a little and keep most on.";
-      runnerPlan = "Keep 75% as long as momentum and time still support the move.";
-      color = "green";
-    }else if(ttt !== null && ttt >= 70){
-      action = "HOLD / NO SCALE YET";
-      reason = "Probability remains strong. Let the position work.";
-      runnerPlan = "No trim needed unless momentum weakens.";
-      color = "green";
-    }else{
-      action = "SELL 25% / REDUCE RISK";
-      reason = "Setup still works, but taking a little off reduces risk.";
-      runnerPlan = "Keep the rest only while the signal stays strong.";
-      color = "yellow";
-    }
-  }else if(status === "STALKING"){
-    if(dte !== null && dte <= 2){
-      action = "NO ADDING / TIGHT WATCH";
-      reason = "Expiration is close. Avoid adding size here.";
-      runnerPlan = "Exit quickly if the setup weakens.";
-      color = "yellow";
-    }else{
-      action = "HOLD SMALL / NO SCALE";
-      reason = "Position still needs confirmation before scaling out.";
-      runnerPlan = "Wait for stronger confirmation before trimming or adding.";
-      color = "blue";
-    }
-  }else if(status === "STRIKE NOW"){
-    action = "EXIT POSITION";
-    reason = "The app is warning that the risk now outweighs the upside.";
-    runnerPlan = "No runner suggested.";
-    color = "red";
-  }else{
-    action = "HOLD / REASSESS";
-    reason = "No specific scale signal is active.";
-    runnerPlan = "Recheck on the next scan.";
-    color = "blue";
-  }
-
-  return {action, reason, runnerPlan, color};
+    if(r.status === "LOCK PROFITS") alerts.push({level:"green", message:`PROFIT TARGET ALERT // ${r.ticker} is in lock profits zone.`});
+    if(r.reason && r.reason.toUpperCase().includes("MOMENTUM TURNED AGAINST THE CALL")) alerts.push({level:"red", message:`MOMENTUM FLIP ALERT // ${r.ticker} call momentum turned bearish.`});
+    if(r.reason && r.reason.toUpperCase().includes("MOMENTUM TURNED AGAINST THE PUT")) alerts.push({level:"red", message:`MOMENTUM FLIP ALERT // ${r.ticker} put momentum turned bullish.`});
+    if(!Number.isNaN(dteNum) && dteNum <= 2) alerts.push({level:"yellow", message:`TIME RISK ALERT // ${r.ticker} has ${dteNum} day${dteNum===1?"":"s"} left to expiration.`});
+    if(ttt !== null && ttt < 40) alerts.push({level:"red", message:`PROBABILITY DROP ALERT // ${r.ticker} time-to-target fell to ${ttt}%.`});
+    if(r.trapWarning && r.trapWarning !== "CLEAR") alerts.push({level:"yellow", message:`TRAP WARNING // ${r.ticker} ${r.trapWarning}.`});
+    if(r.profitScaling && r.profitScaling.action && r.profitScaling.action.includes("SELL")) alerts.push({level:"green", message:`SCALING ALERT // ${r.ticker} ${r.profitScaling.action}.`});
+    if(r.profitScaling && r.profitScaling.action === "EXIT POSITION") alerts.push({level:"red", message:`EXIT ALERT // ${r.ticker} exit position.`});
+    if(r.incomeMode && r.incomeMode.incomeSignal === "ON" && r.incomeMode.spreadType !== "WAIT / NO SPREAD") alerts.push({level:"green", message:`INCOME MODE ALERT // ${r.ticker} ${r.incomeMode.spreadType}.`});
+  });
+  const seen = new Set();
+  return alerts.filter(a=>{ if(seen.has(a.message)) return false; seen.add(a.message); return true; }).slice(0,8);
 }
 
 function analyzePosition(position, livePrice, ai, priceSource){
@@ -1169,6 +877,7 @@ function analyzePosition(position, livePrice, ai, priceSource){
   if(dte !== null){ if(dte <= 1){ timeRisk = "Extreme"; expirationFit = "Very Short"; } else if(dte <= 3){ timeRisk = "High"; expirationFit = "Tight"; } else if(dte <= 7){ timeRisk = "Moderate"; expirationFit = "Good"; } else { timeRisk = "Low"; expirationFit = "Good"; } }
   const direction = type === "CALL" ? "BUY CALL" : "BUY PUT", timeTarget = buildTimeToTarget(direction, price, breakeven, expectedMoveNum, ai.momentumEngine, dte);
   let status = "STALKING", reason = "Setup still active but needs close monitoring", cardClass = "weak-alert";
+
   if(type === "CALL"){
     if((dte !== null && dte <= 1 && price < breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL" || timeTarget.probability < 35){ status = "STRIKE NOW"; reason = "Not enough time or probability left for the call to work"; cardClass = "sell-alert"; }
     else if(throughTargetCall){ status = "LOCK PROFITS"; reason = "Price pushed through the call profit zone"; cardClass = "sell-alert"; }
@@ -1187,72 +896,28 @@ function analyzePosition(position, livePrice, ai, priceSource){
   return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode};
 }
 
-function signalClass(value){
-  if(typeof value !== "string") return "blue";
-  if(value.includes("TARGET LOCKED") || value.includes("TAKE PROFIT") || value.includes("BUY CALL") || value.includes("BULLISH") || value.includes("ACCUMULATION") || value.includes("PASS") || value === "A+" || value === "A" || value === "Favorable" || value === "Low" || value.includes("Likely")) return "green";
-  if(value.includes("STRIKE NOW") || value.includes("CUT LOSS") || value.includes("LOCK PROFITS") || value.includes("BUY PUT") || value.includes("BEARISH") || value.includes("SELLING") || value.includes("FAIL") || value === "C" || value === "Risky" || value.includes("Extreme") || value.includes("High") || value.includes("Unlikely")) return "red";
-  if(value.includes("STALKING") || value.includes("WAIT") || value === "B" || value === "Medium" || value.includes("BALANCED") || value.includes("RANGE") || value.includes("NORMAL") || value.includes("Moderate") || value.includes("Good") || value.includes("Tight") || value.includes("Possible")) return "yellow";
-  return "blue";
-}
+function analyzeSpreadPosition(position, livePrice, ai){
+  const width = Math.abs(position.shortStrike - position.longStrike);
+  const dte = getDTE(position.expiration);
+  let spreadValue = position.credit, status = "HOLD", reason = "Spread remains in a workable range.", cardClass = "weak-alert";
+  let profitPct = 0, maxProfit = position.credit, maxLoss = Math.max(0.01, width - position.credit);
 
-function renderThinkingCard(lines){
-  document.getElementById("output").innerHTML = `<div class="card"><div class="section-title">Predator Engine</div>${lines.map(x=>`<div class="metric">${x}</div>`).join("")}</div>`;
-}
+  if(position.type === "BULL PUT SPREAD"){
+    if(livePrice > position.shortStrike){ spreadValue = Math.max(0.05, position.credit * 0.2); status = "TAKE PROFIT"; reason = "Price is above the short put strike and the spread is likely decaying in your favor."; cardClass = "hold-alert"; }
+    else if(livePrice <= position.shortStrike && livePrice > position.longStrike){ spreadValue = Math.min(width, Math.max(position.credit, width * 0.55)); status = "HOLD"; reason = "Price is between the strikes. Spread is under pressure but not broken."; }
+    else { spreadValue = width; status = "CUT LOSS"; reason = "Price moved through the long strike and max spread risk is near."; cardClass = "sell-alert"; }
+  }else{
+    if(livePrice < position.shortStrike){ spreadValue = Math.max(0.05, position.credit * 0.2); status = "TAKE PROFIT"; reason = "Price is below the short call strike and the spread is likely decaying in your favor."; cardClass = "hold-alert"; }
+    else if(livePrice >= position.shortStrike && livePrice < position.longStrike){ spreadValue = Math.min(width, Math.max(position.credit, width * 0.55)); status = "HOLD"; reason = "Price is between the strikes. Spread is under pressure but not broken."; }
+    else { spreadValue = width; status = "CUT LOSS"; reason = "Price moved through the long strike and max spread risk is near."; cardClass = "sell-alert"; }
+  }
 
+  const currentPnL = position.credit - spreadValue;
+  profitPct = Math.round((currentPnL / Math.max(0.01, maxProfit)) * 100);
+  if(dte !== null && dte <= 2 && status === "HOLD") reason = "Expiration is close. Consider closing if you want to avoid late risk.";
+  if(dte !== null && dte <= 1 && status !== "TAKE PROFIT"){ status = "CUT LOSS"; reason = "Expiration is too close to comfortably hold this spread."; cardClass = "sell-alert"; }
 
-function buildSmartAlerts(results){
-  const alerts = [];
-  results.forEach(r=>{
-    const live = parseFloat(String(r.livePrice).replace("$",""));
-    const breakeven = parseFloat(r.breakeven);
-    const dteNum = typeof r.dte === "number" ? r.dte : parseInt(r.dte,10);
-    const ttt = typeof r.timeTarget?.probability === "number" ? r.timeTarget.probability : null;
-
-    if(!Number.isNaN(live) && !Number.isNaN(breakeven)){
-      const hitBE = (r.type === "CALL" && live >= breakeven) || (r.type === "PUT" && live <= breakeven);
-      if(hitBE){
-        alerts.push({level:"green", message:`BREAKEVEN ALERT // ${r.ticker} reached breakeven.`});
-      }
-    }
-
-    if(r.status === "LOCK PROFITS"){
-      alerts.push({level:"green", message:`PROFIT TARGET ALERT // ${r.ticker} is in lock profits zone.`});
-    }
-
-    if(r.type === "CALL" && r.reason && r.reason.toUpperCase().includes("MOMENTUM TURNED AGAINST THE CALL")){
-      alerts.push({level:"red", message:`MOMENTUM FLIP ALERT // ${r.ticker} call momentum turned bearish.`});
-    }
-    if(r.type === "PUT" && r.reason && r.reason.toUpperCase().includes("MOMENTUM TURNED AGAINST THE PUT")){
-      alerts.push({level:"red", message:`MOMENTUM FLIP ALERT // ${r.ticker} put momentum turned bullish.`});
-    }
-
-    if(!Number.isNaN(dteNum) && dteNum <= 2){
-      alerts.push({level:"yellow", message:`TIME RISK ALERT // ${r.ticker} has ${dteNum} day${dteNum===1?"":"s"} left to expiration.`});
-    }
-
-    if(ttt !== null && ttt < 40){
-      alerts.push({level:"red", message:`PROBABILITY DROP ALERT // ${r.ticker} time-to-target fell to ${ttt}%.`});
-    }
-    if(r.trapWarning && r.trapWarning !== "CLEAR"){
-      alerts.push({level:"yellow", message:`TRAP WARNING // ${r.ticker} ${r.trapWarning}.`});
-    }
-    if(r.profitScaling && r.profitScaling.action && r.profitScaling.action.includes("SELL")){
-      alerts.push({level:"green", message:`SCALING ALERT // ${r.ticker} ${r.profitScaling.action}.`});
-    }
-    if(r.profitScaling && r.profitScaling.action === "EXIT POSITION"){
-      alerts.push({level:"red", message:`EXIT ALERT // ${r.ticker} exit position.`});
-    }
-    if(r.incomeMode && r.incomeMode.incomeSignal === "ON" && r.incomeMode.spreadType !== "WAIT / NO SPREAD"){
-      alerts.push({level:"green", message:`INCOME MODE ALERT // ${r.ticker} ${r.incomeMode.spreadType}.`});
-    }
-  });
-
-  const seen = new Set();
-  return alerts.filter(a=>{
-    if(seen.has(a.message)) return false;
-    seen.add(a.message);
-    return true;
-  }).slice(0,8);
+  return {ticker:position.ticker,type:position.type,shortStrike:position.shortStrike,longStrike:position.longStrike,credit:position.credit,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,livePrice:livePrice.toFixed(2),estSpreadValue:spreadValue.toFixed(2),maxProfit:maxProfit.toFixed(2),maxLoss:maxLoss.toFixed(2),profitPct,status,reason,cardClass,predictiveEngine:ai.predictiveEngine,trapWarning:ai.trapWarning};
 }
 
 function renderPositionCards(results){
@@ -1266,22 +931,22 @@ function renderPositionCards(results){
       <div class="metric"><b>DTE:</b> ${r.dte}</div>
       <div class="metric"><b>Time Risk:</b> <span class="${signalClass(r.timeRisk)}">${r.timeRisk}</span></div>
       <div class="metric"><b>Expiration Fit:</b> <span class="${signalClass(r.expirationFit)}">${r.expirationFit}</span></div>
-      <div class="metric"><b>Time-to-Target:</b> ${r.timeTarget.probability}${r.timeTarget.probability==="N/A"?"":"%"}</div>
+      <div class="metric"><b>Time-to-Target:</b> ${r.timeTarget.probability}%</div>
       <div class="metric"><b>Time Window:</b> <span class="${signalClass(r.timeTarget.window)}">${r.timeTarget.window}</span></div>
       <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(r.timeTarget.bias)}">${r.timeTarget.bias}</span></div>
-      <div class="metric"><b>Likely Move:</b> ${r.predictiveEngine ? r.predictiveEngine.likelyMove : "N/A"}</div>
+      <div class="metric"><b>Likely Move:</b> ${r.predictiveEngine.likelyMove}</div>
       <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning || "CLEAR")}">${r.trapWarning || "CLEAR"}</span></div>
       <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
       <div class="divider"></div>
       <div class="section-title">Income Mode</div>
-      <div class="metric"><b>Mode:</b> ${r.incomeMode ? r.incomeMode.strategy : "BUY PREMIUM"}</div>
-      <div class="metric"><b>Spread:</b> ${r.incomeMode ? r.incomeMode.spreadType : "NONE"}</div>
-      <div class="metric"><b>Income Read:</b> ${r.incomeMode ? r.incomeMode.rationale : "No income setup."}</div>
+      <div class="metric"><b>Mode:</b> ${r.incomeMode.strategy}</div>
+      <div class="metric"><b>Spread:</b> ${r.incomeMode.spreadType}</div>
+      <div class="metric"><b>Income Read:</b> ${r.incomeMode.rationale}</div>
       <div class="divider"></div>
       <div class="section-title">Profit Scaling System</div>
-      <div class="metric"><b>Scale Action:</b> <span class="${r.profitScaling ? r.profitScaling.color : "blue"}">${r.profitScaling ? r.profitScaling.action : "HOLD / REASSESS"}</span></div>
-      <div class="metric"><b>Scale Read:</b> ${r.profitScaling ? r.profitScaling.reason : "No scale signal."}</div>
-      <div class="metric"><b>Runner Plan:</b> ${r.profitScaling ? r.profitScaling.runnerPlan : "Recheck next scan."}</div>
+      <div class="metric"><b>Scale Action:</b> <span class="${r.profitScaling.color}">${r.profitScaling.action}</span></div>
+      <div class="metric"><b>Scale Read:</b> ${r.profitScaling.reason}</div>
+      <div class="metric"><b>Runner Plan:</b> ${r.profitScaling.runnerPlan}</div>
       <div class="metric"><b>Reason:</b> ${r.reason}</div>
       <div class="metric"><b>Price Source:</b> ${r.priceSource}</div>
       ${r.approxPnLPercent !== null ? `<div class="metric"><b>Approx P/L:</b> ${r.approxPnLPercent > 0 ? "+" : ""}${r.approxPnLPercent}%</div>` : ""}
@@ -1289,58 +954,9 @@ function renderPositionCards(results){
   `).join("");
 }
 
-function applyPortfolioAlertSummary(results, sourceLabel){
-  let redAlerts = 0, yellowAlerts = 0;
-  results.forEach(m=>{
-    if(m.status === "STRIKE NOW" || m.status === "LOCK PROFITS" || m.status === "UNAVAILABLE") redAlerts++;
-    else if(m.status === "STALKING") yellowAlerts++;
-  });
-  if(redAlerts > 0) pushAlert(`${sourceLabel}: ${redAlerts} target${redAlerts>1?'s':''} need immediate action.`, "red");
-  else if(yellowAlerts > 0) pushAlert(`${sourceLabel}: ${yellowAlerts} target${yellowAlerts>1?'s':''} are stalking.`, "yellow");
-  else pushAlert(`${sourceLabel}: all saved targets look stable.`, "green");
-  const allAlerts = buildSmartAlerts(results).concat(getRiskControlAdvice());
-  renderActiveAlertsPanel(allAlerts);
-}
-
-
-function getConfidenceMeter(a){
-  let points = a.score;
-  if(a.timeTarget && typeof a.timeTarget.probability === "number") points = Math.round((a.score + a.timeTarget.probability) / 2);
-  if(points >= 82) return {label:"HIGH", color:"green"};
-  if(points >= 62) return {label:"MEDIUM", color:"yellow"};
-  return {label:"LOW", color:"red"};
-}
-
-function getEntryTiming(a){
-  let label = "WAIT";
-  let reason = "Setup is not ideal for entry yet.";
-  if(a.direction === "BUY CALL"){
-    if(a.momentumEngine === "STRONG BULLISH" && a.edge === "Favorable"){
-      label = "GOOD ENTRY ZONE";
-      reason = "Bullish pressure and favorable edge support entry.";
-    }else if(a.momentumEngine === "BULLISH"){
-      label = "WATCH FOR PULLBACK";
-      reason = "Trend is positive, but a cleaner dip could improve entry.";
-    }else{
-      label = "OVEREXTENDED / WAIT";
-      reason = "Momentum is not strong enough for a clean call entry.";
-    }
-  }else if(a.direction === "BUY PUT"){
-    if(a.momentumEngine === "STRONG BEARISH" && a.edge === "Favorable"){
-      label = "GOOD ENTRY ZONE";
-      reason = "Bearish pressure and favorable edge support entry.";
-    }else if(a.momentumEngine === "BEARISH"){
-      label = "WATCH FOR POP";
-      reason = "Trend is negative, but a bounce could improve put entry.";
-    }else{
-      label = "OVEREXTENDED / WAIT";
-      reason = "Momentum is not strong enough for a clean put entry.";
-    }
-  }
-  return {label, reason};
-}
-
 function renderFull(ticker, a){
+  const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
+  const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `<div class="card">
     <div class="section-title">Predator Trade Setup</div>
     <div class="metric"><b>Ticker:</b> ${ticker}</div>
@@ -1379,8 +995,8 @@ function renderFull(ticker, a){
     <div class="bar"><div class="fill" style="width:${a.pressureGauge.bear}%"></div></div>
     <div class="divider"></div>
     <div class="section-title">Income Mode</div>
-    <div class="metric"><b>Strategy Mode:</b> <span class="${signalClass(a.incomeMode.strategy === "SELL PREMIUM" ? "MEDIUM" : "BUY CALL")}">${a.incomeMode.strategy}</span></div>
-    <div class="metric"><b>Income Signal:</b> <span class="${a.incomeMode.incomeSignal === "ON" ? "green" : "blue"}">${a.incomeMode.incomeSignal}</span></div>
+    <div class="metric"><b>Strategy Mode:</b> ${a.incomeMode.strategy}</div>
+    <div class="metric"><b>Income Signal:</b> <span class="${a.incomeMode.incomeSignal==='ON' ? 'green':'blue'}">${a.incomeMode.incomeSignal}</span></div>
     <div class="metric"><b>Spread Type:</b> ${a.incomeMode.spreadType}</div>
     <div class="metric"><b>Short Strike:</b> ${a.incomeMode.shortStrike}</div>
     <div class="metric"><b>Long Strike:</b> ${a.incomeMode.longStrike}</div>
@@ -1391,8 +1007,8 @@ function renderFull(ticker, a){
     <div class="divider"></div>
     <div class="section-title">Risk Control</div>
     <div class="metric"><b>Max Risk Per Trade:</b> $${riskSettings.maxRiskPerTrade}</div>
-    <div class="metric"><b>Suggested Risk Posture:</b> ${a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT"}</div>
-    <div class="metric"><b>Discipline Note:</b> ${a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve."}</div>
+    <div class="metric"><b>Suggested Risk Posture:</b> ${riskPosture}</div>
+    <div class="metric"><b>Discipline Note:</b> ${discipline}</div>
     <div class="divider"></div>
     <div class="section-title">Position Sizing</div>
     <div class="metric"><b>Suggested Contracts:</b> ${a.contracts}</div>
@@ -1441,12 +1057,29 @@ function renderCompact(ticker, a){
   return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
+function applyPortfolioAlertSummary(results, sourceLabel){
+  let redAlerts = 0, yellowAlerts = 0;
+  results.forEach(m=>{
+    if(m.status === "STRIKE NOW" || m.status === "LOCK PROFITS" || m.status === "UNAVAILABLE") redAlerts++;
+    else if(m.status === "STALKING") yellowAlerts++;
+  });
+  if(redAlerts > 0) pushAlert(`${sourceLabel}: ${redAlerts} target${redAlerts>1?'s':''} need immediate action.`, "red");
+  else if(yellowAlerts > 0) pushAlert(`${sourceLabel}: ${yellowAlerts} target${yellowAlerts>1?'s':''} are stalking.`, "yellow");
+  else pushAlert(`${sourceLabel}: all saved targets look stable.`, "green");
+  const allAlerts = buildSmartAlerts(results).concat(getRiskControlAdvice());
+  renderActiveAlertsPanel(allAlerts);
+}
+
 async function runAI(){
-  const ticker = normalizeTicker(document.getElementById("ticker").value), output = document.getElementById("output"), mode = document.getElementById("uiMode").value;
+  const ticker = normalizeTicker(document.getElementById("ticker").value);
+  const output = document.getElementById("output");
+  const mode = document.getElementById("uiMode").value;
   if(!ticker){ output.innerHTML = "<div class='card'>Enter a ticker first.</div>"; return; }
   renderThinkingCard(["TRACKING MARKET MOVEMENT...","LOCKING ONTO TARGET...","CALCULATING STRIKE PROBABILITY..."]);
-  const closes = await getHistory(ticker); if(!closes){ output.innerHTML = "<div class='card'>Data unavailable.</div>"; return; }
-  const pricePack = await getBestAvailablePrice(ticker, closes); if(pricePack.price === null){ output.innerHTML = "<div class='card'>Price unavailable.</div>"; return; }
+  const closes = await getHistory(ticker);
+  if(!closes){ output.innerHTML = "<div class='card'>Data unavailable.</div>"; return; }
+  const pricePack = await getBestAvailablePrice(ticker, closes);
+  if(pricePack.price === null){ output.innerHTML = "<div class='card'>Price unavailable.</div>"; return; }
   const a = analyze(closes, pricePack.price);
   output.innerHTML = mode === "compact" ? renderCompact(ticker, a) : renderFull(ticker, a);
 }
@@ -1456,8 +1089,10 @@ async function scanList(list, title){
   let results = [];
   for(let i=0; i<list.length; i++){
     const ticker = normalizeTicker(list[i]);
-    const closes = await getHistory(ticker); if(!closes) continue;
-    const pricePack = await getBestAvailablePrice(ticker, closes); if(pricePack.price === null) continue;
+    const closes = await getHistory(ticker);
+    if(!closes) continue;
+    const pricePack = await getBestAvailablePrice(ticker, closes);
+    if(pricePack.price === null) continue;
     const a = analyze(closes, pricePack.price);
     if(a.tradeFilter === "PASS") results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability});
     await new Promise(r => setTimeout(r, 15000));
@@ -1467,16 +1102,16 @@ async function scanList(list, title){
   if(results.length === 0){ document.getElementById("output").innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`; return; }
   document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Score ${r.score} â TTT ${r.timeTarget}% â ${r.expiration}</div>`).join("")}</div>`;
 }
-
+async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
+async function scanMyWatchlist(){
+  if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; }
+  await scanList(customWatchlist, "Top Watchlist Opportunities");
+}
 
 async function findBestTrade(){
-  if(!customWatchlist.length){
-    document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>";
-    return;
-  }
+  if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; }
   renderThinkingCard(["SCANNING WATCHLIST...","RANKING TOP TARGET...","LOCKING BEST TRADE..."]);
   let best = null;
-
   for(let i=0; i<customWatchlist.length; i++){
     const ticker = normalizeTicker(customWatchlist[i]);
     const closes = await getHistory(ticker);
@@ -1485,19 +1120,11 @@ async function findBestTrade(){
     if(pricePack.price === null) continue;
     const a = analyze(closes, pricePack.price);
     if(a.tradeFilter !== "PASS") continue;
-
     const rankScore = a.score + (a.timeTarget?.probability || 0);
-    if(!best || rankScore > best.rankScore){
-      best = {ticker, a, rankScore};
-    }
+    if(!best || rankScore > best.rankScore) best = {ticker, a, rankScore};
     await new Promise(r => setTimeout(r, 15000));
   }
-
-  if(!best){
-    document.getElementById("output").innerHTML = "<div class='card'>No strong trade found in your watchlist right now.</div>";
-    return;
-  }
-
+  if(!best){ document.getElementById("output").innerHTML = "<div class='card'>No strong trade found in your watchlist right now.</div>"; return; }
   document.getElementById("output").innerHTML =
     `<div class="card hold-alert">
       <div class="section-title">Best Trade of the Day</div>
@@ -1519,9 +1146,6 @@ async function findBestTrade(){
     </div>` + (document.getElementById("uiMode").value === "compact" ? renderCompact(best.ticker, best.a) : renderFull(best.ticker, best.a));
 }
 
-async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
-async function scanMyWatchlist(){ if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; } await scanList(customWatchlist, "Top Watchlist Opportunities"); }
-
 async function scanMyPositions(){
   const output = document.getElementById("output");
   if(!savedPositions.length){ output.innerHTML = "<div class='card'>No saved positions yet.</div>"; clearActiveAlertsPanel(); return; }
@@ -1541,19 +1165,21 @@ async function scanMyPositions(){
       const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
-    const ai = analyze(closes, pricePack.price), monitor = analyzePosition(p, pricePack.price, ai, pricePack.source);
+    const ai = analyze(closes, pricePack.price);
+    const monitor = analyzePosition(p, pricePack.price, ai, pricePack.source);
     results.push(monitor); cache.results.push(monitor);
     await new Promise(r => setTimeout(r, 5000));
   }
 
-  saveLatestScanCache(cache);
+  lastScanCache = cache;
+  setStore("ai_options_last_scan_cache", lastScanCache);
   applyPortfolioAlertSummary(results, "TACTICAL LIVE SCAN");
   output.innerHTML = renderPositionCards(results);
 }
 
 function quickRecheckPositions(){
   const output = document.getElementById("output");
-  const cache = getLatestScanCache();
+  const cache = getStore("ai_options_last_scan_cache", null);
   if(!cache || !cache.results || !cache.results.length){
     output.innerHTML = "<div class='card'>No recent live scan found yet. Run <b>Live Position Scan</b> once first, then Quick Recheck will work without API calls.</div>";
     clearActiveAlertsPanel();
@@ -1584,9 +1210,66 @@ function quickRecheckPositions(){
   output.innerHTML = `<div class='card'><div class='section-title'>Quick Recheck</div><div class='metric'>Using your most recent live scan from ${new Date(cache.scannedAt).toLocaleString()}.</div><div class='metric muted'>No new API calls were used.</div><div class="pill blue">CACHE MODE</div><div class="pill green">API SAFE</div></div>` + renderPositionCards(refreshed);
 }
 
+async function scanSpreadPositions(){
+  const output = document.getElementById("output");
+  if(!savedSpreadPositions.length){ output.innerHTML = "<div class='card'>No saved spreads yet.</div>"; return; }
+  renderThinkingCard(["TRACKING SPREAD POSITIONS...","CHECKING CREDIT SPREAD RISK...","CALCULATING EXIT SIGNALS..."]);
+  let results = [];
+
+  for(let i=0; i<savedSpreadPositions.length; i++){
+    const p = savedSpreadPositions[i];
+    const closes = await getHistory(p.ticker);
+    if(!closes){
+      results.push({ticker:p.ticker,type:p.type,shortStrike:p.shortStrike,longStrike:p.longStrike,credit:p.credit,expiration:p.expiration || "Not set",dte:"N/A",livePrice:"N/A",estSpreadValue:"N/A",maxProfit:"N/A",maxLoss:"N/A",profitPct:0,status:"UNAVAILABLE",reason:"Could not load historical data for this spread.",cardClass:"sell-alert",predictiveEngine:{likelyMove:"N/A"},trapWarning:"CLEAR"});
+      continue;
+    }
+    const pricePack = await getBestAvailablePrice(p.ticker, closes);
+    if(pricePack.price === null){
+      results.push({ticker:p.ticker,type:p.type,shortStrike:p.shortStrike,longStrike:p.longStrike,credit:p.credit,expiration:p.expiration || "Not set",dte:"N/A",livePrice:"N/A",estSpreadValue:"N/A",maxProfit:"N/A",maxLoss:"N/A",profitPct:0,status:"UNAVAILABLE",reason:"Could not load price for this spread.",cardClass:"sell-alert",predictiveEngine:{likelyMove:"N/A"},trapWarning:"CLEAR"});
+      continue;
+    }
+    const ai = analyze(closes, pricePack.price);
+    results.push(analyzeSpreadPosition(p, pricePack.price, ai));
+    await new Promise(r => setTimeout(r, 5000));
+  }
+
+  const spreadAlerts = [];
+  results.forEach(r=>{
+    if(r.status === "CUT LOSS") spreadAlerts.push({level:"red", message:`SPREAD EXIT ALERT // ${r.ticker} ${r.type} cut loss.`});
+    if(r.status === "TAKE PROFIT") spreadAlerts.push({level:"green", message:`SPREAD PROFIT ALERT // ${r.ticker} ${r.type} take profit.`});
+  });
+  const allSpreadAlerts = spreadAlerts.concat(getRiskControlAdvice());
+  renderActiveAlertsPanel(allSpreadAlerts);
+  if(allSpreadAlerts.length) allSpreadAlerts.slice(0,3).forEach(a=>pushAlert(a.message, a.level));
+
+  output.innerHTML = results.map(r=>`
+    <div class="card ${r.cardClass}">
+      <div class="section-title">Spread Position Readout</div>
+      <div class="metric"><b>${r.ticker}</b> ${r.type}</div>
+      <div class="metric"><b>Strikes:</b> ${r.shortStrike} / ${r.longStrike}</div>
+      <div class="metric"><b>Credit Received:</b> ${r.credit}</div>
+      <div class="metric"><b>Live Price:</b> ${r.livePrice === "N/A" ? "N/A" : "$" + r.livePrice}</div>
+      <div class="metric"><b>Est. Spread Value:</b> ${r.estSpreadValue === "N/A" ? "N/A" : "$" + r.estSpreadValue}</div>
+      <div class="metric"><b>Max Profit:</b> ${r.maxProfit === "N/A" ? "N/A" : "$" + r.maxProfit}</div>
+      <div class="metric"><b>Max Loss:</b> ${r.maxLoss === "N/A" ? "N/A" : "$" + r.maxLoss}</div>
+      <div class="metric"><b>Profit Capture:</b> ${r.profitPct}%</div>
+      <div class="metric"><b>Expiration:</b> ${r.expiration}</div>
+      <div class="metric"><b>DTE:</b> ${r.dte}</div>
+      <div class="metric"><b>Likely Move:</b> ${r.predictiveEngine ? r.predictiveEngine.likelyMove : "N/A"}</div>
+      <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning || "CLEAR")}">${r.trapWarning || "CLEAR"}</span></div>
+      <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
+      <div class="metric"><b>Reason:</b> ${r.reason}</div>
+    </div>
+  `).join("");
+}
+
 renderWatchlist();
 renderPositions();
+renderSpreadPositions();
+renderPerformanceTracker();
+renderRiskControlSummary();
 renderAlertHistory();
+clearActiveAlertsPanel();
 </script>
 </body>
 </html>
