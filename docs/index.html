@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Signal Predator AI v34.7 Profit Scaling Edition</title>
+  <title>Signal Predator AI v34.8 Performance Tracker Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -206,7 +206,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v34.7 // profit scaling system // predictive engine // trap warnings</div>
+  <div class="subtitle">v34.8 // performance tracker // profit scaling // predictive engine</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -238,6 +238,26 @@
       <button class="secondary" onclick="testAlert()">Test Alert</button>
     </div>
     <div id="alertHistory" style="margin-top:14px;"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Performance Tracker</div>
+    <div class="metric muted">Track wins, losses, and the signals behind your trades.</div>
+    <div class="grid-2">
+      <input id="perfTicker" placeholder="Ticker">
+      <select id="perfOutcome">
+        <option value="WIN">Win</option>
+        <option value="LOSS">Loss</option>
+      </select>
+      <input id="perfEntrySignal" placeholder="Entry Signal (ENTER NOW)">
+      <input id="perfTTT" placeholder="Time-to-Target %">
+      <input id="perfDTE" placeholder="DTE at Entry">
+      <input id="perfNotes" placeholder="Notes (optional)">
+    </div>
+    <button onclick="addPerformanceTrade()">Log Trade Result</button>
+    <button class="secondary" onclick="clearPerformanceTrades()">Clear Trade Log</button>
+    <div id="performanceSummary" style="margin-top:14px;"></div>
+    <div id="performanceLog" style="margin-top:10px;"></div>
   </div>
 
   <div class="card">
@@ -296,6 +316,105 @@ let alertLog = getAlertLog();
 
 function getLatestScanCache(){ const raw = localStorage.getItem("ai_options_last_scan_cache"); if(!raw) return null; try{ return JSON.parse(raw); }catch(e){ return null; } }
 function saveLatestScanCache(data){ localStorage.setItem("ai_options_last_scan_cache", JSON.stringify(data)); }
+
+
+function getPerformanceTrades(){
+  const raw = localStorage.getItem("signal_predator_performance_log");
+  if(!raw) return [];
+  try{
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  }catch(e){
+    return [];
+  }
+}
+function savePerformanceTrades(list){
+  localStorage.setItem("signal_predator_performance_log", JSON.stringify(list.slice(0,100)));
+}
+let performanceTrades = getPerformanceTrades();
+
+function addPerformanceTrade(){
+  const ticker = normalizeTicker(document.getElementById("perfTicker").value);
+  const outcome = document.getElementById("perfOutcome").value;
+  const entrySignal = String(document.getElementById("perfEntrySignal").value || "").trim().toUpperCase();
+  const ttt = parseFloat(document.getElementById("perfTTT").value || "");
+  const dte = parseFloat(document.getElementById("perfDTE").value || "");
+  const notes = String(document.getElementById("perfNotes").value || "").trim();
+
+  if(!ticker || !entrySignal){
+    alert("Enter ticker and entry signal.");
+    return;
+  }
+
+  performanceTrades.unshift({
+    ticker,
+    outcome,
+    entrySignal,
+    ttt: Number.isNaN(ttt) ? null : ttt,
+    dte: Number.isNaN(dte) ? null : dte,
+    notes,
+    loggedAt: new Date().toISOString()
+  });
+  savePerformanceTrades(performanceTrades);
+  renderPerformanceTracker();
+
+  ["perfTicker","perfEntrySignal","perfTTT","perfDTE","perfNotes"].forEach(id => {
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("perfOutcome").value = "WIN";
+}
+
+function clearPerformanceTrades(){
+  performanceTrades = [];
+  savePerformanceTrades(performanceTrades);
+  renderPerformanceTracker();
+}
+
+function pct(n, d){
+  if(!d) return "0%";
+  return Math.round((n / d) * 100) + "%";
+}
+
+function renderPerformanceTracker(){
+  const summary = document.getElementById("performanceSummary");
+  const log = document.getElementById("performanceLog");
+  if(!summary || !log) return;
+
+  if(!performanceTrades.length){
+    summary.innerHTML = "<div class='muted'>No trade results logged yet.</div>";
+    log.innerHTML = "";
+    return;
+  }
+
+  const total = performanceTrades.length;
+  const wins = performanceTrades.filter(t => t.outcome === "WIN").length;
+  const losses = performanceTrades.filter(t => t.outcome === "LOSS").length;
+  const enterNow = performanceTrades.filter(t => t.entrySignal.includes("ENTER NOW"));
+  const retest = performanceTrades.filter(t => t.entrySignal.includes("WAIT FOR RETEST"));
+  const chase = performanceTrades.filter(t => t.entrySignal.includes("DO NOT CHASE"));
+  const avgTTT = performanceTrades.filter(t => typeof t.ttt === "number").reduce((a,b)=>a+b.ttt,0) / Math.max(1, performanceTrades.filter(t => typeof t.ttt === "number").length);
+  const avgDTE = performanceTrades.filter(t => typeof t.dte === "number").reduce((a,b)=>a+b.dte,0) / Math.max(1, performanceTrades.filter(t => typeof t.dte === "number").length);
+
+  summary.innerHTML = `
+    <div class="metric"><b>Total Trades:</b> ${total}</div>
+    <div class="metric"><b>Wins:</b> <span class="green">${wins}</span></div>
+    <div class="metric"><b>Losses:</b> <span class="red">${losses}</span></div>
+    <div class="metric"><b>Win Rate:</b> <span class="blue">${pct(wins,total)}</span></div>
+    <div class="divider"></div>
+    <div class="metric"><b>ENTER NOW Win Rate:</b> ${pct(enterNow.filter(t => t.outcome === "WIN").length, enterNow.length)}</div>
+    <div class="metric"><b>WAIT FOR RETEST Win Rate:</b> ${pct(retest.filter(t => t.outcome === "WIN").length, retest.length)}</div>
+    <div class="metric"><b>DO NOT CHASE Win Rate:</b> ${pct(chase.filter(t => t.outcome === "WIN").length, chase.length)}</div>
+    <div class="divider"></div>
+    <div class="metric"><b>Average Time-to-Target at Entry:</b> ${Number.isFinite(avgTTT) ? Math.round(avgTTT) + "%" : "N/A"}</div>
+    <div class="metric"><b>Average DTE at Entry:</b> ${Number.isFinite(avgDTE) ? avgDTE.toFixed(1) : "N/A"}</div>
+  `;
+
+  log.innerHTML = performanceTrades.slice(0,10).map(t => `
+    <div class="watch-item">
+      <span>${t.ticker} â¢ ${t.outcome} â¢ ${t.entrySignal}${typeof t.ttt === "number" ? " â¢ TTT " + t.ttt + "%" : ""}${typeof t.dte === "number" ? " â¢ DTE " + t.dte : ""}</span>
+    </div>
+  `).join("");
+}
 
 function normalizeTicker(ticker){ return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,""); }
 
@@ -367,6 +486,7 @@ function pushAlert(message, level){
   saveAlertLog(alertLog);
   renderAlertHistory();
 clearActiveAlertsPanel();
+renderPerformanceTracker();
   try{
     if(navigator.vibrate){
       if(level === "red") navigator.vibrate([250,100,250,100,250]);
