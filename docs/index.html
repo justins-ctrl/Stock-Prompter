@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Signal Predator AI v34.6 Predictive Engine Edition</title>
+  <title>Signal Predator AI v34.7 Profit Scaling Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -206,7 +206,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v34.6 // predictive engine // pressure gauge // trap warnings</div>
+  <div class="subtitle">v34.7 // profit scaling system // predictive engine // trap warnings</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -558,6 +558,76 @@ function analyze(closes, livePrice){
   return result;
 }
 
+
+function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
+  const pnl = typeof approxPnLPercent === "number" ? approxPnLPercent : null;
+  const ttt = typeof timeTarget?.probability === "number" ? timeTarget.probability : null;
+  let action = "HOLD FULL POSITION";
+  let reason = "No scaling action needed yet.";
+  let runnerPlan = "No runner plan yet.";
+  let color = "blue";
+
+  if(status === "LOCK PROFITS"){
+    if(pnl !== null && pnl >= 300){
+      action = "SELL 75% / HOLD 25% RUNNER";
+      reason = "Large gain is on the table. Lock most of it and leave a runner.";
+      runnerPlan = "Keep 25% only if momentum stays aligned.";
+      color = "green";
+    }else if(pnl !== null && pnl >= 100){
+      action = "SELL 50% / HOLD 50% RUNNER";
+      reason = "Strong gain reached. Bank partial profits and let some ride.";
+      runnerPlan = "Keep half only while price stays above the profit zone.";
+      color = "green";
+    }else{
+      action = "SELL 33% / WATCH CLOSELY";
+      reason = "Trade entered profit zone, but move is not yet extended.";
+      runnerPlan = "Keep the rest only if time-to-target stays healthy.";
+      color = "yellow";
+    }
+  }else if(status === "TARGET LOCKED"){
+    if(pnl !== null && pnl >= 150){
+      action = "SELL 25% / HOLD 75%";
+      reason = "You have a strong winner. Trim a little and keep most on.";
+      runnerPlan = "Keep 75% as long as momentum and time still support the move.";
+      color = "green";
+    }else if(ttt !== null && ttt >= 70){
+      action = "HOLD / NO SCALE YET";
+      reason = "Probability remains strong. Let the position work.";
+      runnerPlan = "No trim needed unless momentum weakens.";
+      color = "green";
+    }else{
+      action = "SELL 25% / REDUCE RISK";
+      reason = "Setup still works, but taking a little off reduces risk.";
+      runnerPlan = "Keep the rest only while the signal stays strong.";
+      color = "yellow";
+    }
+  }else if(status === "STALKING"){
+    if(dte !== null && dte <= 2){
+      action = "NO ADDING / TIGHT WATCH";
+      reason = "Expiration is close. Avoid adding size here.";
+      runnerPlan = "Exit quickly if the setup weakens.";
+      color = "yellow";
+    }else{
+      action = "HOLD SMALL / NO SCALE";
+      reason = "Position still needs confirmation before scaling out.";
+      runnerPlan = "Wait for stronger confirmation before trimming or adding.";
+      color = "blue";
+    }
+  }else if(status === "STRIKE NOW"){
+    action = "EXIT POSITION";
+    reason = "The app is warning that the risk now outweighs the upside.";
+    runnerPlan = "No runner suggested.";
+    color = "red";
+  }else{
+    action = "HOLD / REASSESS";
+    reason = "No specific scale signal is active.";
+    runnerPlan = "Recheck on the next scan.";
+    color = "blue";
+  }
+
+  return {action, reason, runnerPlan, color};
+}
+
 function analyzePosition(position, livePrice, ai, priceSource){
   const price = livePrice, type = position.type, strike = position.strike, breakeven = position.breakeven, entryPremium = position.entryPremium || 0, dte = getDTE(position.expiration);
   const intrinsic = type === "CALL" ? Math.max(0, price - strike) : Math.max(0, strike - price);
@@ -582,7 +652,8 @@ function analyzePosition(position, livePrice, ai, priceSource){
     else if(ai.momentumEngine.includes("BULLISH") && dte !== null && dte <= 3){ status = "STRIKE NOW"; reason = "Momentum turned against the put with little time remaining"; cardClass = "sell-alert"; }
   }
   if(dte !== null && dte <= 2 && status === "STALKING") reason = "Setup is still alive, but expiration is getting very close";
-  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine};
+  const profitScaling = getProfitScaling(status, approxPnLPercent, dte, timeTarget);
+  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling};
 }
 
 function signalClass(value){
@@ -634,6 +705,12 @@ function buildSmartAlerts(results){
     if(r.trapWarning && r.trapWarning !== "CLEAR"){
       alerts.push({level:"yellow", message:`TRAP WARNING // ${r.ticker} ${r.trapWarning}.`});
     }
+    if(r.profitScaling && r.profitScaling.action && r.profitScaling.action.includes("SELL")){
+      alerts.push({level:"green", message:`SCALING ALERT // ${r.ticker} ${r.profitScaling.action}.`});
+    }
+    if(r.profitScaling && r.profitScaling.action === "EXIT POSITION"){
+      alerts.push({level:"red", message:`EXIT ALERT // ${r.ticker} exit position.`});
+    }
   });
 
   const seen = new Set();
@@ -661,6 +738,11 @@ function renderPositionCards(results){
       <div class="metric"><b>Likely Move:</b> ${r.predictiveEngine ? r.predictiveEngine.likelyMove : "N/A"}</div>
       <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning || "CLEAR")}">${r.trapWarning || "CLEAR"}</span></div>
       <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
+      <div class="divider"></div>
+      <div class="section-title">Profit Scaling System</div>
+      <div class="metric"><b>Scale Action:</b> <span class="${r.profitScaling ? r.profitScaling.color : "blue"}">${r.profitScaling ? r.profitScaling.action : "HOLD / REASSESS"}</span></div>
+      <div class="metric"><b>Scale Read:</b> ${r.profitScaling ? r.profitScaling.reason : "No scale signal."}</div>
+      <div class="metric"><b>Runner Plan:</b> ${r.profitScaling ? r.profitScaling.runnerPlan : "Recheck next scan."}</div>
       <div class="metric"><b>Reason:</b> ${r.reason}</div>
       <div class="metric"><b>Price Source:</b> ${r.priceSource}</div>
       ${r.approxPnLPercent !== null ? `<div class="metric"><b>Approx P/L:</b> ${r.approxPnLPercent > 0 ? "+" : ""}${r.approxPnLPercent}%</div>` : ""}
@@ -893,12 +975,12 @@ async function scanMyPositions(){
     const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
     const closes = await getHistory(ticker);
     if(!closes){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"}};
       results.push(item); cache.results.push(item); continue;
     }
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"}};
       results.push(item); cache.results.push(item); continue;
     }
     const ai = analyze(closes, pricePack.price), monitor = analyzePosition(p, pricePack.price, ai, pricePack.source);
