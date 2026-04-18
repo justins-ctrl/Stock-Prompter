@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Signal Predator AI v35 Income Mode Edition</title>
+  <title>Signal Predator AI v35.1 Spread Position Manager Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -206,7 +206,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v35 // income mode // performance tracker // profit scaling // predictive engine</div>
+  <div class="subtitle">v35.1 // spread position manager // income mode // performance tracker</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -297,6 +297,25 @@
     <button class="secondary" onclick="quickRecheckPositions()">Quick Recheck Positions</button>
   </div>
 
+  <div class="card">
+    <div class="section-title">Spread Position Manager</div>
+    <div class="metric muted">Track live bull put and bear call spreads you actually entered.</div>
+    <div class="grid-2">
+      <input id="spreadTicker" placeholder="Ticker">
+      <select id="spreadType">
+        <option value="BULL PUT SPREAD">Bull Put Spread</option>
+        <option value="BEAR CALL SPREAD">Bear Call Spread</option>
+      </select>
+      <input id="spreadShortStrike" placeholder="Short Strike">
+      <input id="spreadLongStrike" placeholder="Long Strike">
+      <input id="spreadCredit" placeholder="Credit Received">
+      <input id="spreadExpiration" type="date">
+    </div>
+    <button onclick="addSpreadPosition()">Save Spread Position</button>
+    <div id="spreadPositionsContainer" style="margin-top:14px;"></div>
+    <button onclick="scanSpreadPositions()">Scan Spread Positions</button>
+  </div>
+
   <input id="ticker" placeholder="Enter Stock Ticker">
   <button onclick="runAI()">Run Predator Analysis</button>
   <button onclick="scanMarket()">Scan Default Top Opportunities</button>
@@ -363,6 +382,7 @@ function addPerformanceTrade(){
   });
   savePerformanceTrades(performanceTrades);
   renderPerformanceTracker();
+renderSpreadPositions();
 
   ["perfTicker","perfEntrySignal","perfTTT","perfDTE","perfNotes"].forEach(id => {
     document.getElementById(id).value = "";
@@ -374,6 +394,7 @@ function clearPerformanceTrades(){
   performanceTrades = [];
   savePerformanceTrades(performanceTrades);
   renderPerformanceTracker();
+renderSpreadPositions();
 }
 
 function pct(n, d){
@@ -418,6 +439,204 @@ function renderPerformanceTracker(){
   log.innerHTML = performanceTrades.slice(0,10).map(t => `
     <div class="watch-item">
       <span>${t.ticker} â¢ ${t.outcome} â¢ ${t.entrySignal}${typeof t.ttt === "number" ? " â¢ TTT " + t.ttt + "%" : ""}${typeof t.dte === "number" ? " â¢ DTE " + t.dte : ""}</span>
+    </div>
+  `).join("");
+}
+
+
+function getSavedSpreadPositions(){
+  const raw = localStorage.getItem("signal_predator_spread_positions");
+  if(!raw) return [];
+  try{
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  }catch(e){
+    return [];
+  }
+}
+function saveSpreadPositions(list){
+  localStorage.setItem("signal_predator_spread_positions", JSON.stringify(list));
+}
+let savedSpreadPositions = getSavedSpreadPositions();
+
+function renderSpreadPositions(){
+  const c = document.getElementById("spreadPositionsContainer");
+  if(!c) return;
+  if(!savedSpreadPositions.length){
+    c.innerHTML = "<div class='muted'>No saved spreads yet.</div>";
+    return;
+  }
+  c.innerHTML = savedSpreadPositions.map((p,index)=>`<div class="watch-item"><span>${p.ticker} â¢ ${p.type} â¢ ${p.shortStrike}/${p.longStrike} â¢ Credit ${p.credit}${p.expiration ? " â¢ Exp " + p.expiration : ""}</span><button class="small-btn danger" onclick="removeSpreadPosition(${index})">Remove</button></div>`).join("");
+}
+
+function addSpreadPosition(){
+  const ticker = normalizeTicker(document.getElementById("spreadTicker").value);
+  const type = document.getElementById("spreadType").value;
+  const shortStrike = parseFloat(document.getElementById("spreadShortStrike").value);
+  const longStrike = parseFloat(document.getElementById("spreadLongStrike").value);
+  const credit = parseFloat(document.getElementById("spreadCredit").value);
+  const expiration = document.getElementById("spreadExpiration").value;
+
+  if(!ticker || Number.isNaN(shortStrike) || Number.isNaN(longStrike) || Number.isNaN(credit)){
+    alert("Enter ticker, short strike, long strike, and credit.");
+    return;
+  }
+
+  savedSpreadPositions.push({ticker,type,shortStrike,longStrike,credit,expiration});
+  saveSpreadPositions(savedSpreadPositions);
+  renderSpreadPositions();
+
+  ["spreadTicker","spreadShortStrike","spreadLongStrike","spreadCredit","spreadExpiration"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("spreadType").value = "BULL PUT SPREAD";
+}
+
+function removeSpreadPosition(index){
+  savedSpreadPositions.splice(index,1);
+  saveSpreadPositions(savedSpreadPositions);
+  renderSpreadPositions();
+}
+
+function analyzeSpreadPosition(position, livePrice, ai){
+  const width = Math.abs(position.shortStrike - position.longStrike);
+  const dte = getDTE(position.expiration);
+  let spreadValue = position.credit;
+  let status = "HOLD";
+  let reason = "Spread remains in a workable range.";
+  let cardClass = "weak-alert";
+  let profitPct = 0;
+  let maxProfit = position.credit;
+  let maxLoss = Math.max(0.01, width - position.credit);
+
+  if(position.type === "BULL PUT SPREAD"){
+    if(livePrice > position.shortStrike){
+      spreadValue = Math.max(0.05, position.credit * 0.2);
+      status = "TAKE PROFIT";
+      reason = "Price is above the short put strike and the spread is likely decaying in your favor.";
+      cardClass = "hold-alert";
+    }else if(livePrice <= position.shortStrike && livePrice > position.longStrike){
+      spreadValue = Math.min(width, Math.max(position.credit, width * 0.55));
+      status = "HOLD";
+      reason = "Price is between the strikes. Spread is under pressure but not broken.";
+      cardClass = "weak-alert";
+    }else{
+      spreadValue = width;
+      status = "CUT LOSS";
+      reason = "Price moved through the long strike and max spread risk is near.";
+      cardClass = "sell-alert";
+    }
+  }else if(position.type === "BEAR CALL SPREAD"){
+    if(livePrice < position.shortStrike){
+      spreadValue = Math.max(0.05, position.credit * 0.2);
+      status = "TAKE PROFIT";
+      reason = "Price is below the short call strike and the spread is likely decaying in your favor.";
+      cardClass = "hold-alert";
+    }else if(livePrice >= position.shortStrike && livePrice < position.longStrike){
+      spreadValue = Math.min(width, Math.max(position.credit, width * 0.55));
+      status = "HOLD";
+      reason = "Price is between the strikes. Spread is under pressure but not broken.";
+      cardClass = "weak-alert";
+    }else{
+      spreadValue = width;
+      status = "CUT LOSS";
+      reason = "Price moved through the long strike and max spread risk is near.";
+      cardClass = "sell-alert";
+    }
+  }
+
+  const currentPnL = position.credit - spreadValue;
+  profitPct = Math.round((currentPnL / Math.max(0.01, maxProfit)) * 100);
+
+  if(status === "TAKE PROFIT" && profitPct < 50){
+    reason = "Spread is favorable, but profit capture is still modest.";
+  }
+  if(dte !== null && dte <= 2 && status === "HOLD"){
+    reason = "Expiration is close. Consider closing if you want to avoid late risk.";
+  }
+  if(dte !== null && dte <= 1 && status !== "TAKE PROFIT"){
+    status = "CUT LOSS";
+    reason = "Expiration is too close to comfortably hold this spread.";
+    cardClass = "sell-alert";
+  }
+
+  return {
+    ticker: position.ticker,
+    type: position.type,
+    shortStrike: position.shortStrike,
+    longStrike: position.longStrike,
+    credit: position.credit,
+    expiration: position.expiration || "Not set",
+    dte: dte === null ? "N/A" : dte,
+    livePrice: livePrice.toFixed(2),
+    estSpreadValue: spreadValue.toFixed(2),
+    maxProfit: maxProfit.toFixed(2),
+    maxLoss: maxLoss.toFixed(2),
+    profitPct,
+    status,
+    reason,
+    cardClass,
+    predictiveEngine: ai.predictiveEngine,
+    trapWarning: ai.trapWarning
+  };
+}
+
+async function scanSpreadPositions(){
+  const output = document.getElementById("output");
+  if(!savedSpreadPositions.length){
+    output.innerHTML = "<div class='card'>No saved spreads yet.</div>";
+    return;
+  }
+
+  renderThinkingCard(["TRACKING SPREAD POSITIONS...","CHECKING CREDIT SPREAD RISK...","CALCULATING EXIT SIGNALS..."]);
+  let results = [];
+
+  for(let i=0; i<savedSpreadPositions.length; i++){
+    const p = savedSpreadPositions[i];
+    const closes = await getHistory(p.ticker);
+    if(!closes){
+      results.push({
+        ticker:p.ticker,type:p.type,shortStrike:p.shortStrike,longStrike:p.longStrike,credit:p.credit,expiration:p.expiration || "Not set",dte:"N/A",livePrice:"N/A",estSpreadValue:"N/A",maxProfit:"N/A",maxLoss:"N/A",profitPct:0,status:"UNAVAILABLE",reason:"Could not load historical data for this spread.",cardClass:"sell-alert",predictiveEngine:{likelyMove:"N/A"},trapWarning:"CLEAR"
+      });
+      continue;
+    }
+    const pricePack = await getBestAvailablePrice(p.ticker, closes);
+    if(pricePack.price === null){
+      results.push({
+        ticker:p.ticker,type:p.type,shortStrike:p.shortStrike,longStrike:p.longStrike,credit:p.credit,expiration:p.expiration || "Not set",dte:"N/A",livePrice:"N/A",estSpreadValue:"N/A",maxProfit:"N/A",maxLoss:"N/A",profitPct:0,status:"UNAVAILABLE",reason:"Could not load price for this spread.",cardClass:"sell-alert",predictiveEngine:{likelyMove:"N/A"},trapWarning:"CLEAR"
+      });
+      continue;
+    }
+    const ai = analyze(closes, pricePack.price);
+    results.push(analyzeSpreadPosition(p, pricePack.price, ai));
+    await new Promise(r => setTimeout(r, 5000));
+  }
+
+  const spreadAlerts = [];
+  results.forEach(r=>{
+    if(r.status === "CUT LOSS") spreadAlerts.push({level:"red", message:`SPREAD EXIT ALERT // ${r.ticker} ${r.type} cut loss.`});
+    if(r.status === "TAKE PROFIT") spreadAlerts.push({level:"green", message:`SPREAD PROFIT ALERT // ${r.ticker} ${r.type} take profit.`});
+  });
+  renderActiveAlertsPanel(spreadAlerts);
+  if(spreadAlerts.length){
+    spreadAlerts.slice(0,3).forEach(a=>pushAlert(a.message, a.level));
+  }
+
+  output.innerHTML = results.map(r=>`
+    <div class="card ${r.cardClass}">
+      <div class="section-title">Spread Position Readout</div>
+      <div class="metric"><b>${r.ticker}</b> ${r.type}</div>
+      <div class="metric"><b>Strikes:</b> ${r.shortStrike} / ${r.longStrike}</div>
+      <div class="metric"><b>Credit Received:</b> ${r.credit}</div>
+      <div class="metric"><b>Live Price:</b> ${r.livePrice === "N/A" ? "N/A" : "$" + r.livePrice}</div>
+      <div class="metric"><b>Est. Spread Value:</b> ${r.estSpreadValue === "N/A" ? "N/A" : "$" + r.estSpreadValue}</div>
+      <div class="metric"><b>Max Profit:</b> ${r.maxProfit === "N/A" ? "N/A" : "$" + r.maxProfit}</div>
+      <div class="metric"><b>Max Loss:</b> ${r.maxLoss === "N/A" ? "N/A" : "$" + r.maxLoss}</div>
+      <div class="metric"><b>Profit Capture:</b> ${r.profitPct}%</div>
+      <div class="metric"><b>Expiration:</b> ${r.expiration}</div>
+      <div class="metric"><b>DTE:</b> ${r.dte}</div>
+      <div class="metric"><b>Likely Move:</b> ${r.predictiveEngine ? r.predictiveEngine.likelyMove : "N/A"}</div>
+      <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning || "CLEAR")}">${r.trapWarning || "CLEAR"}</span></div>
+      <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
+      <div class="metric"><b>Reason:</b> ${r.reason}</div>
     </div>
   `).join("");
 }
@@ -493,6 +712,7 @@ function pushAlert(message, level){
   renderAlertHistory();
 clearActiveAlertsPanel();
 renderPerformanceTracker();
+renderSpreadPositions();
   try{
     if(navigator.vibrate){
       if(level === "red") navigator.vibrate([250,100,250,100,250]);
@@ -831,8 +1051,8 @@ function analyzePosition(position, livePrice, ai, priceSource){
 
 function signalClass(value){
   if(typeof value !== "string") return "blue";
-  if(value.includes("TARGET LOCKED") || value.includes("BUY CALL") || value.includes("BULLISH") || value.includes("ACCUMULATION") || value.includes("PASS") || value === "A+" || value === "A" || value === "Favorable" || value === "Low" || value.includes("Likely")) return "green";
-  if(value.includes("STRIKE NOW") || value.includes("LOCK PROFITS") || value.includes("BUY PUT") || value.includes("BEARISH") || value.includes("SELLING") || value.includes("FAIL") || value === "C" || value === "Risky" || value.includes("Extreme") || value.includes("High") || value.includes("Unlikely")) return "red";
+  if(value.includes("TARGET LOCKED") || value.includes("TAKE PROFIT") || value.includes("BUY CALL") || value.includes("BULLISH") || value.includes("ACCUMULATION") || value.includes("PASS") || value === "A+" || value === "A" || value === "Favorable" || value === "Low" || value.includes("Likely")) return "green";
+  if(value.includes("STRIKE NOW") || value.includes("CUT LOSS") || value.includes("LOCK PROFITS") || value.includes("BUY PUT") || value.includes("BEARISH") || value.includes("SELLING") || value.includes("FAIL") || value === "C" || value === "Risky" || value.includes("Extreme") || value.includes("High") || value.includes("Unlikely")) return "red";
   if(value.includes("STALKING") || value.includes("WAIT") || value === "B" || value === "Medium" || value.includes("BALANCED") || value.includes("RANGE") || value.includes("NORMAL") || value.includes("Moderate") || value.includes("Good") || value.includes("Tight") || value.includes("Possible")) return "yellow";
   return "blue";
 }
