@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Signal Predator AI v35.1 Spread Position Manager Edition</title>
+  <title>Signal Predator AI v35.2 Risk Control Engine Edition</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -206,7 +206,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v35.1 // spread position manager // income mode // performance tracker</div>
+  <div class="subtitle">v35.2 // risk control engine // spread manager // income mode // performance tracker</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -298,6 +298,19 @@
   </div>
 
   <div class="card">
+    <div class="section-title">Risk Control Engine</div>
+    <div class="metric muted">Protect your account with max risk rules, streak protection, and portfolio exposure tracking.</div>
+    <div class="grid-2">
+      <input id="maxRiskPerTrade" placeholder="Max Risk Per Trade ($)">
+      <input id="dailyProfitLock" placeholder="Daily Profit Lock %">
+      <input id="maxPortfolioRisk" placeholder="Max Portfolio Risk %">
+      <input id="maxActiveTrades" placeholder="Max Active Trades">
+    </div>
+    <button onclick="saveRiskSettings()">Save Risk Settings</button>
+    <div id="riskControlSummary" style="margin-top:14px;"></div>
+  </div>
+
+  <div class="card">
     <div class="section-title">Spread Position Manager</div>
     <div class="metric muted">Track live bull put and bear call spreads you actually entered.</div>
     <div class="grid-2">
@@ -382,6 +395,7 @@ function addPerformanceTrade(){
   });
   savePerformanceTrades(performanceTrades);
   renderPerformanceTracker();
+  renderRiskControlSummary();
 renderSpreadPositions();
 
   ["perfTicker","perfEntrySignal","perfTTT","perfDTE","perfNotes"].forEach(id => {
@@ -394,6 +408,7 @@ function clearPerformanceTrades(){
   performanceTrades = [];
   savePerformanceTrades(performanceTrades);
   renderPerformanceTracker();
+  renderRiskControlSummary();
 renderSpreadPositions();
 }
 
@@ -485,6 +500,7 @@ function addSpreadPosition(){
   savedSpreadPositions.push({ticker,type,shortStrike,longStrike,credit,expiration});
   saveSpreadPositions(savedSpreadPositions);
   renderSpreadPositions();
+renderRiskControlSummary();
 
   ["spreadTicker","spreadShortStrike","spreadLongStrike","spreadCredit","spreadExpiration"].forEach(id=>document.getElementById(id).value="");
   document.getElementById("spreadType").value = "BULL PUT SPREAD";
@@ -494,6 +510,7 @@ function removeSpreadPosition(index){
   savedSpreadPositions.splice(index,1);
   saveSpreadPositions(savedSpreadPositions);
   renderSpreadPositions();
+renderRiskControlSummary();
 }
 
 function analyzeSpreadPosition(position, livePrice, ai){
@@ -615,7 +632,7 @@ async function scanSpreadPositions(){
     if(r.status === "CUT LOSS") spreadAlerts.push({level:"red", message:`SPREAD EXIT ALERT // ${r.ticker} ${r.type} cut loss.`});
     if(r.status === "TAKE PROFIT") spreadAlerts.push({level:"green", message:`SPREAD PROFIT ALERT // ${r.ticker} ${r.type} take profit.`});
   });
-  renderActiveAlertsPanel(spreadAlerts);
+  renderActiveAlertsPanel(spreadAlerts.concat(getRiskControlAdvice()));
   if(spreadAlerts.length){
     spreadAlerts.slice(0,3).forEach(a=>pushAlert(a.message, a.level));
   }
@@ -639,6 +656,127 @@ async function scanSpreadPositions(){
       <div class="metric"><b>Reason:</b> ${r.reason}</div>
     </div>
   `).join("");
+}
+
+
+function getRiskSettings(){
+  const raw = localStorage.getItem("signal_predator_risk_settings");
+  if(!raw){
+    return {maxRiskPerTrade:100,dailyProfitLock:20,maxPortfolioRisk:25,maxActiveTrades:3};
+  }
+  try{
+    const parsed = JSON.parse(raw);
+    return {
+      maxRiskPerTrade: Number(parsed.maxRiskPerTrade || 100),
+      dailyProfitLock: Number(parsed.dailyProfitLock || 20),
+      maxPortfolioRisk: Number(parsed.maxPortfolioRisk || 25),
+      maxActiveTrades: Number(parsed.maxActiveTrades || 3)
+    };
+  }catch(e){
+    return {maxRiskPerTrade:100,dailyProfitLock:20,maxPortfolioRisk:25,maxActiveTrades:3};
+  }
+}
+function saveRiskSettingsToStorage(settings){
+  localStorage.setItem("signal_predator_risk_settings", JSON.stringify(settings));
+}
+let riskSettings = getRiskSettings();
+
+function saveRiskSettings(){
+  riskSettings = {
+    maxRiskPerTrade: Number(document.getElementById("maxRiskPerTrade").value || 100),
+    dailyProfitLock: Number(document.getElementById("dailyProfitLock").value || 20),
+    maxPortfolioRisk: Number(document.getElementById("maxPortfolioRisk").value || 25),
+    maxActiveTrades: Number(document.getElementById("maxActiveTrades").value || 3)
+  };
+  saveRiskSettingsToStorage(riskSettings);
+  renderRiskControlSummary();
+}
+
+function estimatePortfolioRisk(){
+  let buySideRisk = savedPositions.length * riskSettings.maxRiskPerTrade;
+  let spreadRisk = savedSpreadPositions.reduce((sum,p)=>{
+    const width = Math.abs(Number(p.shortStrike) - Number(p.longStrike));
+    const credit = Number(p.credit || 0);
+    return sum + Math.max(0, width - credit) * 100;
+  },0);
+  return buySideRisk + spreadRisk;
+}
+
+function getLossStreak(){
+  let streak = 0;
+  for(const t of performanceTrades){
+    if(t.outcome === "LOSS") streak += 1;
+    else break;
+  }
+  return streak;
+}
+
+function getTodayWinRate(){
+  const today = new Date().toISOString().slice(0,10);
+  const todays = performanceTrades.filter(t => String(t.loggedAt || "").slice(0,10) === today);
+  if(!todays.length) return null;
+  const wins = todays.filter(t => t.outcome === "WIN").length;
+  return Math.round((wins / todays.length) * 100);
+}
+
+function renderRiskControlSummary(){
+  const el = document.getElementById("riskControlSummary");
+  if(!el) return;
+
+  document.getElementById("maxRiskPerTrade").value = riskSettings.maxRiskPerTrade;
+  document.getElementById("dailyProfitLock").value = riskSettings.dailyProfitLock;
+  document.getElementById("maxPortfolioRisk").value = riskSettings.maxPortfolioRisk;
+  document.getElementById("maxActiveTrades").value = riskSettings.maxActiveTrades;
+
+  const activeTrades = savedPositions.length + savedSpreadPositions.length;
+  const estRiskDollars = estimatePortfolioRisk();
+  const estPortfolioRiskPct = Math.round((activeTrades / Math.max(1, riskSettings.maxActiveTrades)) * riskSettings.maxPortfolioRisk);
+  const lossStreak = getLossStreak();
+  const todayWinRate = getTodayWinRate();
+
+  let warnings = [];
+  if(activeTrades > riskSettings.maxActiveTrades){
+    warnings.push("TOO MANY ACTIVE TRADES");
+  }
+  if(estPortfolioRiskPct > riskSettings.maxPortfolioRisk){
+    warnings.push("PORTFOLIO RISK TOO HIGH");
+  }
+  if(lossStreak >= 2){
+    warnings.push("LOSS STREAK PROTECTION");
+  }
+  if(todayWinRate !== null && todayWinRate >= riskSettings.dailyProfitLock){
+    warnings.push("DAILY PROFIT LOCK CONSIDER PAUSING");
+  }
+
+  el.innerHTML = `
+    <div class="metric"><b>Max Risk Per Trade:</b> $${riskSettings.maxRiskPerTrade}</div>
+    <div class="metric"><b>Daily Profit Lock:</b> ${riskSettings.dailyProfitLock}%</div>
+    <div class="metric"><b>Max Portfolio Risk:</b> ${riskSettings.maxPortfolioRisk}%</div>
+    <div class="metric"><b>Max Active Trades:</b> ${riskSettings.maxActiveTrades}</div>
+    <div class="divider"></div>
+    <div class="metric"><b>Active Trades:</b> ${activeTrades}</div>
+    <div class="metric"><b>Estimated Portfolio Risk ($):</b> $${Math.round(estRiskDollars)}</div>
+    <div class="metric"><b>Portfolio Risk Meter:</b> ${estPortfolioRiskPct}%</div>
+    <div class="bar"><div class="fill" style="width:${Math.min(100,estPortfolioRiskPct)}%"></div></div>
+    <div class="metric"><b>Loss Streak:</b> ${lossStreak}</div>
+    <div class="metric"><b>Today Win Rate:</b> ${todayWinRate === null ? "N/A" : todayWinRate + "%"}</div>
+    <div class="divider"></div>
+    <div class="metric"><b>Risk Warnings:</b> ${warnings.length ? warnings.join(" â¢ ") : "NONE"}</div>
+  `;
+}
+
+function getRiskControlAdvice(){
+  const activeTrades = savedPositions.length + savedSpreadPositions.length;
+  const estPortfolioRiskPct = Math.round((activeTrades / Math.max(1, riskSettings.maxActiveTrades)) * riskSettings.maxPortfolioRisk);
+  const lossStreak = getLossStreak();
+  const todayWinRate = getTodayWinRate();
+  const advice = [];
+
+  if(activeTrades > riskSettings.maxActiveTrades) advice.push({level:"red", message:"RISK CONTROL // Too many active trades. Focus and reduce exposure."});
+  if(estPortfolioRiskPct > riskSettings.maxPortfolioRisk) advice.push({level:"red", message:"RISK CONTROL // Portfolio risk meter is above your limit."});
+  if(lossStreak >= 2) advice.push({level:"yellow", message:"RISK CONTROL // Loss streak protection suggests slowing down."});
+  if(todayWinRate !== null && todayWinRate >= riskSettings.dailyProfitLock) advice.push({level:"green", message:"RISK CONTROL // Daily profit lock reached. Consider stopping for the day."});
+  return advice;
 }
 
 function normalizeTicker(ticker){ return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,""); }
@@ -1160,7 +1298,8 @@ function applyPortfolioAlertSummary(results, sourceLabel){
   if(redAlerts > 0) pushAlert(`${sourceLabel}: ${redAlerts} target${redAlerts>1?'s':''} need immediate action.`, "red");
   else if(yellowAlerts > 0) pushAlert(`${sourceLabel}: ${yellowAlerts} target${yellowAlerts>1?'s':''} are stalking.`, "yellow");
   else pushAlert(`${sourceLabel}: all saved targets look stable.`, "green");
-  renderActiveAlertsPanel(buildSmartAlerts(results));
+  const allAlerts = buildSmartAlerts(results).concat(getRiskControlAdvice());
+  renderActiveAlertsPanel(allAlerts);
 }
 
 
@@ -1250,6 +1389,11 @@ function renderFull(ticker, a){
     <div class="metric"><b>Max Risk:</b> ${a.incomeMode.maxRisk}</div>
     <div class="metric"><b>Income Read:</b> ${a.incomeMode.rationale}</div>
     <div class="divider"></div>
+    <div class="section-title">Risk Control</div>
+    <div class="metric"><b>Max Risk Per Trade:</b> $${riskSettings.maxRiskPerTrade}</div>
+    <div class="metric"><b>Suggested Risk Posture:</b> ${a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT"}</div>
+    <div class="metric"><b>Discipline Note:</b> ${a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve."}</div>
+    <div class="divider"></div>
     <div class="section-title">Position Sizing</div>
     <div class="metric"><b>Suggested Contracts:</b> ${a.contracts}</div>
     <div class="metric"><b>Capital Allocation:</b> ${a.allocation}</div>
@@ -1294,7 +1438,7 @@ function renderFull(ticker, a){
 }
 
 function renderCompact(ticker, a){
-  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 async function runAI(){
