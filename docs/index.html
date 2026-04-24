@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v36.2 // next-day confirmation engine // grade filter // stable core</div>
+  <div class="subtitle">v36.3 // trade quality engine // alignment score // market regime filter</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -331,9 +331,9 @@ let riskSettings = getStore("signal_predator_risk_settings", {maxRiskPerTrade:10
 
 function signalClass(value){
   value = String(value || "");
-  if(["TARGET LOCKED","TAKE PROFIT","BUY CALL","BULLISH","STRONG BULLISH","ACCUMULATION","PASS","A+","A","FAVORABLE","LOW","LIKELY TO HIT BEFORE EXPIRATION","CLEAR","ENTER NOW","VALID IF PRICE HOLDS"].includes(value)) return "green";
-  if(["STRIKE NOW","CUT LOSS","LOCK PROFITS","BUY PUT","BEARISH","STRONG BEARISH","SELLING","FAIL","C","RISKY","EXTREME","HIGH","UNLIKELY BEFORE EXPIRATION","BULL TRAP RISK","BEAR TRAP RISK","DO NOT CHASE","DOWN","INVALID UNTIL RECLAIM"].includes(value)) return "red";
-  if(["STALKING","WAIT","B","MEDIUM","BALANCED","RANGE","NORMAL","MODERATE","GOOD","TIGHT","POSSIBLE BEFORE EXPIRATION","CHOP ZONE","LOW EDGE SETUP","CHOP","UP","WAIT FOR RETEST","NEEDS CONFIRMATION","A+ BUT CONFIRM FIRST","WAIT FOR PULLBACK","NO NEXT-DAY ENTRY"].includes(value)) return "yellow";
+  if(["TARGET LOCKED","TAKE PROFIT","BUY CALL","BULLISH","STRONG BULLISH","ACCUMULATION","PASS","A+","A","FAVORABLE","LOW","LIKELY TO HIT BEFORE EXPIRATION","CLEAR","ENTER NOW","VALID IF PRICE HOLDS","APPROVED","TRENDING","GOOD FOR TRADING","STRONG","GOOD"].includes(value)) return "green";
+  if(["STRIKE NOW","CUT LOSS","LOCK PROFITS","BUY PUT","BEARISH","STRONG BEARISH","SELLING","FAIL","C","RISKY","EXTREME","HIGH","UNLIKELY BEFORE EXPIRATION","BULL TRAP RISK","BEAR TRAP RISK","DO NOT CHASE","DOWN","INVALID UNTIL RECLAIM","REJECT","DANGEROUS","AVOID NEW TRADES","DANGEROUS CONDITIONS","NO TRADE","TRAP ZONE"].includes(value)) return "red";
+  if(["STALKING","WAIT","B","MEDIUM","BALANCED","RANGE","NORMAL","MODERATE","TIGHT","POSSIBLE BEFORE EXPIRATION","CHOP ZONE","LOW EDGE SETUP","CHOP","UP","WAIT FOR RETEST","NEEDS CONFIRMATION","A+ BUT CONFIRM FIRST","WAIT FOR PULLBACK","NO NEXT-DAY ENTRY","REDUCED SIZE","CHOPPY","CHOP FILTER","MID-RANGE CHOP","MIXED","WEAK"].includes(value)) return "yellow";
   return "blue";
 }
 
@@ -892,6 +892,134 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
   return {tomorrowRead, chaseRisk, overnightRisk, reversalTrap, buyTrigger, invalidation, morningChecklist, oneDayMovePct:oneDayMovePct.toFixed(1), fiveDayMovePct:fiveDayMovePct.toFixed(1)};
 }
 
+
+function getMarketRegimeFilter(closes, momentum, volatility){
+  const spyLikeTrend = closes[0] > avg(closes.slice(0,20)) && avg(closes.slice(0,20)) > avg(closes.slice(0,50));
+  const bearishTrend = closes[0] < avg(closes.slice(0,20)) && avg(closes.slice(0,20)) < avg(closes.slice(0,50));
+  const absMomentum = Math.abs(momentum);
+
+  let state = "CHOPPY";
+  let action = "REDUCE SIZE";
+  let reason = "Market conditions are mixed. Be selective and wait for confirmation.";
+
+  if((spyLikeTrend || bearishTrend) && absMomentum >= 0.02 && volatility !== "COMPRESSION"){
+    state = "TRENDING";
+    action = "GOOD FOR TRADING";
+    reason = "Trend and momentum are aligned enough for active trading.";
+  }
+
+  if(volatility === "COMPRESSION" || absMomentum < 0.012){
+    state = "CHOPPY";
+    action = "REDUCE SIZE";
+    reason = "Low momentum or compressed volatility can cause false signals.";
+  }
+
+  if(volatility === "EXPANSION LIKELY" && absMomentum < 0.015){
+    state = "DANGEROUS";
+    action = "AVOID NEW TRADES";
+    reason = "Volatility is expanding without clean direction. Reversal risk is elevated.";
+  }
+
+  return {state, action, reason};
+}
+
+function getAlignmentScore(direction, bias, momentumEngine, flow, volatility, regime, edge, trapWarning, nextDay){
+  let score = 50;
+
+  if(direction === "BUY CALL"){
+    if(bias === "Bullish") score += 15;
+    if(momentumEngine.includes("BULLISH")) score += 15;
+    if(flow.includes("ACCUMULATION")) score += 10;
+    if(bias === "Bearish" || momentumEngine.includes("BEARISH") || flow.includes("SELLING")) score -= 20;
+  }else if(direction === "BUY PUT"){
+    if(bias === "Bearish") score += 15;
+    if(momentumEngine.includes("BEARISH")) score += 15;
+    if(flow.includes("SELLING")) score += 10;
+    if(bias === "Bullish" || momentumEngine.includes("BULLISH") || flow.includes("ACCUMULATION")) score -= 20;
+  }else{
+    score -= 25;
+  }
+
+  if(regime === "TREND" || regime === "BREAKOUT") score += 10;
+  if(regime === "RANGE") score -= 8;
+
+  if(edge === "Favorable") score += 10;
+  if(edge === "Risky") score -= 15;
+
+  if(volatility === "EXPANSION LIKELY") score += 5;
+  if(volatility === "COMPRESSION") score -= 8;
+
+  if(trapWarning && trapWarning !== "CLEAR") score -= 15;
+  if(nextDay && (nextDay.chaseRisk === "HIGH" || nextDay.overnightRisk === "HIGH" || nextDay.reversalTrap === "HIGH")) score -= 12;
+  if(nextDay && nextDay.tomorrowRead === "VALID IF PRICE HOLDS") score += 8;
+  if(nextDay && (nextDay.tomorrowRead === "WAIT FOR PULLBACK" || nextDay.tomorrowRead === "INVALID UNTIL RECLAIM")) score -= 10;
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  let label = "WEAK";
+  if(score >= 80) label = "STRONG";
+  else if(score >= 65) label = "GOOD";
+  else if(score >= 50) label = "MIXED";
+
+  return {score, label};
+}
+
+function getNoTradeZone(price, closes, direction, alignmentScore, marketRegime, trapWarning){
+  const high10 = Math.max(...closes.slice(0,10));
+  const low10 = Math.min(...closes.slice(0,10));
+  const range = Math.max(0.01, high10 - low10);
+  const location = (price - low10) / range;
+
+  let zone = "CLEAR";
+  let reason = "Trade is not inside a major no-trade zone.";
+
+  if(direction === "WAIT"){
+    zone = "NO TRADE";
+    reason = "No clear directional edge is active.";
+  }else if(location > 0.40 && location < 0.60 && alignmentScore.score < 70){
+    zone = "MID-RANGE CHOP";
+    reason = "Price is sitting near the middle of its recent range with weak alignment.";
+  }else if(marketRegime.state === "DANGEROUS"){
+    zone = "DANGEROUS CONDITIONS";
+    reason = marketRegime.reason;
+  }else if(trapWarning && trapWarning !== "CLEAR" && alignmentScore.score < 70){
+    zone = "TRAP ZONE";
+    reason = "Trap warning and alignment are not strong enough for a clean entry.";
+  }else if(marketRegime.state === "CHOPPY" && alignmentScore.score < 65){
+    zone = "CHOP FILTER";
+    reason = "Market is choppy and alignment is not strong enough.";
+  }
+
+  return {zone, reason, rangeLocation:Math.round(location * 100)};
+}
+
+function getTradeQualityDecision(tradeFilter, grade, alignmentScore, marketRegime, noTradeZone, nextDay){
+  let decision = "APPROVED";
+  let reason = "Trade passes the quality filters.";
+
+  if(tradeFilter !== "PASS"){
+    decision = "REJECT";
+    reason = "Base trade filter failed.";
+  }else if(noTradeZone.zone !== "CLEAR"){
+    decision = "REJECT";
+    reason = noTradeZone.reason;
+  }else if(alignmentScore.score < 60){
+    decision = "REJECT";
+    reason = "Alignment score is too weak.";
+  }else if(marketRegime.state === "DANGEROUS"){
+    decision = "REJECT";
+    reason = "Market regime is dangerous.";
+  }else if(nextDay && (nextDay.tomorrowRead === "WAIT FOR PULLBACK" || nextDay.tomorrowRead === "INVALID UNTIL RECLAIM")){
+    decision = "WAIT";
+    reason = "Next-day confirmation is not clean enough.";
+  }else if(alignmentScore.score < 75 || marketRegime.state === "CHOPPY"){
+    decision = "REDUCED SIZE";
+    reason = "Setup is tradable but should be sized smaller.";
+  }
+
+  return {decision, reason};
+}
+
 function analyze(closes, livePrice){
   const price = livePrice ?? closes[0], avg20 = avg(closes.slice(0,20)), avg50 = avg(closes.slice(0,50)), momentum = (closes[0] - closes[5]) / closes[5];
   let bias = "Neutral"; if(price > avg20 && avg20 > avg50) bias = "Bullish"; if(price < avg20 && avg20 < avg50) bias = "Bearish";
@@ -935,6 +1063,10 @@ function analyze(closes, livePrice){
   result.entryTiming = getActionEntryTiming(result);
   result.incomeMode = getIncomeMode(result);
   result.nextDay = getNextDayConfirmation(price, closes, direction, momentumEngine, expectedMove, score, grade, volatility);
+  result.marketRegimeFilter = getMarketRegimeFilter(closes, momentum, volatility);
+  result.alignmentScore = getAlignmentScore(direction, bias, momentumEngine, flow, volatility, regime, edge, result.trapWarning, result.nextDay);
+  result.noTradeZone = getNoTradeZone(price, closes, direction, result.alignmentScore, result.marketRegimeFilter, result.trapWarning);
+  result.qualityDecision = getTradeQualityDecision(tradeFilter, grade, result.alignmentScore, result.marketRegimeFilter, result.noTradeZone, result.nextDay);
   return result;
 }
 
@@ -959,6 +1091,8 @@ function buildSmartAlerts(results){
     if(r.profitScaling && r.profitScaling.action && r.profitScaling.action.includes("SELL")) alerts.push({level:"green", message:`SCALING ALERT // ${r.ticker} ${r.profitScaling.action}.`});
     if(r.profitScaling && r.profitScaling.action === "EXIT POSITION") alerts.push({level:"red", message:`EXIT ALERT // ${r.ticker} exit position.`});
     if(r.incomeMode && r.incomeMode.incomeSignal === "ON" && r.incomeMode.spreadType !== "WAIT / NO SPREAD") alerts.push({level:"green", message:`INCOME MODE ALERT // ${r.ticker} ${r.incomeMode.spreadType}.`});
+    if(r.qualityDecision && r.qualityDecision.decision === "REJECT") alerts.push({level:"red", message:`QUALITY FILTER // ${r.ticker} rejected: ${r.qualityDecision.reason}`});
+    if(r.noTradeZone && r.noTradeZone.zone !== "CLEAR" && r.noTradeZone.zone !== "N/A") alerts.push({level:"yellow", message:`NO TRADE ZONE // ${r.ticker} ${r.noTradeZone.zone}.`});
   });
   const seen = new Set();
   return alerts.filter(a=>{ if(seen.has(a.message)) return false; seen.add(a.message); return true; }).slice(0,8);
@@ -990,7 +1124,7 @@ function analyzePosition(position, livePrice, ai, priceSource){
   }
   if(dte !== null && dte <= 2 && status === "STALKING") reason = "Setup is still alive, but expiration is getting very close";
   const profitScaling = getProfitScaling(status, approxPnLPercent, dte, timeTarget);
-  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay};
+  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone};
 }
 
 function analyzeSpreadPosition(position, livePrice, ai){
@@ -1035,6 +1169,12 @@ function renderPositionCards(results){
       <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning || "CLEAR")}">${r.trapWarning || "CLEAR"}</span></div>
       <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
       <div class="divider"></div>
+      <div class="section-title">Trade Quality</div>
+      <div class="metric"><b>Quality Decision:</b> <span class="${signalClass(r.qualityDecision ? r.qualityDecision.decision : "N/A")}">${r.qualityDecision ? r.qualityDecision.decision : "N/A"}</span></div>
+      <div class="metric"><b>Alignment:</b> ${r.alignmentScore ? r.alignmentScore.score : "N/A"}/100</div>
+      <div class="metric"><b>Market State:</b> ${r.marketRegimeFilter ? r.marketRegimeFilter.state : "N/A"}</div>
+      <div class="metric"><b>No-Trade Zone:</b> ${r.noTradeZone ? r.noTradeZone.zone : "N/A"}</div>
+      <div class="divider"></div>
       <div class="section-title">Next-Day Confirmation</div>
       <div class="metric"><b>Tomorrow Read:</b> <span class="${signalClass(r.nextDay ? r.nextDay.tomorrowRead : "N/A")}">${r.nextDay ? r.nextDay.tomorrowRead : "N/A"}</span></div>
       <div class="metric"><b>Buy Trigger:</b> ${r.nextDay && r.nextDay.buyTrigger !== "N/A" ? "$" + r.nextDay.buyTrigger : "N/A"}</div>
@@ -1073,6 +1213,18 @@ function renderFull(ticker, a){
     <div class="metric"><b>Trade Score:</b> ${a.score}/100 (<span class="${signalClass(a.grade)}">${a.grade}</span>)</div>
     <div class="bar"><div class="fill" style="width:${a.score}%"></div></div>
     <div class="metric"><b>Trade Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div>
+    <div class="divider"></div>
+    <div class="section-title">Trade Quality Engine</div>
+    <div class="metric"><b>Quality Decision:</b> <span class="${signalClass(a.qualityDecision.decision)}">${a.qualityDecision.decision}</span></div>
+    <div class="metric"><b>Quality Reason:</b> ${a.qualityDecision.reason}</div>
+    <div class="metric"><b>Alignment Score:</b> ${a.alignmentScore.score}/100 (<span class="${signalClass(a.alignmentScore.label)}">${a.alignmentScore.label}</span>)</div>
+    <div class="bar"><div class="fill" style="width:${a.alignmentScore.score}%"></div></div>
+    <div class="metric"><b>Market State:</b> <span class="${signalClass(a.marketRegimeFilter.state)}">${a.marketRegimeFilter.state}</span></div>
+    <div class="metric"><b>Market Action:</b> <span class="${signalClass(a.marketRegimeFilter.action)}">${a.marketRegimeFilter.action}</span></div>
+    <div class="metric"><b>Market Read:</b> ${a.marketRegimeFilter.reason}</div>
+    <div class="metric"><b>No-Trade Zone:</b> <span class="${signalClass(a.noTradeZone.zone)}">${a.noTradeZone.zone}</span></div>
+    <div class="metric"><b>No-Trade Reason:</b> ${a.noTradeZone.reason}</div>
+    <div class="metric"><b>Range Location:</b> ${a.noTradeZone.rangeLocation}%</div>
     <div class="divider"></div>
     <div class="section-title">Time-to-Target Engine</div>
     <div class="metric"><b>Time-to-Target Probability:</b> ${a.timeTarget.probability}%</div>
@@ -1169,7 +1321,7 @@ function renderFull(ticker, a){
 }
 
 function renderCompact(ticker, a){
-  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
@@ -1209,13 +1361,13 @@ async function scanList(list, title){
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null) continue;
     const a = analyze(closes, pricePack.price);
-    if(a.tradeFilter === "PASS" && passesGradeFilter(a)) results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability, grade:a.grade, tomorrowRead:a.nextDay.tomorrowRead, chaseRisk:a.nextDay.chaseRisk});
+    if(a.tradeFilter === "PASS" && passesGradeFilter(a) && a.qualityDecision.decision !== "REJECT") results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability, grade:a.grade, tomorrowRead:a.nextDay.tomorrowRead, chaseRisk:a.nextDay.chaseRisk, quality:a.qualityDecision.decision, alignment:a.alignmentScore.score});
     await new Promise(r => setTimeout(r, 15000));
   }
   results.sort((a,b)=>b.score-a.score || b.timeTarget-a.timeTarget);
   results = results.slice(0,2);
   if(results.length === 0){ document.getElementById("output").innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`; return; }
-  document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Grade ${r.grade} â Score ${r.score} â TTT ${r.timeTarget}% â ${r.tomorrowRead} â Chase ${r.chaseRisk} â ${r.expiration}</div>`).join("")}</div>`;
+  document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Grade ${r.grade} â Score ${r.score} â Align ${r.alignment}% â ${r.quality} â TTT ${r.timeTarget}% â ${r.tomorrowRead} â Chase ${r.chaseRisk} â ${r.expiration}</div>`).join("")}</div>`;
 }
 async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
 async function scanMyWatchlist(){
@@ -1234,8 +1386,8 @@ async function findBestTrade(){
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null) continue;
     const a = analyze(closes, pricePack.price);
-    if(a.tradeFilter !== "PASS" || !passesGradeFilter(a)) continue;
-    const rankScore = a.score + (a.timeTarget?.probability || 0);
+    if(a.tradeFilter !== "PASS" || !passesGradeFilter(a) || a.qualityDecision.decision === "REJECT") continue;
+    const rankScore = a.score + (a.timeTarget?.probability || 0) + (a.alignmentScore?.score || 0);
     if(!best || rankScore > best.rankScore) best = {ticker, a, rankScore};
     await new Promise(r => setTimeout(r, 15000));
   }
@@ -1246,6 +1398,10 @@ async function findBestTrade(){
       <div class="metric"><b>${best.ticker}</b> â <span class="${signalClass(best.a.direction)}">${best.a.direction}</span></div>
       <div class="metric"><b>Price:</b> $${best.a.price}</div>
       <div class="metric"><b>Trade Score:</b> ${best.a.score}/100</div>
+      <div class="metric"><b>Quality Decision:</b> <span class="${signalClass(best.a.qualityDecision.decision)}">${best.a.qualityDecision.decision}</span></div>
+      <div class="metric"><b>Alignment Score:</b> ${best.a.alignmentScore.score}/100</div>
+      <div class="metric"><b>Market State:</b> ${best.a.marketRegimeFilter.state}</div>
+      <div class="metric"><b>No-Trade Zone:</b> ${best.a.noTradeZone.zone}</div>
       <div class="metric"><b>Confidence Meter:</b> <span class="${best.a.confidenceMeter.color}">${best.a.confidenceMeter.label}</span></div>
       <div class="metric"><b>Entry Timing:</b> <span class="${signalClass(best.a.entryTiming.label)}">${best.a.entryTiming.label}</span></div>
       <div class="metric"><b>Entry Read:</b> ${best.a.entryTiming.reason}</div>
@@ -1276,12 +1432,12 @@ async function scanMyPositions(){
     const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
     const closes = await getHistory(ticker);
     if(!closes){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
     const ai = analyze(closes, pricePack.price);
