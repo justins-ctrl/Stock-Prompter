@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v36.1 // grade filter control // stable clean build // dependable core systems</div>
+  <div class="subtitle">v36.2 // next-day confirmation engine // grade filter // stable core</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -331,9 +331,9 @@ let riskSettings = getStore("signal_predator_risk_settings", {maxRiskPerTrade:10
 
 function signalClass(value){
   value = String(value || "");
-  if(["TARGET LOCKED","TAKE PROFIT","BUY CALL","BULLISH","STRONG BULLISH","ACCUMULATION","PASS","A+","A","FAVORABLE","LOW","LIKELY TO HIT BEFORE EXPIRATION","CLEAR","ENTER NOW"].includes(value)) return "green";
-  if(["STRIKE NOW","CUT LOSS","LOCK PROFITS","BUY PUT","BEARISH","STRONG BEARISH","SELLING","FAIL","C","RISKY","EXTREME","HIGH","UNLIKELY BEFORE EXPIRATION","BULL TRAP RISK","BEAR TRAP RISK","DO NOT CHASE","DOWN"].includes(value)) return "red";
-  if(["STALKING","WAIT","B","MEDIUM","BALANCED","RANGE","NORMAL","MODERATE","GOOD","TIGHT","POSSIBLE BEFORE EXPIRATION","CHOP ZONE","LOW EDGE SETUP","CHOP","UP","WAIT FOR RETEST"].includes(value)) return "yellow";
+  if(["TARGET LOCKED","TAKE PROFIT","BUY CALL","BULLISH","STRONG BULLISH","ACCUMULATION","PASS","A+","A","FAVORABLE","LOW","LIKELY TO HIT BEFORE EXPIRATION","CLEAR","ENTER NOW","VALID IF PRICE HOLDS"].includes(value)) return "green";
+  if(["STRIKE NOW","CUT LOSS","LOCK PROFITS","BUY PUT","BEARISH","STRONG BEARISH","SELLING","FAIL","C","RISKY","EXTREME","HIGH","UNLIKELY BEFORE EXPIRATION","BULL TRAP RISK","BEAR TRAP RISK","DO NOT CHASE","DOWN","INVALID UNTIL RECLAIM"].includes(value)) return "red";
+  if(["STALKING","WAIT","B","MEDIUM","BALANCED","RANGE","NORMAL","MODERATE","GOOD","TIGHT","POSSIBLE BEFORE EXPIRATION","CHOP ZONE","LOW EDGE SETUP","CHOP","UP","WAIT FOR RETEST","NEEDS CONFIRMATION","A+ BUT CONFIRM FIRST","WAIT FOR PULLBACK","NO NEXT-DAY ENTRY"].includes(value)) return "yellow";
   return "blue";
 }
 
@@ -834,6 +834,64 @@ function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
   return {action, reason, runnerPlan, color};
 }
 
+
+function getNextDayConfirmation(price, closes, direction, momentumEngine, expectedMove, score, grade, volatility){
+  const todayClose = closes[0];
+  const prevClose = closes[1] || closes[0];
+  const fiveDayHigh = Math.max(...closes.slice(0,5));
+  const fiveDayLow = Math.min(...closes.slice(0,5));
+  const oneDayMovePct = Math.abs((todayClose - prevClose) / prevClose) * 100;
+  const fiveDayMovePct = ((todayClose - closes[5]) / closes[5]) * 100;
+  const range5 = Math.max(0.01, fiveDayHigh - fiveDayLow);
+  const closeLocation = (todayClose - fiveDayLow) / range5;
+
+  let tomorrowRead = "NEEDS CONFIRMATION";
+  let chaseRisk = "MEDIUM";
+  let overnightRisk = "MEDIUM";
+  let reversalTrap = "LOW";
+  let buyTrigger = "N/A";
+  let invalidation = "N/A";
+  let morningChecklist = "Confirm price, direction, and no gap against the setup.";
+
+  if(oneDayMovePct >= 4 || Math.abs(fiveDayMovePct) >= 8) chaseRisk = "HIGH";
+  else if(oneDayMovePct <= 1.5 && Math.abs(fiveDayMovePct) <= 4) chaseRisk = "LOW";
+
+  if(volatility === "EXPANSION LIKELY" || oneDayMovePct >= 5) overnightRisk = "HIGH";
+  else if(volatility === "COMPRESSION" && oneDayMovePct <= 2) overnightRisk = "LOW";
+
+  if(direction === "BUY CALL"){
+    buyTrigger = (todayClose + expectedMove * 0.12).toFixed(2);
+    invalidation = Math.max(0.01, todayClose - expectedMove * 0.25).toFixed(2);
+    if(closeLocation > 0.85 && chaseRisk === "HIGH") reversalTrap = "HIGH";
+    else if(closeLocation > 0.70) reversalTrap = "MEDIUM";
+
+    if(score >= 85 && chaseRisk !== "HIGH" && overnightRisk !== "HIGH") tomorrowRead = "VALID IF PRICE HOLDS";
+    if(chaseRisk === "HIGH" || reversalTrap === "HIGH") tomorrowRead = "WAIT FOR PULLBACK";
+    if(momentumEngine.includes("BEARISH")) tomorrowRead = "INVALID UNTIL RECLAIM";
+    morningChecklist = `Enter only if price holds above $${buyTrigger}. Avoid if it breaks below $${invalidation}.`;
+  }else if(direction === "BUY PUT"){
+    buyTrigger = Math.max(0.01, todayClose - expectedMove * 0.12).toFixed(2);
+    invalidation = (todayClose + expectedMove * 0.25).toFixed(2);
+    if(closeLocation < 0.15 && chaseRisk === "HIGH") reversalTrap = "HIGH";
+    else if(closeLocation < 0.30) reversalTrap = "MEDIUM";
+
+    if(score >= 85 && chaseRisk !== "HIGH" && overnightRisk !== "HIGH") tomorrowRead = "VALID IF PRICE HOLDS";
+    if(chaseRisk === "HIGH" || reversalTrap === "HIGH") tomorrowRead = "WAIT FOR PULLBACK";
+    if(momentumEngine.includes("BULLISH")) tomorrowRead = "INVALID UNTIL RECLAIM";
+    morningChecklist = `Enter only if price stays below $${buyTrigger}. Avoid if it reclaims above $${invalidation}.`;
+  }else{
+    tomorrowRead = "NO NEXT-DAY ENTRY";
+    chaseRisk = "N/A";
+    overnightRisk = "N/A";
+    reversalTrap = "N/A";
+    morningChecklist = "No trade trigger because the current setup is WAIT.";
+  }
+
+  if(grade === "A+" && tomorrowRead === "NEEDS CONFIRMATION") tomorrowRead = "A+ BUT CONFIRM FIRST";
+
+  return {tomorrowRead, chaseRisk, overnightRisk, reversalTrap, buyTrigger, invalidation, morningChecklist, oneDayMovePct:oneDayMovePct.toFixed(1), fiveDayMovePct:fiveDayMovePct.toFixed(1)};
+}
+
 function analyze(closes, livePrice){
   const price = livePrice ?? closes[0], avg20 = avg(closes.slice(0,20)), avg50 = avg(closes.slice(0,50)), momentum = (closes[0] - closes[5]) / closes[5];
   let bias = "Neutral"; if(price > avg20 && avg20 > avg50) bias = "Bullish"; if(price < avg20 && avg20 < avg50) bias = "Bearish";
@@ -876,6 +934,7 @@ function analyze(closes, livePrice){
   result.trapWarning = getTrapWarning(direction, momentumEngine, regime, edge, volatility, timeTarget);
   result.entryTiming = getActionEntryTiming(result);
   result.incomeMode = getIncomeMode(result);
+  result.nextDay = getNextDayConfirmation(price, closes, direction, momentumEngine, expectedMove, score, grade, volatility);
   return result;
 }
 
@@ -931,7 +990,7 @@ function analyzePosition(position, livePrice, ai, priceSource){
   }
   if(dte !== null && dte <= 2 && status === "STALKING") reason = "Setup is still alive, but expiration is getting very close";
   const profitScaling = getProfitScaling(status, approxPnLPercent, dte, timeTarget);
-  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode};
+  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay};
 }
 
 function analyzeSpreadPosition(position, livePrice, ai){
@@ -976,6 +1035,13 @@ function renderPositionCards(results){
       <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning || "CLEAR")}">${r.trapWarning || "CLEAR"}</span></div>
       <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
       <div class="divider"></div>
+      <div class="section-title">Next-Day Confirmation</div>
+      <div class="metric"><b>Tomorrow Read:</b> <span class="${signalClass(r.nextDay ? r.nextDay.tomorrowRead : "N/A")}">${r.nextDay ? r.nextDay.tomorrowRead : "N/A"}</span></div>
+      <div class="metric"><b>Buy Trigger:</b> ${r.nextDay && r.nextDay.buyTrigger !== "N/A" ? "$" + r.nextDay.buyTrigger : "N/A"}</div>
+      <div class="metric"><b>Invalidation:</b> ${r.nextDay && r.nextDay.invalidation !== "N/A" ? "$" + r.nextDay.invalidation : "N/A"}</div>
+      <div class="metric"><b>Chase Risk:</b> ${r.nextDay ? r.nextDay.chaseRisk : "N/A"}</div>
+      <div class="metric"><b>Overnight Risk:</b> ${r.nextDay ? r.nextDay.overnightRisk : "N/A"}</div>
+      <div class="divider"></div>
       <div class="section-title">Income Mode</div>
       <div class="metric"><b>Mode:</b> ${r.incomeMode.strategy}</div>
       <div class="metric"><b>Spread:</b> ${r.incomeMode.spreadType}</div>
@@ -1019,6 +1085,17 @@ function renderFull(ticker, a){
     <div class="section-title">Entry Timing</div>
     <div class="metric"><b>Entry Signal:</b> <span class="${signalClass(a.entryTiming.label)}">${a.entryTiming.label}</span></div>
     <div class="metric"><b>Entry Read:</b> ${a.entryTiming.reason}</div>
+    <div class="divider"></div>
+    <div class="section-title">Next-Day Confirmation Engine</div>
+    <div class="metric"><b>Tomorrow Read:</b> <span class="${signalClass(a.nextDay.tomorrowRead)}">${a.nextDay.tomorrowRead}</span></div>
+    <div class="metric"><b>Buy Trigger:</b> ${a.nextDay.buyTrigger === "N/A" ? "N/A" : "$" + a.nextDay.buyTrigger}</div>
+    <div class="metric"><b>Invalidation:</b> ${a.nextDay.invalidation === "N/A" ? "N/A" : "$" + a.nextDay.invalidation}</div>
+    <div class="metric"><b>Chase Risk:</b> <span class="${signalClass(a.nextDay.chaseRisk)}">${a.nextDay.chaseRisk}</span></div>
+    <div class="metric"><b>Overnight Risk:</b> <span class="${signalClass(a.nextDay.overnightRisk)}">${a.nextDay.overnightRisk}</span></div>
+    <div class="metric"><b>Reversal Trap:</b> <span class="${signalClass(a.nextDay.reversalTrap)}">${a.nextDay.reversalTrap}</span></div>
+    <div class="metric"><b>1-Day Move:</b> ${a.nextDay.oneDayMovePct}%</div>
+    <div class="metric"><b>5-Day Move:</b> ${a.nextDay.fiveDayMovePct}%</div>
+    <div class="metric"><b>Morning Checklist:</b> ${a.nextDay.morningChecklist}</div>
     <div class="divider"></div>
     <div class="section-title">Predictive Engine</div>
     <div class="metric"><b>Likely Move:</b> <span class="${signalClass(a.predictiveEngine.likelyMove)}">${a.predictiveEngine.likelyMove}</span></div>
@@ -1092,7 +1169,7 @@ function renderFull(ticker, a){
 }
 
 function renderCompact(ticker, a){
-  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
@@ -1132,13 +1209,13 @@ async function scanList(list, title){
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null) continue;
     const a = analyze(closes, pricePack.price);
-    if(a.tradeFilter === "PASS" && passesGradeFilter(a)) results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability, grade:a.grade});
+    if(a.tradeFilter === "PASS" && passesGradeFilter(a)) results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability, grade:a.grade, tomorrowRead:a.nextDay.tomorrowRead, chaseRisk:a.nextDay.chaseRisk});
     await new Promise(r => setTimeout(r, 15000));
   }
   results.sort((a,b)=>b.score-a.score || b.timeTarget-a.timeTarget);
   results = results.slice(0,2);
   if(results.length === 0){ document.getElementById("output").innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`; return; }
-  document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Grade ${r.grade} â Score ${r.score} â TTT ${r.timeTarget}% â ${r.expiration}</div>`).join("")}</div>`;
+  document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Grade ${r.grade} â Score ${r.score} â TTT ${r.timeTarget}% â ${r.tomorrowRead} â Chase ${r.chaseRisk} â ${r.expiration}</div>`).join("")}</div>`;
 }
 async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
 async function scanMyWatchlist(){
@@ -1172,6 +1249,10 @@ async function findBestTrade(){
       <div class="metric"><b>Confidence Meter:</b> <span class="${best.a.confidenceMeter.color}">${best.a.confidenceMeter.label}</span></div>
       <div class="metric"><b>Entry Timing:</b> <span class="${signalClass(best.a.entryTiming.label)}">${best.a.entryTiming.label}</span></div>
       <div class="metric"><b>Entry Read:</b> ${best.a.entryTiming.reason}</div>
+      <div class="metric"><b>Tomorrow Read:</b> <span class="${signalClass(best.a.nextDay.tomorrowRead)}">${best.a.nextDay.tomorrowRead}</span></div>
+      <div class="metric"><b>Buy Trigger:</b> ${best.a.nextDay.buyTrigger === "N/A" ? "N/A" : "$" + best.a.nextDay.buyTrigger}</div>
+      <div class="metric"><b>Invalidation:</b> ${best.a.nextDay.invalidation === "N/A" ? "N/A" : "$" + best.a.nextDay.invalidation}</div>
+      <div class="metric"><b>Chase Risk:</b> ${best.a.nextDay.chaseRisk}</div>
       <div class="metric"><b>Likely Move:</b> ${best.a.predictiveEngine.likelyMove}</div>
       <div class="metric"><b>Move Strength:</b> ${best.a.predictiveEngine.moveStrength}</div>
       <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(best.a.trapWarning)}">${best.a.trapWarning}</span></div>
@@ -1195,12 +1276,12 @@ async function scanMyPositions(){
     const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
     const closes = await getHistory(ticker);
     if(!closes){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
     const ai = analyze(closes, pricePack.price);
