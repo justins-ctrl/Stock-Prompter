@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v36.4 // signal history // accuracy calibration // adaptive learning</div>
+  <div class="subtitle">v36.5 // unified trade journal // saved positions + win/loss tracker</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -196,14 +196,6 @@
     <div id="gradeFilterSummary" style="margin-top:12px;"></div>
   </div>
 
-  
-  <div class="card">
-    <div class="section-title">Signal History & Calibration</div>
-    <div id="historyStats"></div>
-    <button onclick="renderHistory()">View History</button>
-    <div id="historyList"></div>
-  </div>
-
   <div class="card">
     <div class="section-title">Alert Settings</div>
     <div class="metric">ALERT MODE: <span class="blue">ON-PAGE + VIBRATE</span></div>
@@ -217,7 +209,7 @@
 
   <div class="card">
     <div class="section-title">Performance Tracker</div>
-    <div class="metric muted">Track wins, losses, and the signals behind your trades.</div>
+    <div class="metric muted">This now syncs automatically when you mark saved positions as Win/Loss.</div>
     <div class="grid-2">
       <input id="perfTicker" placeholder="Ticker">
       <select id="perfOutcome">
@@ -266,7 +258,8 @@
   </div>
 
   <div class="card">
-    <div class="section-title">Saved Positions</div>
+    <div class="section-title">Saved Positions / Unified Trade Journal</div>
+    <div class="metric muted">Saved positions now act as your active trade tracker. Mark trades as win/loss when closed.</div>
     <div class="grid-2">
       <input id="posTicker" placeholder="Ticker">
       <select id="posType">
@@ -281,6 +274,9 @@
     <input id="posExpiration" type="date">
     <button onclick="addPosition()">Save Position</button>
     <div id="positionsContainer" style="margin-top:14px;"></div>
+    <div id="journalSummary" style="margin-top:14px;"></div>
+    <button class="secondary" onclick="renderClosedTradeJournal()">View Closed Trade Archive</button>
+    <div id="closedTradeJournal" style="margin-top:10px;"></div>
     <button onclick="scanMyPositions()">Live Position Scan</button>
     <button class="secondary" onclick="quickRecheckPositions()">Quick Recheck Positions</button>
   </div>
@@ -334,6 +330,7 @@ let savedPositions = getStore("ai_options_positions", []);
 let alertLog = getStore("ai_options_alert_log", []);
 let performanceTrades = getStore("signal_predator_performance_log", []);
 let savedSpreadPositions = getStore("signal_predator_spread_positions", []);
+let closedTradeJournal = getStore("signal_predator_closed_trade_journal", []);
 let lastScanCache = getStore("ai_options_last_scan_cache", null);
 let riskSettings = getStore("signal_predator_risk_settings", {maxRiskPerTrade:100,dailyProfitLock:20,maxPortfolioRisk:25,maxActiveTrades:3});
 
@@ -441,11 +438,98 @@ function removeTicker(index){
   renderWatchlist();
 }
 
+
+function journalWinRate(){
+  const total = closedTradeJournal.length;
+  const wins = closedTradeJournal.filter(t => t.result === "WIN").length;
+  const losses = closedTradeJournal.filter(t => t.result === "LOSS").length;
+  return {total,wins,losses,winRate: total ? Math.round((wins/total)*100) : 0};
+}
+
+function renderJournalSummary(){
+  const el = document.getElementById("journalSummary");
+  if(!el) return;
+  const s = journalWinRate();
+  el.innerHTML = `
+    <div class="card" style="padding:12px;margin-top:8px;">
+      <div class="section-title">Journal Stats</div>
+      <div class="metric"><b>Open Trades:</b> ${savedPositions.length}</div>
+      <div class="metric"><b>Closed Trades:</b> ${s.total}</div>
+      <div class="metric"><b>Wins:</b> <span class="green">${s.wins}</span></div>
+      <div class="metric"><b>Losses:</b> <span class="red">${s.losses}</span></div>
+      <div class="metric"><b>Win Rate:</b> <span class="blue">${s.winRate}%</span></div>
+    </div>`;
+}
+
+function closeSavedPosition(index, result){
+  const p = savedPositions[index];
+  if(!p) return;
+  closedTradeJournal.unshift({
+    ...p,
+    result,
+    closedAt: new Date().toISOString()
+  });
+  closedTradeJournal = closedTradeJournal.slice(0,200);
+  setStore("signal_predator_closed_trade_journal", closedTradeJournal);
+
+  // Also sync to the older performance tracker so risk stats and win rate still work.
+  performanceTrades.unshift({
+    ticker:p.ticker,
+    outcome:result,
+    entrySignal:p.entrySignal || "SAVED POSITION",
+    ttt:p.entryTTT || null,
+    dte:p.entryDTE || null,
+    notes:p.notes || "",
+    loggedAt:new Date().toISOString()
+  });
+  performanceTrades = performanceTrades.slice(0,100);
+  setStore("signal_predator_performance_log", performanceTrades);
+
+  savedPositions.splice(index,1);
+  setStore("ai_options_positions", savedPositions);
+
+  renderPositions();
+  renderPerformanceTracker();
+  renderRiskControlSummary();
+  renderClosedTradeJournal();
+}
+
+function renderClosedTradeJournal(){
+  const el = document.getElementById("closedTradeJournal");
+  if(!el) return;
+  if(!closedTradeJournal.length){
+    el.innerHTML = "<div class='muted'>No closed trades yet.</div>";
+    return;
+  }
+  el.innerHTML = closedTradeJournal.slice(0,20).map(t=>`
+    <div class="watch-item">
+      <span>${t.ticker} ${t.strike} ${t.type} â¢ ${t.result} â¢ Exp ${t.expiration || "N/A"}</span>
+    </div>
+  `).join("");
+}
+
 function renderPositions(){
   const c = document.getElementById("positionsContainer");
-  if(!savedPositions.length){ c.innerHTML = "<div class='muted'>No saved positions yet.</div>"; return; }
-  c.innerHTML = savedPositions.map((p,index)=>`<div class="watch-item"><span>${p.ticker} ${p.strike} ${p.type} â¢ BE ${p.breakeven}${p.expiration ? " â¢ Exp " + p.expiration : ""}</span><button class="small-btn danger" onclick="removePosition(${index})">Remove</button></div>`).join("");
+  if(!savedPositions.length){
+    c.innerHTML = "<div class='muted'>No saved positions yet.</div>";
+    renderJournalSummary();
+    return;
+  }
+  c.innerHTML = savedPositions.map((p,index)=>`
+    <div class="card" style="padding:12px;margin-top:10px;">
+      <div class="metric"><b>${p.ticker}</b> ${p.strike} ${p.type}</div>
+      <div class="metric">BE ${p.breakeven}${p.expiration ? " â¢ Exp " + p.expiration : ""}</div>
+      <div class="metric muted">Saved: ${p.entryDate ? new Date(p.entryDate).toLocaleDateString() : "N/A"}</div>
+      <div class="row" style="margin-top:10px;">
+        <button class="small-btn" onclick="closeSavedPosition(${index}, 'WIN')">Mark Win</button>
+        <button class="small-btn danger" onclick="closeSavedPosition(${index}, 'LOSS')">Mark Loss</button>
+        <button class="small-btn secondary" onclick="removePosition(${index})">Remove</button>
+      </div>
+    </div>
+  `).join("");
+  renderJournalSummary();
 }
+
 function addPosition(){
   const ticker = normalizeTicker(document.getElementById("posTicker").value);
   const type = document.getElementById("posType").value;
@@ -454,7 +538,7 @@ function addPosition(){
   const entryPremium = parseFloat(document.getElementById("posEntryPremium").value || "0");
   const expiration = document.getElementById("posExpiration").value;
   if(!ticker || Number.isNaN(strike) || Number.isNaN(breakeven)){ alert("Enter ticker, strike, and breakeven."); return; }
-  savedPositions.push({ticker,type,strike,breakeven,entryPremium,expiration});
+  savedPositions.push({ticker,type,strike,breakeven,entryPremium,expiration,entryDate:new Date().toISOString(),entrySignal:'MANUAL SAVE',entryTTT:null,entryDTE:getDTE(expiration),notes:''});
   setStore("ai_options_positions", savedPositions);
   renderPositions();
   ["posTicker","posStrike","posBreakeven","posEntryPremium","posExpiration"].forEach(id=>document.getElementById(id).value="");
@@ -464,6 +548,7 @@ function removePosition(index){
   savedPositions.splice(index,1);
   setStore("ai_options_positions", savedPositions);
   renderPositions();
+  renderJournalSummary();
   renderRiskControlSummary();
 }
 
@@ -1028,30 +1113,6 @@ function getTradeQualityDecision(tradeFilter, grade, alignmentScore, marketRegim
   return {decision, reason};
 }
 
-
-let signalHistory = JSON.parse(localStorage.getItem("signal_predator_history") || "[]");
-
-function saveSignalToHistory(ticker, a){
-  const entry = {
-    time: new Date().toISOString(),
-    ticker,
-    grade: a.grade,
-    score: a.score,
-    alignment: a.alignmentScore?.score,
-    quality: a.qualityDecision?.decision,
-    tomorrow: a.nextDay?.tomorrowRead
-  };
-  signalHistory.push(entry);
-  localStorage.setItem("signal_predator_history", JSON.stringify(signalHistory));
-}
-
-function getHistoryStats(){
-  if(signalHistory.length === 0) return {msg:"No history yet"};
-  let approved = signalHistory.filter(s=>s.quality==="APPROVED").length;
-  let avgAlign = Math.round(signalHistory.reduce((a,b)=>a+(b.alignment||0),0)/signalHistory.length);
-  return {total: signalHistory.length, approved, avgAlign};
-}
-
 function analyze(closes, livePrice){
   const price = livePrice ?? closes[0], avg20 = avg(closes.slice(0,20)), avg50 = avg(closes.slice(0,50)), momentum = (closes[0] - closes[5]) / closes[5];
   let bias = "Neutral"; if(price > avg20 && avg20 > avg50) bias = "Bullish"; if(price < avg20 && avg20 < avg50) bias = "Bearish";
@@ -1099,7 +1160,6 @@ function analyze(closes, livePrice){
   result.alignmentScore = getAlignmentScore(direction, bias, momentumEngine, flow, volatility, regime, edge, result.trapWarning, result.nextDay);
   result.noTradeZone = getNoTradeZone(price, closes, direction, result.alignmentScore, result.marketRegimeFilter, result.trapWarning);
   result.qualityDecision = getTradeQualityDecision(tradeFilter, grade, result.alignmentScore, result.marketRegimeFilter, result.noTradeZone, result.nextDay);
-  saveSignalToHistory('LAST_RUN', result);
   return result;
 }
 
@@ -1576,22 +1636,11 @@ renderPositions();
 renderSpreadPositions();
 renderPerformanceTracker();
 renderRiskControlSummary();
+renderClosedTradeJournal();
+renderJournalSummary();
 renderAlertHistory();
 clearActiveAlertsPanel();
 renderGradeFilterSummary();
 </script>
 </body>
 </html>
-
-
-function renderHistory(){
-  const stats = getHistoryStats();
-  document.getElementById("historyStats").innerHTML = stats.msg ? stats.msg :
-    `<div class="metric">Total Signals: ${stats.total}</div>
-     <div class="metric">Approved Trades: ${stats.approved}</div>
-     <div class="metric">Avg Alignment: ${stats.avgAlign}</div>`;
-
-  document.getElementById("historyList").innerHTML = signalHistory.slice(-20).reverse().map(s=>
-    `<div class="metric">${s.ticker} | ${s.grade} | Align ${s.alignment} | ${s.quality} | ${s.tomorrow}</div>`
-  ).join("");
-}
