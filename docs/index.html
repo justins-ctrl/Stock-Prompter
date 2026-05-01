@@ -161,13 +161,19 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v36.5 // unified trade journal // saved positions + win/loss tracker</div>
+  <div class="subtitle">v37 // stable core cleanup // unified journal // dependable systems</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
     <div class="metric">HUNT ENGINE <span class="blue">ONLINE</span></div>
     <div class="metric muted">Stable rebuild active â¢ iPhone mode optimized</div>
     <div id="topAlertArea"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Stable Core Status</div>
+    <div class="metric">Core Cleanup <span class="green">ACTIVE</span></div>
+    <div class="metric muted">Saved Positions is now the main trade journal. Older tracking logic stays under the hood for analytics only.</div>
   </div>
 
   <div class="card">
@@ -207,9 +213,9 @@
     <div id="alertHistory" style="margin-top:14px;"></div>
   </div>
 
-  <div class="card">
-    <div class="section-title">Performance Tracker</div>
-    <div class="metric muted">This now syncs automatically when you mark saved positions as Win/Loss.</div>
+  <div class="card" style="display:none;">
+    <div class="section-title">Performance Engine</div>
+    <div class="metric muted">Hidden analytics engine. Synced automatically from Saved Positions.</div>
     <div class="grid-2">
       <input id="perfTicker" placeholder="Ticker">
       <select id="perfOutcome">
@@ -439,6 +445,28 @@ function removeTicker(index){
 }
 
 
+
+function syncClosedJournalToPerformance(){
+  // Keeps the hidden analytics engine aligned with the unified journal without user double-entry.
+  const existingKeys = new Set(performanceTrades.map(t => `${t.ticker}|${t.loggedAt}|${t.outcome}`));
+  closedTradeJournal.forEach(t => {
+    const key = `${t.ticker}|${t.closedAt}|${t.result}`;
+    if(!existingKeys.has(key)){
+      performanceTrades.unshift({
+        ticker:t.ticker,
+        outcome:t.result,
+        entrySignal:t.entrySignal || "SAVED POSITION",
+        ttt:t.entryTTT || null,
+        dte:t.entryDTE || null,
+        notes:t.notes || "",
+        loggedAt:t.closedAt || new Date().toISOString()
+      });
+    }
+  });
+  performanceTrades = performanceTrades.slice(0,100);
+  setStore("signal_predator_performance_log", performanceTrades);
+}
+
 function journalWinRate(){
   const total = closedTradeJournal.length;
   const wins = closedTradeJournal.filter(t => t.result === "WIN").length;
@@ -452,7 +480,7 @@ function renderJournalSummary(){
   const s = journalWinRate();
   el.innerHTML = `
     <div class="card" style="padding:12px;margin-top:8px;">
-      <div class="section-title">Journal Stats</div>
+      <div class="section-title">Unified Journal Stats</div>
       <div class="metric"><b>Open Trades:</b> ${savedPositions.length}</div>
       <div class="metric"><b>Closed Trades:</b> ${s.total}</div>
       <div class="metric"><b>Wins:</b> <span class="green">${s.wins}</span></div>
@@ -489,7 +517,8 @@ function closeSavedPosition(index, result){
   setStore("ai_options_positions", savedPositions);
 
   renderPositions();
-  renderPerformanceTracker();
+  syncClosedJournalToPerformance();
+renderPerformanceTracker();
   renderRiskControlSummary();
   renderClosedTradeJournal();
 }
