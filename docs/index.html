@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v36.3 // trade quality engine // alignment score // market regime filter</div>
+  <div class="subtitle">v36.4 // signal history // accuracy calibration // adaptive learning</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -194,6 +194,14 @@
     </select>
     <button class="secondary" onclick="saveGradeFilter()">Save Grade Filter</button>
     <div id="gradeFilterSummary" style="margin-top:12px;"></div>
+  </div>
+
+  
+  <div class="card">
+    <div class="section-title">Signal History & Calibration</div>
+    <div id="historyStats"></div>
+    <button onclick="renderHistory()">View History</button>
+    <div id="historyList"></div>
   </div>
 
   <div class="card">
@@ -1020,6 +1028,30 @@ function getTradeQualityDecision(tradeFilter, grade, alignmentScore, marketRegim
   return {decision, reason};
 }
 
+
+let signalHistory = JSON.parse(localStorage.getItem("signal_predator_history") || "[]");
+
+function saveSignalToHistory(ticker, a){
+  const entry = {
+    time: new Date().toISOString(),
+    ticker,
+    grade: a.grade,
+    score: a.score,
+    alignment: a.alignmentScore?.score,
+    quality: a.qualityDecision?.decision,
+    tomorrow: a.nextDay?.tomorrowRead
+  };
+  signalHistory.push(entry);
+  localStorage.setItem("signal_predator_history", JSON.stringify(signalHistory));
+}
+
+function getHistoryStats(){
+  if(signalHistory.length === 0) return {msg:"No history yet"};
+  let approved = signalHistory.filter(s=>s.quality==="APPROVED").length;
+  let avgAlign = Math.round(signalHistory.reduce((a,b)=>a+(b.alignment||0),0)/signalHistory.length);
+  return {total: signalHistory.length, approved, avgAlign};
+}
+
 function analyze(closes, livePrice){
   const price = livePrice ?? closes[0], avg20 = avg(closes.slice(0,20)), avg50 = avg(closes.slice(0,50)), momentum = (closes[0] - closes[5]) / closes[5];
   let bias = "Neutral"; if(price > avg20 && avg20 > avg50) bias = "Bullish"; if(price < avg20 && avg20 < avg50) bias = "Bearish";
@@ -1067,6 +1099,7 @@ function analyze(closes, livePrice){
   result.alignmentScore = getAlignmentScore(direction, bias, momentumEngine, flow, volatility, regime, edge, result.trapWarning, result.nextDay);
   result.noTradeZone = getNoTradeZone(price, closes, direction, result.alignmentScore, result.marketRegimeFilter, result.trapWarning);
   result.qualityDecision = getTradeQualityDecision(tradeFilter, grade, result.alignmentScore, result.marketRegimeFilter, result.noTradeZone, result.nextDay);
+  saveSignalToHistory('LAST_RUN', result);
   return result;
 }
 
@@ -1549,3 +1582,16 @@ renderGradeFilterSummary();
 </script>
 </body>
 </html>
+
+
+function renderHistory(){
+  const stats = getHistoryStats();
+  document.getElementById("historyStats").innerHTML = stats.msg ? stats.msg :
+    `<div class="metric">Total Signals: ${stats.total}</div>
+     <div class="metric">Approved Trades: ${stats.approved}</div>
+     <div class="metric">Avg Alignment: ${stats.avgAlign}</div>`;
+
+  document.getElementById("historyList").innerHTML = signalHistory.slice(-20).reverse().map(s=>
+    `<div class="metric">${s.ticker} | ${s.grade} | Align ${s.alignment} | ${s.quality} | ${s.tomorrow}</div>`
+  ).join("");
+}
