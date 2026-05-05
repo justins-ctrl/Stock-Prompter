@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v37 // stable core cleanup // unified journal // dependable systems</div>
+  <div class="subtitle">v37.2 // trade management engine // exits // scaling // hold guidance</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -174,6 +174,18 @@
     <div class="section-title">Stable Core Status</div>
     <div class="metric">Core Cleanup <span class="green">ACTIVE</span></div>
     <div class="metric muted">Saved Positions is now the main trade journal. Older tracking logic stays under the hood for analytics only.</div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">API Status / Diagnostic</div>
+    <div class="metric muted">If Alpha Vantage blocks or limits a request, the app will now show the reason instead of only saying Data unavailable.</div>
+    <div id="apiStatusBox"><div class="muted">No API check yet.</div></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Trade Management Engine</div>
+    <div class="metric muted">Helps decide when to hold, scale out, take profit, or avoid overnight risk.</div>
+    <div class="metric">Uses P/L, DTE, time-to-target, next-day confirmation, alignment, and trade quality.</div>
   </div>
 
   <div class="card">
@@ -342,6 +354,9 @@ let riskSettings = getStore("signal_predator_risk_settings", {maxRiskPerTrade:10
 
 function signalClass(value){
   value = String(value || "");
+  if(value.includes("LOCK") || value.includes("TAKE") || value.includes("SCALE") || value.includes("HOLD FOR TARGET") || value.includes("CONTROLLED")) return "green";
+  if(value.includes("EXIT") || value.includes("CUT") || value.includes("DO NOT HOLD") || value.includes("NOT RECOMMENDED") || value.includes("LOSS CONTROL")) return "red";
+  if(value.includes("MONITOR") || value.includes("TIGHT STOP") || value.includes("ONLY IF") || value.includes("HIGH RISK") || value.includes("ACCEPTABLE ONLY")) return "yellow";
   if(["TARGET LOCKED","TAKE PROFIT","BUY CALL","BULLISH","STRONG BULLISH","ACCUMULATION","PASS","A+","A","FAVORABLE","LOW","LIKELY TO HIT BEFORE EXPIRATION","CLEAR","ENTER NOW","VALID IF PRICE HOLDS","APPROVED","TRENDING","GOOD FOR TRADING","STRONG","GOOD"].includes(value)) return "green";
   if(["STRIKE NOW","CUT LOSS","LOCK PROFITS","BUY PUT","BEARISH","STRONG BEARISH","SELLING","FAIL","C","RISKY","EXTREME","HIGH","UNLIKELY BEFORE EXPIRATION","BULL TRAP RISK","BEAR TRAP RISK","DO NOT CHASE","DOWN","INVALID UNTIL RECLAIM","REJECT","DANGEROUS","AVOID NEW TRADES","DANGEROUS CONDITIONS","NO TRADE","TRAP ZONE"].includes(value)) return "red";
   if(["STALKING","WAIT","B","MEDIUM","BALANCED","RANGE","NORMAL","MODERATE","TIGHT","POSSIBLE BEFORE EXPIRATION","CHOP ZONE","LOW EDGE SETUP","CHOP","UP","WAIT FOR RETEST","NEEDS CONFIRMATION","A+ BUT CONFIRM FIRST","WAIT FOR PULLBACK","NO NEXT-DAY ENTRY","REDUCED SIZE","CHOPPY","CHOP FILTER","MID-RANGE CHOP","MIXED","WEAK"].includes(value)) return "yellow";
@@ -756,15 +771,46 @@ function getRiskControlAdvice(){
 
 async function fetchJson(url){
   const r = await fetch(url);
-  return await r.json();
+  const data = await r.json();
+
+  if(data.Note || data.Information || data["Error Message"]){
+    const msg = data.Note || data.Information || data["Error Message"];
+    const box = document.getElementById("apiStatusBox");
+    if(box){
+      box.innerHTML = `<div class="metric"><b>API Message:</b> ${String(msg).slice(0,220)}</div>`;
+    }
+  }
+
+  return data;
+}
+
+function updateApiStatus(message, level="blue"){
+  const box = document.getElementById("apiStatusBox");
+  if(!box) return;
+  box.innerHTML = `<div class="metric"><b>Status:</b> <span class="${level}">${message}</span></div>`;
 }
 async function getHistory(symbol){
   try{
     const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`);
     const s = d["Time Series (Daily)"];
-    if(!s) return null;
+
+    if(!s){
+      if(d.Note || d.Information){
+        updateApiStatus("Alpha Vantage limit/message returned. Try again later or use fewer scans.", "yellow");
+      }else if(d["Error Message"]){
+        updateApiStatus("Invalid ticker or API error.", "red");
+      }else{
+        updateApiStatus("Daily history unavailable for this ticker.", "yellow");
+      }
+      return null;
+    }
+
+    updateApiStatus("Daily history loaded successfully.", "green");
     return Object.values(s).slice(0,60).map(v=>parseFloat(v["4. close"])).filter(v=>!Number.isNaN(v));
-  }catch(e){ return null; }
+  }catch(e){
+    updateApiStatus("Network/API request failed.", "red");
+    return null;
+  }
 }
 async function getGlobalQuotePrice(symbol){
   try{
@@ -1213,11 +1259,139 @@ function buildSmartAlerts(results){
     if(r.profitScaling && r.profitScaling.action && r.profitScaling.action.includes("SELL")) alerts.push({level:"green", message:`SCALING ALERT // ${r.ticker} ${r.profitScaling.action}.`});
     if(r.profitScaling && r.profitScaling.action === "EXIT POSITION") alerts.push({level:"red", message:`EXIT ALERT // ${r.ticker} exit position.`});
     if(r.incomeMode && r.incomeMode.incomeSignal === "ON" && r.incomeMode.spreadType !== "WAIT / NO SPREAD") alerts.push({level:"green", message:`INCOME MODE ALERT // ${r.ticker} ${r.incomeMode.spreadType}.`});
+    if(r.tradeManagement && (r.tradeManagement.decision.includes("TAKE") || r.tradeManagement.decision.includes("LOCK") || r.tradeManagement.decision.includes("SCALE"))) alerts.push({level:"green", message:`MANAGEMENT ALERT // ${r.ticker} ${r.tradeManagement.decision}.`});
+    if(r.tradeManagement && (r.tradeManagement.decision.includes("EXIT") || r.tradeManagement.decision.includes("CUT"))) alerts.push({level:"red", message:`MANAGEMENT EXIT // ${r.ticker} ${r.tradeManagement.decision}.`});
     if(r.qualityDecision && r.qualityDecision.decision === "REJECT") alerts.push({level:"red", message:`QUALITY FILTER // ${r.ticker} rejected: ${r.qualityDecision.reason}`});
     if(r.noTradeZone && r.noTradeZone.zone !== "CLEAR" && r.noTradeZone.zone !== "N/A") alerts.push({level:"yellow", message:`NO TRADE ZONE // ${r.ticker} ${r.noTradeZone.zone}.`});
   });
   const seen = new Set();
   return alerts.filter(a=>{ if(seen.has(a.message)) return false; seen.add(a.message); return true; }).slice(0,8);
+}
+
+
+function getTradeManagement(position, approxPnLPercent, dte, timeTarget, ai, status){
+  const pnl = typeof approxPnLPercent === "number" ? approxPnLPercent : null;
+  const ttt = typeof timeTarget?.probability === "number" ? timeTarget.probability : null;
+  const align = typeof ai.alignmentScore?.score === "number" ? ai.alignmentScore.score : 50;
+
+  let decision = "HOLD / MONITOR";
+  let holdTime = "DAY TRADE / SHORT SWING";
+  let overnight = "ONLY IF CONFIRMED";
+  let profitRisk = "NORMAL";
+  let scalePlan = "No scale action yet.";
+  let reason = "Trade has not reached a major management trigger yet.";
+
+  if(dte !== null && dte <= 1){
+    holdTime = "SAME DAY ONLY";
+    overnight = "DO NOT HOLD OVERNIGHT";
+  }else if(dte !== null && dte <= 3){
+    holdTime = "SCALP / DAY TRADE";
+    overnight = "HIGH RISK OVERNIGHT";
+  }else if(dte !== null && dte <= 7){
+    holdTime = "DAY TRADE TO 1-2 DAYS";
+    overnight = "ONLY HOLD IF STILL CONFIRMED";
+  }else{
+    holdTime = "1-3 DAYS MAX IF SIGNAL HOLDS";
+    overnight = "ACCEPTABLE ONLY WITH STRONG CONFIRMATION";
+  }
+
+  const badTomorrow = ai.nextDay && (
+    ai.nextDay.chaseRisk === "HIGH" ||
+    ai.nextDay.overnightRisk === "HIGH" ||
+    ai.nextDay.reversalTrap === "HIGH" ||
+    ai.nextDay.tomorrowRead === "WAIT FOR PULLBACK" ||
+    ai.nextDay.tomorrowRead === "INVALID UNTIL RECLAIM"
+  );
+
+  const weakQuality = ai.qualityDecision && (
+    ai.qualityDecision.decision === "REJECT" ||
+    ai.qualityDecision.decision === "WAIT" ||
+    ai.qualityDecision.decision === "REDUCED SIZE"
+  );
+
+  if(pnl !== null){
+    if(pnl >= 75){
+      decision = "LOCK MAJOR PROFITS";
+      profitRisk = "VERY HIGH GIVEBACK RISK";
+      scalePlan = "Sell 75% and hold 25% runner only if momentum stays aligned.";
+      reason = "Large profit reached. Protect the win and avoid giving back a big move.";
+    }else if(pnl >= 40){
+      decision = "TAKE PROFITS / HOLD RUNNER";
+      profitRisk = "HIGH GIVEBACK RISK";
+      scalePlan = "Sell 50-75%. Hold a small runner only if alignment remains strong.";
+      reason = "Profit is strong and the trade may be near a peak zone.";
+    }else if(pnl >= 25){
+      decision = "SCALE OUT";
+      profitRisk = "MEDIUM-HIGH";
+      scalePlan = "Sell 50%. Hold 50% only if time-to-target and alignment remain healthy.";
+      reason = "Profit target reached. Lock part of the win and reduce emotional risk.";
+    }else if(pnl >= 15){
+      decision = "CONSIDER PARTIAL PROFIT";
+      profitRisk = "MEDIUM";
+      scalePlan = "Consider selling 25-33%, especially if holding overnight.";
+      reason = "Early profit reached. Protect part of the move if conditions are weakening.";
+    }else if(pnl <= -35){
+      decision = "CUT OR REDUCE";
+      profitRisk = "LOSS CONTROL";
+      scalePlan = "Do not add. Consider closing or reducing unless signal strongly improves.";
+      reason = "Loss is becoming too large for a short-term options trade.";
+    }else if(pnl <= -20){
+      decision = "TIGHT STOP";
+      profitRisk = "RISK RISING";
+      scalePlan = "Hold only if confirmation level is still intact.";
+      reason = "Trade is moving against you. Keep risk small.";
+    }
+  }
+
+  if(status === "LOCK PROFITS"){
+    decision = "LOCK PROFITS NOW";
+    profitRisk = "HIGH GIVEBACK RISK";
+    scalePlan = pnl !== null && pnl >= 40 ? "Sell 50-75%. Hold runner only if signal stays strong." : "Sell at least 50% or close if you only have one contract.";
+    reason = "Position is already in the profit zone.";
+  }
+
+  if(status === "STRIKE NOW"){
+    decision = "EXIT / PROTECT CAPITAL";
+    profitRisk = "HIGH";
+    scalePlan = "Close or reduce immediately. Do not average down.";
+    reason = "The position monitor says risk now outweighs reward.";
+  }
+
+  if(badTomorrow && pnl !== null && pnl >= 15){
+    decision = "TAKE PROFIT BEFORE OVERNIGHT";
+    overnight = "NOT RECOMMENDED";
+    profitRisk = "OVERNIGHT GIVEBACK RISK";
+    scalePlan = "Sell 50-100% before holding overnight. Keep only a small runner if you want exposure.";
+    reason = "You have profit and next-day risk is elevated.";
+  }else if(badTomorrow && pnl === null){
+    overnight = "NOT RECOMMENDED";
+  }
+
+  if(weakQuality && pnl !== null && pnl > 0){
+    decision = "PROTECT PROFIT";
+    scalePlan = "Take partial or full profit because quality is weakening.";
+    reason = "Trade quality is no longer clean enough to be aggressive.";
+  }
+
+  if(ttt !== null && ttt < 40){
+    if(pnl !== null && pnl > 0){
+      decision = "TAKE PROFIT";
+      scalePlan = "Close most or all. Time-to-target dropped below 40%.";
+    }else{
+      decision = "EXIT / AVOID HOLDING";
+      scalePlan = "Close or reduce. Probability is too low.";
+    }
+    reason = "Time-to-target probability is weak.";
+  }
+
+  if(align >= 80 && ttt !== null && ttt >= 70 && pnl !== null && pnl < 25 && status === "TARGET LOCKED"){
+    decision = "HOLD FOR TARGET";
+    profitRisk = "CONTROLLED";
+    scalePlan = "Hold full position until +25% area, then scale.";
+    reason = "Alignment and probability are strong enough to give the trade room.";
+  }
+
+  return {decision, holdTime, overnight, profitRisk, scalePlan, reason};
 }
 
 function analyzePosition(position, livePrice, ai, priceSource){
@@ -1246,7 +1420,8 @@ function analyzePosition(position, livePrice, ai, priceSource){
   }
   if(dte !== null && dte <= 2 && status === "STALKING") reason = "Setup is still alive, but expiration is getting very close";
   const profitScaling = getProfitScaling(status, approxPnLPercent, dte, timeTarget);
-  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone};
+  const tradeManagement = getTradeManagement(position, approxPnLPercent, dte, timeTarget, ai, status);
+  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,tradeManagement};
 }
 
 function analyzeSpreadPosition(position, livePrice, ai){
@@ -1308,6 +1483,14 @@ function renderPositionCards(results){
       <div class="metric"><b>Mode:</b> ${r.incomeMode.strategy}</div>
       <div class="metric"><b>Spread:</b> ${r.incomeMode.spreadType}</div>
       <div class="metric"><b>Income Read:</b> ${r.incomeMode.rationale}</div>
+      <div class="divider"></div>
+      <div class="section-title">Trade Management Engine</div>
+      <div class="metric"><b>Management Decision:</b> <span class="${signalClass(r.tradeManagement ? r.tradeManagement.decision : "N/A")}">${r.tradeManagement ? r.tradeManagement.decision : "N/A"}</span></div>
+      <div class="metric"><b>Hold Time:</b> ${r.tradeManagement ? r.tradeManagement.holdTime : "N/A"}</div>
+      <div class="metric"><b>Overnight:</b> <span class="${signalClass(r.tradeManagement ? r.tradeManagement.overnight : "N/A")}">${r.tradeManagement ? r.tradeManagement.overnight : "N/A"}</span></div>
+      <div class="metric"><b>Profit Risk:</b> ${r.tradeManagement ? r.tradeManagement.profitRisk : "N/A"}</div>
+      <div class="metric"><b>Scale Plan:</b> ${r.tradeManagement ? r.tradeManagement.scalePlan : "N/A"}</div>
+      <div class="metric"><b>Management Reason:</b> ${r.tradeManagement ? r.tradeManagement.reason : "N/A"}</div>
       <div class="divider"></div>
       <div class="section-title">Profit Scaling System</div>
       <div class="metric"><b>Scale Action:</b> <span class="${r.profitScaling.color}">${r.profitScaling.action}</span></div>
@@ -1432,6 +1615,13 @@ function renderFull(ticker, a){
     <div class="metric"><b>Edge:</b> <span class="${signalClass(a.edge)}">${a.edge}</span></div>
     <div class="metric"><b>Theta Risk:</b> <span class="${signalClass(a.theta)}">${a.theta}</span></div>
     <div class="divider"></div>
+    <div class="section-title">Trade Management Targets</div>
+    <div class="metric"><b>First Scale Zone:</b> +15% to +25%</div>
+    <div class="metric"><b>Strong Profit Zone:</b> +25% to +40%</div>
+    <div class="metric"><b>Runner Zone:</b> +40% or more only if alignment stays strong</div>
+    <div class="metric"><b>Hold Guidance:</b> ${a.nextDay && a.nextDay.overnightRisk === "HIGH" ? "Avoid overnight unless already scaled out" : "Hold only while confirmation stays valid"}</div>
+    <div class="metric"><b>Overnight Rule:</b> ${a.nextDay && (a.nextDay.chaseRisk === "HIGH" || a.nextDay.reversalTrap === "HIGH") ? "Take profits before overnight if green" : "Can consider overnight only with strong confirmation"}</div>
+    <div class="divider"></div>
     <div class="section-title">Exit & Execution</div>
     <div class="metric"><b>Optimal Exit:</b> ${a.optimalExit}</div>
     <div class="metric"><b>Runner Target:</b> ${a.runnerTarget}</div>
@@ -1459,6 +1649,36 @@ function applyPortfolioAlertSummary(results, sourceLabel){
   renderActiveAlertsPanel(allAlerts);
 }
 
+
+async function runFallbackAnalysis(ticker){
+  const output = document.getElementById("output");
+  updateApiStatus("Trying quote-only fallback mode...", "yellow");
+
+  const quote = await getGlobalQuotePrice(ticker);
+  const intra = quote ? null : await getIntradayPrice(ticker);
+  const price = quote || intra;
+
+  if(!price){
+    output.innerHTML = `
+      <div class="card sell-alert">
+        <div class="section-title">API Diagnostic</div>
+        <div class="metric"><b>${ticker}</b> could not load enough data right now.</div>
+        <div class="metric">This usually means Alpha Vantage returned a limit message, temporary API block, invalid symbol, or no data response.</div>
+        <div class="metric">Try one ticker again later, or wait for the daily limit window to reset.</div>
+      </div>`;
+    return;
+  }
+
+  output.innerHTML = `
+    <div class="card weak-alert">
+      <div class="section-title">Quote-Only Fallback Mode</div>
+      <div class="metric"><b>${ticker}</b> â $${price.toFixed(2)}</div>
+      <div class="metric"><b>Status:</b> Price loaded, but historical data was unavailable.</div>
+      <div class="metric"><b>Important:</b> Full Predator Analysis needs daily history for trend, alignment, quality score, and next-day confirmation.</div>
+      <div class="metric"><b>Action:</b> Do not take a new trade from fallback mode alone. Use it only as a price check.</div>
+    </div>`;
+}
+
 async function runAI(){
   const ticker = normalizeTicker(document.getElementById("ticker").value);
   const output = document.getElementById("output");
@@ -1466,9 +1686,13 @@ async function runAI(){
   if(!ticker){ output.innerHTML = "<div class='card'>Enter a ticker first.</div>"; return; }
   renderThinkingCard(["TRACKING MARKET MOVEMENT...","LOCKING ONTO TARGET...","CALCULATING STRIKE PROBABILITY..."]);
   const closes = await getHistory(ticker);
-  if(!closes){ output.innerHTML = "<div class='card'>Data unavailable.</div>"; return; }
+  if(!closes){ await runFallbackAnalysis(ticker); return; }
   const pricePack = await getBestAvailablePrice(ticker, closes);
-  if(pricePack.price === null){ output.innerHTML = "<div class='card'>Price unavailable.</div>"; return; }
+  if(pricePack.price === null){
+    updateApiStatus("Price unavailable after history loaded.", "yellow");
+    output.innerHTML = "<div class='card'>Price unavailable. Try again later or check the ticker symbol.</div>";
+    return;
+  }
   const a = analyze(closes, pricePack.price);
   output.innerHTML = mode === "compact" ? renderCompact(ticker, a) : renderFull(ticker, a);
 }
@@ -1554,12 +1778,12 @@ async function scanMyPositions(){
     const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
     const closes = await getHistory(ticker);
     if(!closes){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
     const ai = analyze(closes, pricePack.price);
