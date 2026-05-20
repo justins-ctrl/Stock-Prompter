@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v38.5 // wheel mode // no-api last recheck // reliability core</div>
+  <div class="subtitle">v39 // secure core cleanup // backup tools // reliability hardened</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -271,6 +271,15 @@
   </div>
 
   <div class="card">
+    <div class="section-title">Secure Core Tools</div>
+    <div class="metric muted">Backup or clear your saved app data. This helps protect your trade journal from accidental loss.</div>
+    <button class="secondary" onclick="safeAction('Export App Backup', exportAppBackup)">Export App Backup</button>
+    <button class="secondary" onclick="safeAction('Show Backup Text', showBackupText)">Show Backup Text</button>
+    <button class="danger" onclick="safeAction('Clear API Cache', clearCachedAnalysis)">Clear Cached Analysis</button>
+    <div id="backupBox" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="card">
     <div class="section-title">Wheel Strategy Mode</div>
     <div class="metric muted">Run Predator Analysis to see whether the stock is better for buying calls/puts, selling cash-secured puts, or selling covered calls.</div>
     <div class="metric">Wheel mode uses trend, support/resistance, quality, next-day risk, and income mode logic.</div>
@@ -338,7 +347,12 @@
 </div>
 
 <script>
-const API_KEY = "OHCJWFQEFSXI8IJ3";
+const APP_CONFIG = Object.freeze({
+  alphaVantageKey: "OHCJWFQEFSXI8IJ3",
+  apiTimeoutMs: 18000,
+  maxBackupItems: 250
+});
+const API_KEY = APP_CONFIG.alphaVantageKey;
 const DEFAULT_WATCHLIST = ["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"];
 
 function normalizeTicker(ticker){
@@ -353,7 +367,81 @@ function getStore(key, fallback){
     return parsed ?? fallback;
   }catch(e){ return fallback; }
 }
-function setStore(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+function setStore(key, value){
+  try{
+    if(Array.isArray(value) && value.length > APP_CONFIG.maxBackupItems){
+      value = value.slice(0, APP_CONFIG.maxBackupItems);
+    }
+    localStorage.setItem(key, JSON.stringify(value));
+  }catch(e){
+    alert("Storage is full or blocked. Export a backup, then remove old closed trades.");
+  }
+}
+
+function safeJsonParse(raw, fallback){
+  try{ return JSON.parse(raw); }catch(e){ return fallback; }
+}
+
+function exportAppBackup(){
+  const backup = {
+    version: "v39",
+    exportedAt: new Date().toISOString(),
+    watchlist: customWatchlist,
+    savedPositions,
+    closedTradeJournal: typeof closedTradeJournal !== "undefined" ? closedTradeJournal : [],
+    spreadPositions: savedSpreadPositions,
+    performanceTrades,
+    riskSettings,
+    gradeFilterSetting: typeof gradeFilterSetting !== "undefined" ? gradeFilterSetting : "A_AND_APLUS",
+    lastAnalysis: getStore("signal_predator_last_analysis", null)
+  };
+
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "signal-predator-backup-v39.json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+
+  const box = document.getElementById("backupBox");
+  if(box) box.innerHTML = "<div class='metric green'>Backup export started.</div>";
+}
+
+function showBackupText(){
+  const backup = {
+    version: "v39",
+    exportedAt: new Date().toISOString(),
+    watchlist: customWatchlist,
+    savedPositions,
+    closedTradeJournal: typeof closedTradeJournal !== "undefined" ? closedTradeJournal : [],
+    spreadPositions: savedSpreadPositions,
+    performanceTrades,
+    riskSettings,
+    gradeFilterSetting: typeof gradeFilterSetting !== "undefined" ? gradeFilterSetting : "A_AND_APLUS"
+  };
+  const box = document.getElementById("backupBox");
+  if(box){
+    box.innerHTML = `
+      <div class="metric"><b>Backup Text:</b></div>
+      <textarea style="width:100%;min-height:180px;border-radius:12px;background:#0b1830;color:white;padding:10px;">${JSON.stringify(backup, null, 2)}</textarea>
+      <div class="metric muted">Copy this text somewhere safe if downloads are difficult on iPhone.</div>`;
+  }
+}
+
+function clearCachedAnalysis(){
+  localStorage.removeItem("signal_predator_last_analysis");
+  const box = document.getElementById("backupBox");
+  if(box) box.innerHTML = "<div class='metric yellow'>Cached last analysis cleared. Your journal and watchlists were not deleted.</div>";
+}
+
+function sanitizeNumber(value, fallback=0){
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 
 let customWatchlist = getStore("ai_options_watchlist", ["AAPL","NVDA","TSLA","SOFI"]);
 let savedPositions = getStore("ai_options_positions", []);
@@ -490,6 +578,7 @@ function addTicker(){
   if(customWatchlist.length >= 15){ alert("Keep your watchlist at 15 or fewer tickers for faster scans."); return; }
   customWatchlist.push(ticker);
   setStore("ai_options_watchlist", customWatchlist);
+  runSecureCoreCheck();
   renderWatchlist();
   input.value = "";
 }
@@ -754,10 +843,10 @@ function estimatePortfolioRisk(){
 }
 function saveRiskSettings(){
   riskSettings = {
-    maxRiskPerTrade: Number(document.getElementById("maxRiskPerTrade").value || 100),
-    dailyProfitLock: Number(document.getElementById("dailyProfitLock").value || 20),
-    maxPortfolioRisk: Number(document.getElementById("maxPortfolioRisk").value || 25),
-    maxActiveTrades: Number(document.getElementById("maxActiveTrades").value || 3)
+    maxRiskPerTrade: sanitizeNumber(document.getElementById("maxRiskPerTrade").value, 100),
+    dailyProfitLock: sanitizeNumber(document.getElementById("dailyProfitLock").value, 20),
+    maxPortfolioRisk: sanitizeNumber(document.getElementById("maxPortfolioRisk").value, 25),
+    maxActiveTrades: sanitizeNumber(document.getElementById("maxActiveTrades").value, 3)
   };
   setStore("signal_predator_risk_settings", riskSettings);
   renderRiskControlSummary();
@@ -811,7 +900,7 @@ function getRiskControlAdvice(){
 
 async function fetchJson(url){
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 18000);
+  const timeout = setTimeout(() => controller.abort(), APP_CONFIG.apiTimeoutMs);
   try{
     const r = await fetch(url, {signal: controller.signal});
     const data = await r.json();
