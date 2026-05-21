@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v39.1 Secure Core Lean Build</title>
+  <title>Signal Predator AI v39.2 Short Options Journal</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v39.1 // secure core lean build // spread manager removed // all intelligence preserved</div>
+  <div class="subtitle">v39.2 // short calls + short puts // journal management // secure lean core</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -298,17 +298,19 @@
 
   <div class="card">
     <div class="section-title">Saved Positions / Unified Trade Journal</div>
-    <div class="metric muted">Saved positions now act as your active trade tracker. Mark trades as win/loss when closed.</div>
+    <div class="metric muted">Saved positions now track bought calls/puts and sold calls/puts. Mark trades as win/loss when closed.</div>
     <div class="grid-2">
       <input id="posTicker" placeholder="Ticker">
       <select id="posType">
-        <option value="CALL">Call</option>
-        <option value="PUT">Put</option>
+        <option value="CALL">Bought Call</option>
+        <option value="PUT">Bought Put</option>
+        <option value="SELL_CALL">Sold Call</option>
+        <option value="SELL_PUT">Sold Put</option>
       </select>
       <input id="posStrike" placeholder="Strike">
       <input id="posBreakeven" placeholder="Breakeven">
     </div>
-    <input id="posEntryPremium" placeholder="Entry Premium (optional)">
+    <input id="posEntryPremium" placeholder="Premium Paid / Credit Received">
     <div class="field-label">Expiration Date</div>
     <input id="posExpiration" type="date">
     <button onclick="safeAction('Save Position', addPosition)">Save Position</button>
@@ -364,7 +366,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v39",
+    version: "v39.2",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -379,7 +381,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v39.json";
+  a.download = "signal-predator-backup-v39-2.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -391,7 +393,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v39",
+    version: "v39.2",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -435,8 +437,8 @@ function signalClass(value){
 
   value = String(value || "");
   if(value.includes("LOCK") || value.includes("TAKE") || value.includes("SCALE") || value.includes("HOLD FOR TARGET") || value.includes("CONTROLLED")) return "green";
-  if(value.includes("EXIT") || value.includes("CUT") || value.includes("DO NOT HOLD") || value.includes("NOT RECOMMENDED") || value.includes("LOSS CONTROL")) return "red";
-  if(value.includes("MONITOR") || value.includes("TIGHT STOP") || value.includes("ONLY IF") || value.includes("HIGH RISK") || value.includes("ACCEPTABLE ONLY")) return "yellow";
+  if(value.includes("EXIT") || value.includes("CUT") || value.includes("DO NOT HOLD") || value.includes("NOT RECOMMENDED") || value.includes("LOSS CONTROL") || value.includes("ASSIGNMENT") || value.includes("ROLL RISK") || value.includes("DEFENSIVE")) return "red";
+  if(value.includes("MONITOR") || value.includes("TIGHT STOP") || value.includes("ONLY IF") || value.includes("HIGH RISK") || value.includes("ACCEPTABLE ONLY") || value.includes("WATCH") || value.includes("CONSIDER CLOSING")) return "yellow";
   if(["TARGET LOCKED","TAKE PROFIT","BUY CALL","BULLISH","STRONG BULLISH","ACCUMULATION","PASS","A+","A","FAVORABLE","LOW","LIKELY TO HIT BEFORE EXPIRATION","CLEAR","ENTER NOW","VALID IF PRICE HOLDS","APPROVED","TRENDING","GOOD FOR TRADING","STRONG","GOOD"].includes(value)) return "green";
   if(["STRIKE NOW","CUT LOSS","LOCK PROFITS","BUY PUT","BEARISH","STRONG BEARISH","SELLING","FAIL","C","RISKY","EXTREME","HIGH","UNLIKELY BEFORE EXPIRATION","BULL TRAP RISK","BEAR TRAP RISK","DO NOT CHASE","DOWN","INVALID UNTIL RECLAIM","REJECT","DANGEROUS","AVOID NEW TRADES","DANGEROUS CONDITIONS","NO TRADE","TRAP ZONE"].includes(value)) return "red";
   if(["STALKING","WAIT","B","MEDIUM","BALANCED","RANGE","NORMAL","MODERATE","TIGHT","POSSIBLE BEFORE EXPIRATION","CHOP ZONE","LOW EDGE SETUP","CHOP","UP","WAIT FOR RETEST","NEEDS CONFIRMATION","A+ BUT CONFIRM FIRST","WAIT FOR PULLBACK","NO NEXT-DAY ENTRY","REDUCED SIZE","CHOPPY","CHOP FILTER","MID-RANGE CHOP","MIXED","WEAK"].includes(value)) return "yellow";
@@ -1431,6 +1433,8 @@ function buildSmartAlerts(results){
     if(r.incomeMode && r.incomeMode.incomeSignal === "ON" && r.incomeMode.spreadType !== "WAIT / NO SPREAD") alerts.push({level:"green", message:`INCOME MODE ALERT // ${r.ticker} ${r.incomeMode.spreadType}.`});
     if(r.tradeManagement && (r.tradeManagement.decision.includes("TAKE") || r.tradeManagement.decision.includes("LOCK") || r.tradeManagement.decision.includes("SCALE"))) alerts.push({level:"green", message:`MANAGEMENT ALERT // ${r.ticker} ${r.tradeManagement.decision}.`});
     if(r.tradeManagement && (r.tradeManagement.decision.includes("EXIT") || r.tradeManagement.decision.includes("CUT"))) alerts.push({level:"red", message:`MANAGEMENT EXIT // ${r.ticker} ${r.tradeManagement.decision}.`});
+    if(r.shortManagement && r.shortManagement.assignmentRisk === "HIGH") alerts.push({level:"red", message:`SHORT OPTION ALERT // ${r.ticker} assignment risk high.`});
+    if(r.shortManagement && r.shortManagement.managementDecision.includes("TAKE")) alerts.push({level:"green", message:`SHORT OPTION PROFIT // ${r.ticker} consider closing for profit.`});
     if(r.qualityDecision && r.qualityDecision.decision === "REJECT") alerts.push({level:"red", message:`QUALITY FILTER // ${r.ticker} rejected: ${r.qualityDecision.reason}`});
     if(r.noTradeZone && r.noTradeZone.zone !== "CLEAR" && r.noTradeZone.zone !== "N/A") alerts.push({level:"yellow", message:`NO TRADE ZONE // ${r.ticker} ${r.noTradeZone.zone}.`});
   });
@@ -1563,7 +1567,153 @@ function getTradeManagement(position, approxPnLPercent, dte, timeTarget, ai, sta
   return {decision, holdTime, overnight, profitRisk, scalePlan, reason};
 }
 
+
+function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
+  const price = livePrice;
+  const type = position.type;
+  const strike = Number(position.strike);
+  const credit = Number(position.entryPremium || 0);
+  const dte = getDTE(position.expiration);
+  const expectedMoveNum = parseFloat(ai.expectedMove || "0");
+  const timeTarget = buildTimeToTarget(type === "SELL_CALL" ? "BUY PUT" : "BUY CALL", price, strike, expectedMoveNum, ai.momentumEngine, dte);
+
+  let status = "HOLD / LET THETA WORK";
+  let reason = "The short option is still in a manageable area.";
+  let cardClass = "hold-alert";
+  let assignmentRisk = "LOW";
+  let expirationDecision = "CAN CONSIDER HOLDING";
+  let managementDecision = "HOLD";
+  let closePlan = "Let premium decay while price stays safely away from the strike.";
+  let approxPnLPercent = null;
+
+  if(credit > 0){
+    let estValue;
+    if(type === "SELL_PUT"){
+      const intrinsic = Math.max(0, strike - price);
+      estValue = intrinsic + Math.max(0.03, price * 0.006);
+    }else{
+      const intrinsic = Math.max(0, price - strike);
+      estValue = intrinsic + Math.max(0.03, price * 0.006);
+    }
+    approxPnLPercent = Math.round(((credit - estValue) / credit) * 100);
+  }
+
+  if(type === "SELL_PUT"){
+    if(price > strike + expectedMoveNum * 0.35){
+      assignmentRisk = "LOW";
+      status = "HOLD / LET THETA WORK";
+      reason = "Price is comfortably above the short put strike.";
+      expirationDecision = dte !== null && dte <= 3 ? "CAN HOLD IF STILL SAFE" : "CAN CONSIDER HOLDING";
+    }else if(price > strike){
+      assignmentRisk = "MEDIUM";
+      status = "WATCH CLOSELY";
+      reason = "Price is above the short put strike, but close enough to monitor.";
+      expirationDecision = "HOLD ONLY IF SUPPORT HOLDS";
+      cardClass = "weak-alert";
+    }else{
+      assignmentRisk = "HIGH";
+      status = "EXIT / ROLL RISK";
+      reason = "Price is below the short put strike. Assignment risk is elevated.";
+      expirationDecision = "DO NOT HOLD TO EXPIRATION UNLESS YOU WANT SHARES";
+      managementDecision = "EXIT OR ROLL";
+      closePlan = "Consider buying back the put or rolling if you do not want assignment.";
+      cardClass = "sell-alert";
+    }
+
+    if(ai.bias === "Bearish" || ai.momentumEngine.includes("BEARISH")){
+      assignmentRisk = assignmentRisk === "LOW" ? "MEDIUM" : "HIGH";
+      if(status === "HOLD / LET THETA WORK") status = "WATCH CLOSELY";
+      reason += " Bearish momentum increases risk for a sold put.";
+      cardClass = assignmentRisk === "HIGH" ? "sell-alert" : "weak-alert";
+    }
+  }
+
+  if(type === "SELL_CALL"){
+    if(price < strike - expectedMoveNum * 0.35){
+      assignmentRisk = "LOW";
+      status = "HOLD / LET THETA WORK";
+      reason = "Price is comfortably below the short call strike.";
+      expirationDecision = dte !== null && dte <= 3 ? "CAN HOLD IF STILL SAFE" : "CAN CONSIDER HOLDING";
+    }else if(price < strike){
+      assignmentRisk = "MEDIUM";
+      status = "WATCH CLOSELY";
+      reason = "Price is below the short call strike, but close enough to monitor.";
+      expirationDecision = "HOLD ONLY IF RESISTANCE HOLDS";
+      cardClass = "weak-alert";
+    }else{
+      assignmentRisk = "HIGH";
+      status = "EXIT / ROLL RISK";
+      reason = "Price is above the short call strike. Assignment/call-away risk is elevated.";
+      expirationDecision = "DO NOT HOLD TO EXPIRATION UNLESS YOU ACCEPT SHARES BEING CALLED AWAY";
+      managementDecision = "EXIT OR ROLL";
+      closePlan = "Consider buying back the call or rolling if you do not want shares called away.";
+      cardClass = "sell-alert";
+    }
+
+    if(ai.bias === "Bullish" || ai.momentumEngine.includes("BULLISH")){
+      assignmentRisk = assignmentRisk === "LOW" ? "MEDIUM" : "HIGH";
+      if(status === "HOLD / LET THETA WORK") status = "WATCH CLOSELY";
+      reason += " Bullish momentum increases risk for a sold call.";
+      cardClass = assignmentRisk === "HIGH" ? "sell-alert" : "weak-alert";
+    }
+  }
+
+  if(approxPnLPercent !== null){
+    if(approxPnLPercent >= 70){
+      managementDecision = "TAKE PROFIT";
+      closePlan = "You captured most of the credit. Consider buying it back and freeing capital.";
+      status = "TAKE PROFIT";
+      cardClass = "hold-alert";
+    }else if(approxPnLPercent >= 50){
+      managementDecision = "CONSIDER CLOSING";
+      closePlan = "You captured around half or more of the credit. Closing reduces assignment/gap risk.";
+    }else if(approxPnLPercent <= -100){
+      managementDecision = "DEFENSIVE ACTION";
+      closePlan = "Loss is large relative to credit received. Consider exit or roll.";
+      status = "EXIT / ROLL RISK";
+      cardClass = "sell-alert";
+    }
+  }
+
+  if(dte !== null && dte <= 1 && assignmentRisk !== "LOW"){
+    managementDecision = "DO NOT HOLD EXPIRATION";
+    expirationDecision = "EXIT OR ACCEPT ASSIGNMENT RISK";
+    closePlan = "Expiration is very close and strike risk is elevated.";
+    cardClass = "sell-alert";
+  }
+
+  return {
+    ticker:position.ticker,
+    type,
+    strike,
+    breakeven: position.breakeven || strike,
+    expiration:position.expiration || "Not set",
+    dte:dte === null ? "N/A" : dte,
+    timeRisk:dte === null ? "Unknown" : dte <= 1 ? "Extreme" : dte <= 3 ? "High" : dte <= 7 ? "Moderate" : "Low",
+    expirationFit:dte === null ? "Unknown" : dte <= 3 ? "Tight" : "Good",
+    livePrice:price.toFixed(2),
+    status,
+    reason,
+    approxPnLPercent,
+    cardClass,
+    priceSource,
+    timeTarget,
+    trapWarning:ai.trapWarning,
+    predictiveEngine:ai.predictiveEngine,
+    incomeMode:ai.incomeMode,
+    nextDay:ai.nextDay,
+    qualityDecision:ai.qualityDecision,
+    alignmentScore:ai.alignmentScore,
+    marketRegimeFilter:ai.marketRegimeFilter,
+    noTradeZone:ai.noTradeZone,
+    shortManagement:{assignmentRisk, expirationDecision, managementDecision, closePlan, credit:credit || "N/A"}
+  };
+}
+
 function analyzePosition(position, livePrice, ai, priceSource){
+  if(position.type === "SELL_CALL" || position.type === "SELL_PUT"){
+    return analyzeShortOptionPosition(position, livePrice, ai, priceSource);
+  }
   const price = livePrice, type = position.type, strike = position.strike, breakeven = position.breakeven, entryPremium = position.entryPremium || 0, dte = getDTE(position.expiration);
   const intrinsic = type === "CALL" ? Math.max(0, price - strike) : Math.max(0, strike - price);
   const approxOptionValue = intrinsic + (price * 0.01);
@@ -1610,6 +1760,15 @@ function renderPositionCards(results){
       <div class="metric"><b>Likely Move:</b> ${r.predictiveEngine.likelyMove}</div>
       <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning || "CLEAR")}">${r.trapWarning || "CLEAR"}</span></div>
       <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
+      ${r.shortManagement ? `
+      <div class="divider"></div>
+      <div class="section-title">Short Option Management</div>
+      <div class="metric"><b>Credit Received:</b> ${r.shortManagement.credit}</div>
+      <div class="metric"><b>Assignment Risk:</b> <span class="${signalClass(r.shortManagement.assignmentRisk)}">${r.shortManagement.assignmentRisk}</span></div>
+      <div class="metric"><b>Expiration Decision:</b> <span class="${signalClass(r.shortManagement.expirationDecision)}">${r.shortManagement.expirationDecision}</span></div>
+      <div class="metric"><b>Management:</b> <span class="${signalClass(r.shortManagement.managementDecision)}">${r.shortManagement.managementDecision}</span></div>
+      <div class="metric"><b>Close Plan:</b> ${r.shortManagement.closePlan}</div>
+      ` : ""}
       <div class="divider"></div>
       <div class="section-title">Trade Quality</div>
       <div class="metric"><b>Quality Decision:</b> <span class="${signalClass(r.qualityDecision ? r.qualityDecision.decision : "N/A")}">${r.qualityDecision ? r.qualityDecision.decision : "N/A"}</span></div>
