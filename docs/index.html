@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v39.2 Short Options Journal</title>
+  <title>Signal Predator AI v39.2.1 Short Options Hotfix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1706,7 +1706,15 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
     alignmentScore:ai.alignmentScore,
     marketRegimeFilter:ai.marketRegimeFilter,
     noTradeZone:ai.noTradeZone,
-    shortManagement:{assignmentRisk, expirationDecision, managementDecision, closePlan, credit:credit || "N/A"}
+    shortManagement:{assignmentRisk, expirationDecision, managementDecision, closePlan, credit:credit || "N/A"},
+    profitScaling:{
+      action: managementDecision,
+      color: managementDecision.includes("TAKE") ? "green" :
+             managementDecision.includes("EXIT") || managementDecision.includes("DEFENSIVE") ? "red" : "yellow",
+      firstScale:"+50%",
+      secondScale:"+70%",
+      finalRunner:"Expire or close near full premium capture"
+    }
   };
 }
 
