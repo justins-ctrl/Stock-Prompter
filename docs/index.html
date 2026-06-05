@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v39.3 Confirmation Hold Engine</title>
+  <title>Signal Predator AI v39.4 Target Confidence Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v39.3 // confirmation hold engine // safer entries // short options journal</div>
+  <div class="subtitle">v39.4 // target confidence // profit protection // wheel assignment engine</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -1491,6 +1491,8 @@ function buildSmartAlerts(results){
     if(r.profitScaling && r.profitScaling.action && r.profitScaling.action.includes("SELL")) alerts.push({level:"green", message:`SCALING ALERT // ${r.ticker} ${r.profitScaling.action}.`});
     if(r.profitScaling && r.profitScaling.action === "EXIT POSITION") alerts.push({level:"red", message:`EXIT ALERT // ${r.ticker} exit position.`});
     if(r.incomeMode && r.incomeMode.incomeSignal === "ON" && r.incomeMode.spreadType !== "WAIT / NO SPREAD") alerts.push({level:"green", message:`INCOME MODE ALERT // ${r.ticker} ${r.incomeMode.spreadType}.`});
+    if(r.targetConfidence && r.targetConfidence.holdScore < 50 && r.approxPnLPercent !== null && r.approxPnLPercent > 0) alerts.push({level:"green", message:`EXIT INTELLIGENCE // ${r.ticker} protect profits. Hold score ${r.targetConfidence.holdScore}/100.`});
+    if(r.wheelAssignment && r.wheelAssignment.risk === "HIGH") alerts.push({level:"red", message:`WHEEL ALERT // ${r.ticker} ${r.wheelAssignment.outlook}.`});
     if(r.tradeManagement && (r.tradeManagement.decision.includes("TAKE") || r.tradeManagement.decision.includes("LOCK") || r.tradeManagement.decision.includes("SCALE"))) alerts.push({level:"green", message:`MANAGEMENT ALERT // ${r.ticker} ${r.tradeManagement.decision}.`});
     if(r.tradeManagement && (r.tradeManagement.decision.includes("EXIT") || r.tradeManagement.decision.includes("CUT"))) alerts.push({level:"red", message:`MANAGEMENT EXIT // ${r.ticker} ${r.tradeManagement.decision}.`});
     if(r.shortManagement && r.shortManagement.assignmentRisk === "HIGH") alerts.push({level:"red", message:`SHORT OPTION ALERT // ${r.ticker} assignment risk high.`});
@@ -1627,6 +1629,117 @@ function getTradeManagement(position, approxPnLPercent, dte, timeTarget, ai, sta
   return {decision, holdTime, overnight, profitRisk, scalePlan, reason};
 }
 
+
+
+function getTargetConfidenceEngine(position, approxPnLPercent, dte, timeTarget, ai, status){
+  const entryPremium = Number(position.entryPremium || 0);
+  const ttt = typeof timeTarget?.probability === "number" ? timeTarget.probability : 50;
+  const align = typeof ai.alignmentScore?.score === "number" ? ai.alignmentScore.score : 50;
+  const nextDay = ai.nextDay || {};
+  const quality = ai.qualityDecision?.decision || "N/A";
+
+  const conservativeGain = 20, idealGain = 40, stretchGain = 75;
+  const conservativeTarget = entryPremium > 0 ? (entryPremium * 1.20).toFixed(2) : "N/A";
+  const idealTarget = entryPremium > 0 ? (entryPremium * 1.40).toFixed(2) : "N/A";
+  const stretchTarget = entryPremium > 0 ? (entryPremium * 1.75).toFixed(2) : "N/A";
+
+  let base = Math.round((ttt + align) / 2);
+  if(quality === "APPROVED") base += 8;
+  if(quality === "REJECT") base -= 20;
+  if(nextDay.overnightRisk === "HIGH") base -= 10;
+  if(nextDay.chaseRisk === "HIGH") base -= 10;
+  if(nextDay.reversalTrap === "HIGH") base -= 10;
+  if(nextDay.tomorrowRead === "VALID IF PRICE HOLDS") base += 8;
+  if(nextDay.tomorrowRead === "WAIT FOR PULLBACK") base -= 10;
+  if(status === "STRIKE NOW") base -= 20;
+  if(status === "LOCK PROFITS") base -= 5;
+
+  let conservativeConfidence = base + 22;
+  let idealConfidence = base + 2;
+  let stretchConfidence = base - 28;
+
+  if(dte !== null && dte <= 2){ conservativeConfidence += 5; idealConfidence -= 8; stretchConfidence -= 18; }
+  if(dte !== null && dte >= 10){ idealConfidence += 6; stretchConfidence += 8; }
+
+  function clamp(n){ return Math.max(0, Math.min(100, Math.round(n))); }
+  conservativeConfidence = clamp(conservativeConfidence);
+  idealConfidence = clamp(idealConfidence);
+  stretchConfidence = clamp(stretchConfidence);
+
+  let holdScore = Math.round((align * 0.40) + (ttt * 0.40) + (idealConfidence * 0.20));
+  if(approxPnLPercent !== null && approxPnLPercent >= 25) holdScore -= 8;
+  if(approxPnLPercent !== null && approxPnLPercent >= 40) holdScore -= 12;
+  if(nextDay.overnightRisk === "HIGH") holdScore -= 12;
+  if(nextDay.chaseRisk === "HIGH") holdScore -= 8;
+  if(status === "STRIKE NOW") holdScore -= 35;
+  holdScore = clamp(holdScore);
+
+  let holdLabel = "HOLD / MONITOR";
+  if(holdScore >= 90) holdLabel = "STRONG HOLD";
+  else if(holdScore >= 70) holdLabel = "HOLD / MONITOR";
+  else if(holdScore >= 50) holdLabel = "PROTECT GAINS";
+  else if(holdScore >= 30) holdLabel = "LOCK PROFITS";
+  else holdLabel = "EXIT";
+
+  let protectionStatus = "OFF", givebackRisk = "NORMAL";
+  if(approxPnLPercent !== null){
+    if(approxPnLPercent >= 100){ protectionStatus = "HARVEST ZONE"; givebackRisk = "EXTREME"; }
+    else if(approxPnLPercent >= 60){ protectionStatus = "AGGRESSIVE PROTECTION"; givebackRisk = "VERY HIGH"; }
+    else if(approxPnLPercent >= 40){ protectionStatus = "LOCK-IN ZONE"; givebackRisk = "HIGH"; }
+    else if(approxPnLPercent >= 25){ protectionStatus = "PROTECTION ON"; givebackRisk = "MEDIUM-HIGH"; }
+    else if(approxPnLPercent >= 15){ protectionStatus = "MONITORING"; givebackRisk = "MEDIUM"; }
+  }
+
+  let recommendedTarget = "CONSERVATIVE";
+  let recommendationReason = "Account builder mode favors protecting green trades.";
+  if(idealConfidence >= 75 && holdScore >= 70 && nextDay.overnightRisk !== "HIGH"){
+    recommendedTarget = "IDEAL";
+    recommendationReason = "Ideal target has strong confidence and the hold score supports giving the trade more room.";
+  }
+  if(stretchConfidence >= 65 && holdScore >= 85 && nextDay.chaseRisk !== "HIGH" && nextDay.overnightRisk !== "HIGH"){
+    recommendedTarget = "STRETCH";
+    recommendationReason = "Stretch target is supported because momentum, alignment, and hold score are unusually strong.";
+  }
+  if(approxPnLPercent !== null && approxPnLPercent >= 25 && holdScore < 60){
+    recommendedTarget = "CONSERVATIVE";
+    recommendationReason = "Profit is already available and hold score is weakening.";
+  }
+
+  return {conservativeGain,idealGain,stretchGain,conservativeTarget,idealTarget,stretchTarget,conservativeConfidence,idealConfidence,stretchConfidence,holdScore,holdLabel,protectionStatus,givebackRisk,recommendedTarget,recommendationReason};
+}
+
+function getWheelAssignmentEngine(position, livePrice, ai){
+  const type = position.type, price = livePrice, strike = Number(position.strike);
+  const dte = getDTE(position.expiration);
+  const expectedMove = parseFloat(ai.expectedMove || "0");
+  const distance = Math.abs(price - strike);
+  const distanceFactor = expectedMove > 0 ? Math.max(0, 1 - (distance / expectedMove)) : 0.5;
+  let probability = Math.round(35 + distanceFactor * 45);
+
+  if(type === "SELL_PUT"){
+    if(price > strike) probability -= 20;
+    if(price < strike) probability += 25;
+    if(ai.bias === "Bearish" || ai.momentumEngine.includes("BEARISH")) probability += 15;
+    if(ai.bias === "Bullish" || ai.momentumEngine.includes("BULLISH")) probability -= 10;
+  }
+  if(type === "SELL_CALL"){
+    if(price < strike) probability -= 20;
+    if(price > strike) probability += 25;
+    if(ai.bias === "Bullish" || ai.momentumEngine.includes("BULLISH")) probability += 15;
+    if(ai.bias === "Bearish" || ai.momentumEngine.includes("BEARISH")) probability -= 10;
+  }
+
+  if(dte !== null && dte <= 2) probability += 10;
+  if(dte !== null && dte >= 10) probability -= 5;
+  probability = Math.max(5, Math.min(95, Math.round(probability)));
+  const expireWorthlessProbability = Math.max(5, Math.min(95, 100 - probability));
+
+  let risk = "LOW", outlook = "LIKELY EXPIRES WORTHLESS", action = "HOLD / LET THETA WORK";
+  if(probability >= 65){ risk = "HIGH"; outlook = type === "SELL_PUT" ? "HIGH ASSIGNMENT RISK" : "HIGH CALL-AWAY RISK"; action = type === "SELL_PUT" ? "ROLL / CLOSE / ACCEPT SHARES" : "ROLL / CLOSE / ACCEPT CALL-AWAY"; }
+  else if(probability >= 40){ risk = "MEDIUM"; outlook = type === "SELL_PUT" ? "PREPARE FOR POSSIBLE ASSIGNMENT" : "PREPARE FOR POSSIBLE CALL-AWAY"; action = "WATCH / CONSIDER ROLL IF STRIKE IS TESTED"; }
+
+  return {probability, expireWorthlessProbability, risk, outlook, action};
+}
 
 function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
   const price = livePrice;
@@ -1768,6 +1881,7 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
     noTradeZone:ai.noTradeZone,
     confirmationHold:ai.confirmationHold,
     shortManagement:{assignmentRisk, expirationDecision, managementDecision, closePlan, credit:credit || "N/A"},
+    wheelAssignment:getWheelAssignmentEngine(position, livePrice, ai),
     profitScaling:{
       action: managementDecision,
       color: managementDecision.includes("TAKE") ? "green" :
@@ -1809,7 +1923,8 @@ function analyzePosition(position, livePrice, ai, priceSource){
   if(dte !== null && dte <= 2 && status === "STALKING") reason = "Setup is still alive, but expiration is getting very close";
   const profitScaling = getProfitScaling(status, approxPnLPercent, dte, timeTarget);
   const tradeManagement = getTradeManagement(position, approxPnLPercent, dte, timeTarget, ai, status);
-  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement};
+  const targetConfidence = getTargetConfidenceEngine(position, approxPnLPercent, dte, timeTarget, ai, status);
+  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence};
 }
 
 function renderPositionCards(results){
@@ -1865,6 +1980,27 @@ function renderPositionCards(results){
       <div class="metric"><b>Profit Risk:</b> ${r.tradeManagement ? r.tradeManagement.profitRisk : "N/A"}</div>
       <div class="metric"><b>Scale Plan:</b> ${r.tradeManagement ? r.tradeManagement.scalePlan : "N/A"}</div>
       <div class="metric"><b>Management Reason:</b> ${r.tradeManagement ? r.tradeManagement.reason : "N/A"}</div>
+      ${r.targetConfidence ? `
+      <div class="divider"></div>
+      <div class="section-title">Target Confidence Engine</div>
+      <div class="metric"><b>Conservative Target:</b> ${r.targetConfidence.conservativeTarget === "N/A" ? "N/A" : "$" + r.targetConfidence.conservativeTarget} (+${r.targetConfidence.conservativeGain}%) â ${r.targetConfidence.conservativeConfidence}/100</div>
+      <div class="metric"><b>Ideal Target:</b> ${r.targetConfidence.idealTarget === "N/A" ? "N/A" : "$" + r.targetConfidence.idealTarget} (+${r.targetConfidence.idealGain}%) â ${r.targetConfidence.idealConfidence}/100</div>
+      <div class="metric"><b>Stretch Target:</b> ${r.targetConfidence.stretchTarget === "N/A" ? "N/A" : "$" + r.targetConfidence.stretchTarget} (+${r.targetConfidence.stretchGain}%) â ${r.targetConfidence.stretchConfidence}/100</div>
+      <div class="metric"><b>Recommended Exit:</b> <span class="${signalClass(r.targetConfidence.recommendedTarget)}">${r.targetConfidence.recommendedTarget}</span></div>
+      <div class="metric"><b>Hold Score:</b> ${r.targetConfidence.holdScore}/100 â <span class="${signalClass(r.targetConfidence.holdLabel)}">${r.targetConfidence.holdLabel}</span></div>
+      <div class="metric"><b>Profit Protection:</b> ${r.targetConfidence.protectionStatus}</div>
+      <div class="metric"><b>Giveback Risk:</b> ${r.targetConfidence.givebackRisk}</div>
+      <div class="metric"><b>Why:</b> ${r.targetConfidence.recommendationReason}</div>
+      ` : ""}
+      ${r.wheelAssignment ? `
+      <div class="divider"></div>
+      <div class="section-title">Wheel Assignment Engine</div>
+      <div class="metric"><b>Assignment / Call-Away Risk:</b> <span class="${signalClass(r.wheelAssignment.risk)}">${r.wheelAssignment.risk}</span></div>
+      <div class="metric"><b>Estimated Probability:</b> ${r.wheelAssignment.probability}%</div>
+      <div class="metric"><b>Expire Worthless Probability:</b> ${r.wheelAssignment.expireWorthlessProbability}%</div>
+      <div class="metric"><b>Outlook:</b> ${r.wheelAssignment.outlook}</div>
+      <div class="metric"><b>Action:</b> ${r.wheelAssignment.action}</div>
+      ` : ""}
       <div class="divider"></div>
       <div class="section-title">Profit Scaling System</div>
       <div class="metric"><b>Scale Action:</b> <span class="${r.profitScaling.color}">${r.profitScaling.action}</span></div>
