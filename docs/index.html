@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v39.2.1 Short Options Hotfix</title>
+  <title>Signal Predator AI v39.3 Confirmation Hold Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v39.2 // short calls + short puts // journal management // secure lean core</div>
+  <div class="subtitle">v39.3 // confirmation hold engine // safer entries // short options journal</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -436,9 +436,9 @@ function signalClass(value){
   if(value === "AVOID") return "red";
 
   value = String(value || "");
-  if(value.includes("LOCK") || value.includes("TAKE") || value.includes("SCALE") || value.includes("HOLD FOR TARGET") || value.includes("CONTROLLED")) return "green";
-  if(value.includes("EXIT") || value.includes("CUT") || value.includes("DO NOT HOLD") || value.includes("NOT RECOMMENDED") || value.includes("LOSS CONTROL") || value.includes("ASSIGNMENT") || value.includes("ROLL RISK") || value.includes("DEFENSIVE")) return "red";
-  if(value.includes("MONITOR") || value.includes("TIGHT STOP") || value.includes("ONLY IF") || value.includes("HIGH RISK") || value.includes("ACCEPTABLE ONLY") || value.includes("WATCH") || value.includes("CONSIDER CLOSING")) return "yellow";
+  if(value.includes("LOCK") || value.includes("TAKE") || value.includes("SCALE") || value.includes("HOLD FOR TARGET") || value.includes("CONTROLLED") || value.includes("CAN ENTER")) return "green";
+  if(value.includes("EXIT") || value.includes("CUT") || value.includes("DO NOT HOLD") || value.includes("NOT RECOMMENDED") || value.includes("LOSS CONTROL") || value.includes("ASSIGNMENT") || value.includes("ROLL RISK") || value.includes("DEFENSIVE") || value.includes("DO NOT ENTER")) return "red";
+  if(value.includes("MONITOR") || value.includes("TIGHT STOP") || value.includes("ONLY IF") || value.includes("HIGH RISK") || value.includes("ACCEPTABLE ONLY") || value.includes("WATCH") || value.includes("CONSIDER CLOSING") || value.includes("WAIT") || value.includes("WEAK UNTIL")) return "yellow";
   if(["TARGET LOCKED","TAKE PROFIT","BUY CALL","BULLISH","STRONG BULLISH","ACCUMULATION","PASS","A+","A","FAVORABLE","LOW","LIKELY TO HIT BEFORE EXPIRATION","CLEAR","ENTER NOW","VALID IF PRICE HOLDS","APPROVED","TRENDING","GOOD FOR TRADING","STRONG","GOOD"].includes(value)) return "green";
   if(["STRIKE NOW","CUT LOSS","LOCK PROFITS","BUY PUT","BEARISH","STRONG BEARISH","SELLING","FAIL","C","RISKY","EXTREME","HIGH","UNLIKELY BEFORE EXPIRATION","BULL TRAP RISK","BEAR TRAP RISK","DO NOT CHASE","DOWN","INVALID UNTIL RECLAIM","REJECT","DANGEROUS","AVOID NEW TRADES","DANGEROUS CONDITIONS","NO TRADE","TRAP ZONE"].includes(value)) return "red";
   if(["STALKING","WAIT","B","MEDIUM","BALANCED","RANGE","NORMAL","MODERATE","TIGHT","POSSIBLE BEFORE EXPIRATION","CHOP ZONE","LOW EDGE SETUP","CHOP","UP","WAIT FOR RETEST","NEEDS CONFIRMATION","A+ BUT CONFIRM FIRST","WAIT FOR PULLBACK","NO NEXT-DAY ENTRY","REDUCED SIZE","CHOPPY","CHOP FILTER","MID-RANGE CHOP","MIXED","WEAK"].includes(value)) return "yellow";
@@ -1141,6 +1141,65 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
   return {tomorrowRead, chaseRisk, overnightRisk, reversalTrap, buyTrigger, invalidation, morningChecklist, oneDayMovePct:oneDayMovePct.toFixed(1), fiveDayMovePct:fiveDayMovePct.toFixed(1)};
 }
 
+
+function getConfirmationHoldEngine(a){
+  const oneDayMove = parseFloat(a.nextDay?.oneDayMovePct || "0");
+  const fiveDayMove = parseFloat(a.nextDay?.fiveDayMovePct || "0");
+  const chaseRisk = a.nextDay?.chaseRisk || "N/A";
+  const overnightRisk = a.nextDay?.overnightRisk || "N/A";
+  const reversalTrap = a.nextDay?.reversalTrap || "N/A";
+  const tomorrowRead = a.nextDay?.tomorrowRead || "N/A";
+
+  let holdMinutes = 30;
+  let earliestEntry = "10:00 AM ET";
+  let confirmationStrength = "MODERATE";
+  let openingRule = "Wait for the first 30 minutes after market open, then confirm price is still above the trigger.";
+  let entryPermission = "WAIT FOR HOLD CONFIRMATION";
+  let reason = "Setup is strong, but price still needs to prove it can hold the trigger level.";
+
+  if(chaseRisk === "LOW" && reversalTrap === "LOW" && oneDayMove < 2.5){
+    holdMinutes = 15;
+    earliestEntry = "9:45 AM ET";
+    confirmationStrength = "STRONG";
+    entryPermission = "CAN ENTER AFTER 15-MIN HOLD";
+    reason = "Move is not overly extended and reversal risk is low.";
+    openingRule = "Aggressive entry allowed only after price holds the trigger for at least 15 minutes.";
+  }
+
+  if(chaseRisk === "MEDIUM" || overnightRisk === "HIGH" || oneDayMove >= 3 || Math.abs(fiveDayMove) >= 6){
+    holdMinutes = 30;
+    earliestEntry = "10:00 AM ET";
+    confirmationStrength = "MODERATE";
+    entryPermission = "WAIT 30 MINUTES";
+    reason = "There is enough risk to require a real market-open hold, not just a premarket touch.";
+    openingRule = "Do not treat premarket as confirmation. Wait for regular-session price to hold the trigger.";
+  }
+
+  if(chaseRisk === "HIGH" || reversalTrap === "HIGH" || tomorrowRead === "WAIT FOR PULLBACK" || oneDayMove >= 5 || Math.abs(fiveDayMove) >= 10){
+    holdMinutes = 60;
+    earliestEntry = "10:30 AM ET";
+    confirmationStrength = "WEAK UNTIL PROVEN";
+    entryPermission = "WAIT FOR PULLBACK / 60-MIN HOLD";
+    reason = "Move is extended or trap risk is high. A quick trigger touch is not enough.";
+    openingRule = "Wait for pullback, reclaim, and at least 60 minutes of confirmation.";
+  }
+
+  if(a.qualityDecision && a.qualityDecision.decision === "REJECT"){
+    entryPermission = "DO NOT ENTER";
+    confirmationStrength = "FAILED";
+    reason = "Quality engine rejected the setup.";
+    openingRule = "No entry unless the setup improves on a new scan.";
+  }
+
+  const trigger = a.nextDay?.buyTrigger || "N/A";
+  const invalidation = a.nextDay?.invalidation || "N/A";
+  const checklist = trigger === "N/A"
+    ? "No valid trigger available."
+    : `1) Wait until ${earliestEntry}. 2) Price must hold above $${trigger}. 3) Avoid below $${invalidation}. 4) First pullback should get bought.`;
+
+  return {holdMinutes, earliestEntry, confirmationStrength, entryPermission, openingRule, reason, checklist};
+}
+
 function getMarketRegimeFilter(closes, momentum, volatility){
   const spyLikeTrend = closes[0] > avg(closes.slice(0,20)) && avg(closes.slice(0,20)) > avg(closes.slice(0,50));
   const bearishTrend = closes[0] < avg(closes.slice(0,20)) && avg(closes.slice(0,20)) < avg(closes.slice(0,50));
@@ -1407,6 +1466,7 @@ function analyze(closes, livePrice){
   result.qualityDecision = getTradeQualityDecision(tradeFilter, grade, result.alignmentScore, result.marketRegimeFilter, result.noTradeZone, result.nextDay);
   result.supportResistance = getSupportResistance(closes);
   result.wheelMode = getWheelMode(price, direction, bias, momentumEngine, volatility, edge, result.trapWarning, result.nextDay, result.qualityDecision, result.alignmentScore, result.supportResistance);
+  result.confirmationHold = getConfirmationHoldEngine(result);
   return result;
 }
 
@@ -1706,6 +1766,7 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
     alignmentScore:ai.alignmentScore,
     marketRegimeFilter:ai.marketRegimeFilter,
     noTradeZone:ai.noTradeZone,
+    confirmationHold:ai.confirmationHold,
     shortManagement:{assignmentRisk, expirationDecision, managementDecision, closePlan, credit:credit || "N/A"},
     profitScaling:{
       action: managementDecision,
@@ -1748,7 +1809,7 @@ function analyzePosition(position, livePrice, ai, priceSource){
   if(dte !== null && dte <= 2 && status === "STALKING") reason = "Setup is still alive, but expiration is getting very close";
   const profitScaling = getProfitScaling(status, approxPnLPercent, dte, timeTarget);
   const tradeManagement = getTradeManagement(position, approxPnLPercent, dte, timeTarget, ai, status);
-  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,tradeManagement};
+  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement};
 }
 
 function renderPositionCards(results){
@@ -1790,6 +1851,7 @@ function renderPositionCards(results){
       <div class="metric"><b>Invalidation:</b> ${r.nextDay && r.nextDay.invalidation !== "N/A" ? "$" + r.nextDay.invalidation : "N/A"}</div>
       <div class="metric"><b>Chase Risk:</b> ${r.nextDay ? r.nextDay.chaseRisk : "N/A"}</div>
       <div class="metric"><b>Overnight Risk:</b> ${r.nextDay ? r.nextDay.overnightRisk : "N/A"}</div>
+      ${r.confirmationHold ? `<div class="metric"><b>Hold Requirement:</b> ${r.confirmationHold.holdMinutes} min / ${r.confirmationHold.earliestEntry}</div>` : ""}
       <div class="divider"></div>
       <div class="section-title">Income Mode</div>
       <div class="metric"><b>Mode:</b> ${r.incomeMode.strategy}</div>
@@ -1865,6 +1927,15 @@ function renderFull(ticker, a){
     <div class="metric"><b>1-Day Move:</b> ${a.nextDay.oneDayMovePct}%</div>
     <div class="metric"><b>5-Day Move:</b> ${a.nextDay.fiveDayMovePct}%</div>
     <div class="metric"><b>Morning Checklist:</b> ${a.nextDay.morningChecklist}</div>
+    <div class="divider"></div>
+    <div class="section-title">Confirmation Hold Engine</div>
+    <div class="metric"><b>Entry Permission:</b> <span class="${signalClass(a.confirmationHold.entryPermission)}">${a.confirmationHold.entryPermission}</span></div>
+    <div class="metric"><b>Hold Requirement:</b> ${a.confirmationHold.holdMinutes} minutes above trigger</div>
+    <div class="metric"><b>Earliest Safer Entry:</b> ${a.confirmationHold.earliestEntry}</div>
+    <div class="metric"><b>Confirmation Strength:</b> <span class="${signalClass(a.confirmationHold.confirmationStrength)}">${a.confirmationHold.confirmationStrength}</span></div>
+    <div class="metric"><b>Opening Rule:</b> ${a.confirmationHold.openingRule}</div>
+    <div class="metric"><b>Reason:</b> ${a.confirmationHold.reason}</div>
+    <div class="metric"><b>Trigger Checklist:</b> ${a.confirmationHold.checklist}</div>
     <div class="divider"></div>
     <div class="section-title">Predictive Engine</div>
     <div class="metric"><b>Likely Move:</b> <span class="${signalClass(a.predictiveEngine.likelyMove)}">${a.predictiveEngine.likelyMove}</span></div>
@@ -1955,7 +2026,7 @@ function renderFull(ticker, a){
 }
 
 function renderCompact(ticker, a){
-  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
