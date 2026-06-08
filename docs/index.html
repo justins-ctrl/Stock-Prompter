@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v39.5 Long-Term Options & LEAP Engine</title>
+  <title>Signal Predator AI v39.6 Wheel Expiration Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v39.5 // long-term options // LEAP engine // expiration fit analyzer</div>
+  <div class="subtitle">v39.6 // wheel expiration engine // premium selling duration analyzer</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -1201,6 +1201,112 @@ function getConfirmationHoldEngine(a){
 }
 
 
+
+function getWheelExpirationEngine(a){
+  const wheel = a.wheelMode || {};
+  const sellPutScore = Number(wheel.sellPutScore || 50);
+  const sellCallScore = Number(wheel.sellCallScore || 50);
+  const bias = a.bias || "Neutral";
+  const volatility = a.volatility || "NORMAL";
+  const overnightRisk = a.nextDay?.overnightRisk || "N/A";
+  const chaseRisk = a.nextDay?.chaseRisk || "N/A";
+  const quality = a.qualityDecision?.decision || "N/A";
+  const align = Number(a.alignmentScore?.score || 50);
+  const noTrade = a.noTradeZone?.zone || "CLEAR";
+
+  function clamp(n){ return Math.max(0, Math.min(100, Math.round(n))); }
+
+  function durationScore(days, side){
+    let base = side === "PUT" ? sellPutScore : sellCallScore;
+
+    let thetaEfficiency = 50;
+    if(days <= 7) thetaEfficiency = 78;
+    else if(days <= 14) thetaEfficiency = 84;
+    else if(days <= 45) thetaEfficiency = 92;
+    else if(days <= 60) thetaEfficiency = 82;
+    else if(days <= 90) thetaEfficiency = 70;
+    else if(days <= 180) thetaEfficiency = 52;
+    else thetaEfficiency = 38;
+
+    let premiumEfficiency = 50;
+    if(days <= 7) premiumEfficiency = 55;
+    else if(days <= 14) premiumEfficiency = 66;
+    else if(days <= 45) premiumEfficiency = 88;
+    else if(days <= 60) premiumEfficiency = 84;
+    else if(days <= 90) premiumEfficiency = 75;
+    else if(days <= 180) premiumEfficiency = 62;
+    else premiumEfficiency = 48;
+
+    let control = 60;
+    if(days <= 7) control = 45;
+    else if(days <= 14) control = 55;
+    else if(days <= 45) control = 78;
+    else if(days <= 60) control = 80;
+    else if(days <= 90) control = 76;
+    else if(days <= 180) control = 60;
+    else control = 48;
+
+    let score = (base * 0.38) + (thetaEfficiency * 0.25) + (premiumEfficiency * 0.22) + (control * 0.15);
+
+    if(quality === "REJECT") score -= 18;
+    if(noTrade !== "CLEAR") score -= 8;
+    if(align >= 75) score += 5;
+
+    if(side === "PUT"){
+      if(bias === "Bullish") score += 8;
+      if(bias === "Bearish") score -= 12;
+      if(a.momentumEngine && a.momentumEngine.includes("BEARISH")) score -= 10;
+    }
+
+    if(side === "CALL"){
+      if(bias === "Bearish" || bias === "Neutral") score += 6;
+      if(bias === "Bullish") score -= 8;
+      if(a.momentumEngine && a.momentumEngine.includes("BULLISH")) score -= 10;
+    }
+
+    if(volatility === "EXPANSION LIKELY") score += days <= 45 ? 5 : -4;
+    if(volatility === "COMPRESSION") score += days <= 45 ? 2 : -6;
+    if(overnightRisk === "HIGH" && days <= 14) score -= 8;
+    if(chaseRisk === "HIGH" && days <= 14) score -= 6;
+
+    return clamp(score);
+  }
+
+  const rows = [
+    {label:"Weekly", days:7},
+    {label:"Bi-Weekly", days:14},
+    {label:"30-45 DTE", days:45},
+    {label:"45-60 DTE", days:60},
+    {label:"60-90 DTE", days:90},
+    {label:"3-6 Months", days:180},
+    {label:"6-12 Months", days:365}
+  ].map(r => ({...r, sellPutScore:durationScore(r.days,"PUT"), sellCallScore:durationScore(r.days,"CALL")}));
+
+  const bestPut = [...rows].sort((a,b)=>b.sellPutScore-a.sellPutScore)[0];
+  const bestCall = [...rows].sort((a,b)=>b.sellCallScore-a.sellCallScore)[0];
+  const bestSide = bestPut.sellPutScore >= bestCall.sellCallScore ? "SELL PUT" : "SELL CALL";
+  const best = bestSide === "SELL PUT" ? bestPut : bestCall;
+  const bestScore = bestSide === "SELL PUT" ? best.sellPutScore : best.sellCallScore;
+
+  let wheelStyle = "BALANCED INCOME";
+  if(best.days <= 14) wheelStyle = "FAST INCOME / HIGHER MANAGEMENT";
+  else if(best.days <= 60) wheelStyle = "BALANCED THETA INCOME";
+  else if(best.days <= 90) wheelStyle = "SLOWER PREMIUM / MORE TIME";
+  else wheelStyle = "LONG-DURATION INCOME / CAPITAL TIE-UP";
+
+  let assignmentMode = "CONTROLLED";
+  if(best.days <= 14 && (overnightRisk === "HIGH" || chaseRisk === "HIGH")) assignmentMode = "FAST BUT HIGHER RISK";
+  if(best.days >= 180) assignmentMode = "LOWER THETA EFFICIENCY / LONG CAPITAL HOLD";
+
+  let reason = "30-45 DTE often offers the best balance of premium, theta decay, and management flexibility.";
+  if(best.days <= 14) reason = "Short duration can generate faster income, but requires tighter management.";
+  if(best.days >= 90) reason = "Longer duration gives more premium but can tie up capital and reduce theta efficiency.";
+  if(bestSide === "SELL PUT" && bias === "Bullish") reason += " Bullish bias favors selling puts.";
+  if(bestSide === "SELL CALL" && bias !== "Bullish") reason += " Neutral/bearish bias favors selling calls.";
+
+  return {rows,bestSide,bestDuration:best.label,bestDays:best.days,bestScore,wheelStyle,assignmentMode,reason,putBestDuration:bestPut.label,putBestScore:bestPut.sellPutScore,callBestDuration:bestCall.label,callBestScore:bestCall.sellCallScore};
+}
+
 function getLongTermOptionsEngine(price, closes, a){
   const ma20 = avg(closes.slice(0,20));
   const ma50 = avg(closes.slice(0,50));
@@ -1586,6 +1692,7 @@ function analyze(closes, livePrice){
   result.qualityDecision = getTradeQualityDecision(tradeFilter, grade, result.alignmentScore, result.marketRegimeFilter, result.noTradeZone, result.nextDay);
   result.supportResistance = getSupportResistance(closes);
   result.wheelMode = getWheelMode(price, direction, bias, momentumEngine, volatility, edge, result.trapWarning, result.nextDay, result.qualityDecision, result.alignmentScore, result.supportResistance);
+  result.wheelExpiration = getWheelExpirationEngine(result);
   result.confirmationHold = getConfirmationHoldEngine(result);
   result.longTermOptions = getLongTermOptionsEngine(price, closes, result);
   return result;
@@ -2003,6 +2110,7 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
     confirmationHold:ai.confirmationHold,
     shortManagement:{assignmentRisk, expirationDecision, managementDecision, closePlan, credit:credit || "N/A"},
     wheelAssignment:getWheelAssignmentEngine(position, livePrice, ai),
+    wheelExpiration:ai.wheelExpiration,
     profitScaling:{
       action: managementDecision,
       color: managementDecision.includes("TAKE") ? "green" :
@@ -2121,6 +2229,7 @@ function renderPositionCards(results){
       <div class="metric"><b>Expire Worthless Probability:</b> ${r.wheelAssignment.expireWorthlessProbability}%</div>
       <div class="metric"><b>Outlook:</b> ${r.wheelAssignment.outlook}</div>
       <div class="metric"><b>Action:</b> ${r.wheelAssignment.action}</div>
+      ${r.wheelExpiration ? `<div class="metric"><b>Best Wheel Duration:</b> ${r.wheelExpiration.bestDuration} (${r.wheelExpiration.bestScore}/100)</div>` : ""}
       ` : ""}
       <div class="divider"></div>
       <div class="section-title">Profit Scaling System</div>
@@ -2242,6 +2351,22 @@ function renderFull(ticker, a){
     <div class="metric"><b>Buy Put:</b> ${a.wheelMode.buyPutRead} â¢ Score ${a.wheelMode.buyPutScore}/100</div>
     <div class="metric"><b>Wheel Warning:</b> ${a.wheelMode.wheelWarning}</div>
     <div class="divider"></div>
+    <div class="section-title">Wheel Expiration Engine</div>
+    <div class="metric"><b>Best Wheel Action:</b> <span class="${signalClass(a.wheelExpiration.bestSide)}">${a.wheelExpiration.bestSide}</span></div>
+    <div class="metric"><b>Best Duration:</b> ${a.wheelExpiration.bestDuration} â ${a.wheelExpiration.bestScore}/100</div>
+    <div class="metric"><b>Wheel Style:</b> ${a.wheelExpiration.wheelStyle}</div>
+    <div class="metric"><b>Assignment Mode:</b> ${a.wheelExpiration.assignmentMode}</div>
+    <div class="metric"><b>Best Sell Put Duration:</b> ${a.wheelExpiration.putBestDuration} â ${a.wheelExpiration.putBestScore}/100</div>
+    <div class="metric"><b>Best Sell Call Duration:</b> ${a.wheelExpiration.callBestDuration} â ${a.wheelExpiration.callBestScore}/100</div>
+    <div class="metric"><b>Weekly:</b> Put ${a.wheelExpiration.rows[0].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[0].sellCallScore}/100</div>
+    <div class="metric"><b>Bi-Weekly:</b> Put ${a.wheelExpiration.rows[1].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[1].sellCallScore}/100</div>
+    <div class="metric"><b>30-45 DTE:</b> Put ${a.wheelExpiration.rows[2].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[2].sellCallScore}/100</div>
+    <div class="metric"><b>45-60 DTE:</b> Put ${a.wheelExpiration.rows[3].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[3].sellCallScore}/100</div>
+    <div class="metric"><b>60-90 DTE:</b> Put ${a.wheelExpiration.rows[4].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[4].sellCallScore}/100</div>
+    <div class="metric"><b>3-6 Months:</b> Put ${a.wheelExpiration.rows[5].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[5].sellCallScore}/100</div>
+    <div class="metric"><b>6-12 Months:</b> Put ${a.wheelExpiration.rows[6].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[6].sellCallScore}/100</div>
+    <div class="metric"><b>Reason:</b> ${a.wheelExpiration.reason}</div>
+    <div class="divider"></div>
     <div class="section-title">Risk Control</div>
     <div class="metric"><b>Max Risk Per Trade:</b> $${riskSettings.maxRiskPerTrade}</div>
     <div class="metric"><b>Suggested Risk Posture:</b> ${riskPosture}</div>
@@ -2298,7 +2423,7 @@ function renderFull(ticker, a){
 }
 
 function renderCompact(ticker, a){
-  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
@@ -2456,6 +2581,7 @@ async function findBestTrade(){
       <div class="metric"><b>Mode:</b> ${best.a.incomeMode.strategy}</div>
       <div class="metric"><b>Income Setup:</b> ${best.a.incomeMode.spreadType}</div>
       <div class="metric"><b>Wheel Best Action:</b> ${best.a.wheelMode.bestAction}</div>
+      <div class="metric"><b>Wheel Duration:</b> ${best.a.wheelExpiration.bestDuration} (${best.a.wheelExpiration.bestScore}/100)</div>
       <div class="metric"><b>Best Duration:</b> ${best.a.longTermOptions.bestLabel} (${best.a.longTermOptions.bestScore}/100)</div>
       <div class="metric"><b>Time-to-Target:</b> ${best.a.timeTarget.probability}%</div>
       <div class="metric"><b>Suggested Expiration:</b> ${best.a.expiration}</div>
