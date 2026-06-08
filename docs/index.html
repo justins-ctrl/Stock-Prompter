@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v39.4 Target Confidence Engine</title>
+  <title>Signal Predator AI v39.5 Long-Term Options & LEAP Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v39.4 // target confidence // profit protection // wheel assignment engine</div>
+  <div class="subtitle">v39.5 // long-term options // LEAP engine // expiration fit analyzer</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -1200,6 +1200,126 @@ function getConfirmationHoldEngine(a){
   return {holdMinutes, earliestEntry, confirmationStrength, entryPermission, openingRule, reason, checklist};
 }
 
+
+function getLongTermOptionsEngine(price, closes, a){
+  const ma20 = avg(closes.slice(0,20));
+  const ma50 = avg(closes.slice(0,50));
+  const trend20 = (price - ma20) / ma20 * 100;
+  const trend50 = (price - ma50) / ma50 * 100;
+  const momentum20 = (closes[0] - closes[20]) / closes[20] * 100;
+  const high20 = Math.max(...closes.slice(0,20));
+  const low20 = Math.min(...closes.slice(0,20));
+  const rangeLocation = (price - low20) / Math.max(0.01, high20 - low20);
+
+  let longBull = 50, longBear = 50;
+
+  if(price > ma20) longBull += 10;
+  if(price > ma50) longBull += 15;
+  if(ma20 > ma50) longBull += 15;
+  if(momentum20 > 5) longBull += 15;
+  if(momentum20 > 12) longBull += 10;
+  if(a.flow && a.flow.includes("ACCUMULATION")) longBull += 10;
+  if(a.smartMoney === "ACCUMULATING") longBull += 10;
+
+  if(price < ma20) longBear += 10;
+  if(price < ma50) longBear += 15;
+  if(ma20 < ma50) longBear += 15;
+  if(momentum20 < -5) longBear += 15;
+  if(momentum20 < -12) longBear += 10;
+  if(a.flow && a.flow.includes("SELLING")) longBear += 10;
+  if(a.smartMoney === "DISTRIBUTION") longBear += 10;
+
+  if(a.noTradeZone && a.noTradeZone.zone !== "CLEAR"){
+    longBull -= 5;
+    longBear -= 5;
+  }
+
+  function clamp(n){ return Math.max(0, Math.min(100, Math.round(n))); }
+  longBull = clamp(longBull);
+  longBear = clamp(longBear);
+
+  const favoredDirection = longBull >= longBear ? "LONG-TERM CALL" : "LONG-TERM PUT";
+  const favoredScore = Math.max(longBull, longBear);
+
+  let weeklyScore = a.timeTarget?.probability || 50;
+  if(a.nextDay?.chaseRisk === "HIGH") weeklyScore -= 15;
+  if(a.nextDay?.reversalTrap === "HIGH") weeklyScore -= 15;
+  if(a.nextDay?.overnightRisk === "HIGH") weeklyScore -= 8;
+  if(a.confirmationHold?.holdMinutes >= 60) weeklyScore -= 10;
+
+  let biweeklyScore = weeklyScore + 8;
+  let oneToThreeMonthScore = favoredScore + 5;
+  let threeToSixMonthScore = favoredScore + 10;
+  let sixToTwelveMonthScore = favoredScore + (Math.abs(momentum20) >= 8 ? 8 : 0);
+  let twelvePlusLeapScore = favoredScore + (Math.abs(trend50) >= 8 ? 8 : -4);
+
+  if(a.volatility === "EXPANSION LIKELY"){
+    weeklyScore += 5;
+    oneToThreeMonthScore -= 2;
+  }
+  if(a.volatility === "COMPRESSION"){
+    weeklyScore -= 8;
+    biweeklyScore -= 4;
+    threeToSixMonthScore += 4;
+    sixToTwelveMonthScore += 5;
+  }
+
+  if(rangeLocation > 0.80 && favoredDirection === "LONG-TERM CALL"){
+    weeklyScore -= 6;
+    oneToThreeMonthScore -= 4;
+    threeToSixMonthScore += 2;
+  }
+  if(rangeLocation < 0.20 && favoredDirection === "LONG-TERM PUT"){
+    weeklyScore -= 6;
+    oneToThreeMonthScore -= 4;
+    threeToSixMonthScore += 2;
+  }
+
+  weeklyScore = clamp(weeklyScore);
+  biweeklyScore = clamp(biweeklyScore);
+  oneToThreeMonthScore = clamp(oneToThreeMonthScore);
+  threeToSixMonthScore = clamp(threeToSixMonthScore);
+  sixToTwelveMonthScore = clamp(sixToTwelveMonthScore);
+  twelvePlusLeapScore = clamp(twelvePlusLeapScore);
+
+  const horizons = [
+    {label:"Weekly / Bi-Weekly", score:Math.max(weeklyScore, biweeklyScore), duration:"Weekly or 2 weeks"},
+    {label:"1-3 Month Swing", score:oneToThreeMonthScore, duration:"1-3 months"},
+    {label:"3-6 Month Position", score:threeToSixMonthScore, duration:"3-6 months"},
+    {label:"6-12 Month LEAP-Style", score:sixToTwelveMonthScore, duration:"6-12 months"},
+    {label:"12+ Month LEAP", score:twelvePlusLeapScore, duration:"12+ months"}
+  ].sort((x,y)=>y.score-x.score);
+
+  const best = horizons[0];
+
+  let expirationFit = "FAST TRADE";
+  if(best.label.includes("1-3")) expirationFit = "SWING TRADE";
+  if(best.label.includes("3-6")) expirationFit = "POSITION TRADE";
+  if(best.label.includes("6-12") || best.label.includes("12+")) expirationFit = "LEAP TRADE";
+
+  let longTermTrend = "WEAK";
+  if(favoredScore >= 90) longTermTrend = "EXCEPTIONAL";
+  else if(favoredScore >= 80) longTermTrend = "STRONG";
+  else if(favoredScore >= 65) longTermTrend = "IMPROVING";
+
+  let mismatchRisk = "LOW";
+  if(weeklyScore < 60 && best.score >= 75) mismatchRisk = "HIGH";
+  else if(weeklyScore < 70 && best.score >= 75) mismatchRisk = "MEDIUM";
+
+  let reason = "Short-term and long-term timeframes are reasonably aligned.";
+  if(mismatchRisk === "HIGH") reason = "Weekly options look noisy or risky, but longer-duration options score much better.";
+  else if(expirationFit === "LEAP TRADE") reason = "Long-term trend strength is better than the short-term trade setup.";
+  else if(expirationFit === "FAST TRADE") reason = "Short-term momentum is strong enough that a weekly or bi-weekly setup still fits.";
+
+  return {
+    weeklyScore, biweeklyScore, oneToThreeMonthScore, threeToSixMonthScore, sixToTwelveMonthScore, twelvePlusLeapScore,
+    longBull, longBear, favoredDirection, favoredScore,
+    bestDuration:best.duration, bestLabel:best.label, bestScore:best.score,
+    expirationFit, longTermTrend, mismatchRisk, reason,
+    trend20:trend20.toFixed(1), trend50:trend50.toFixed(1), momentum20:momentum20.toFixed(1)
+  };
+}
+
 function getMarketRegimeFilter(closes, momentum, volatility){
   const spyLikeTrend = closes[0] > avg(closes.slice(0,20)) && avg(closes.slice(0,20)) > avg(closes.slice(0,50));
   const bearishTrend = closes[0] < avg(closes.slice(0,20)) && avg(closes.slice(0,20)) < avg(closes.slice(0,50));
@@ -1467,6 +1587,7 @@ function analyze(closes, livePrice){
   result.supportResistance = getSupportResistance(closes);
   result.wheelMode = getWheelMode(price, direction, bias, momentumEngine, volatility, edge, result.trapWarning, result.nextDay, result.qualityDecision, result.alignmentScore, result.supportResistance);
   result.confirmationHold = getConfirmationHoldEngine(result);
+  result.longTermOptions = getLongTermOptionsEngine(price, closes, result);
   return result;
 }
 
@@ -2073,6 +2194,21 @@ function renderFull(ticker, a){
     <div class="metric"><b>Reason:</b> ${a.confirmationHold.reason}</div>
     <div class="metric"><b>Trigger Checklist:</b> ${a.confirmationHold.checklist}</div>
     <div class="divider"></div>
+    <div class="section-title">Long-Term Options / LEAP Engine</div>
+    <div class="metric"><b>Best Duration:</b> <span class="${signalClass(a.longTermOptions.expirationFit)}">${a.longTermOptions.bestLabel}</span> â ${a.longTermOptions.bestScore}/100</div>
+    <div class="metric"><b>Recommended Direction:</b> <span class="${signalClass(a.longTermOptions.favoredDirection)}">${a.longTermOptions.favoredDirection}</span></div>
+    <div class="metric"><b>Expiration Fit:</b> ${a.longTermOptions.expirationFit}</div>
+    <div class="metric"><b>Long-Term Trend:</b> ${a.longTermOptions.longTermTrend}</div>
+    <div class="metric"><b>Time Horizon Mismatch Risk:</b> <span class="${signalClass(a.longTermOptions.mismatchRisk)}">${a.longTermOptions.mismatchRisk}</span></div>
+    <div class="metric"><b>Weekly Score:</b> ${a.longTermOptions.weeklyScore}/100</div>
+    <div class="metric"><b>Bi-Weekly Score:</b> ${a.longTermOptions.biweeklyScore}/100</div>
+    <div class="metric"><b>1-3 Month Score:</b> ${a.longTermOptions.oneToThreeMonthScore}/100</div>
+    <div class="metric"><b>3-6 Month Score:</b> ${a.longTermOptions.threeToSixMonthScore}/100</div>
+    <div class="metric"><b>6-12 Month Score:</b> ${a.longTermOptions.sixToTwelveMonthScore}/100</div>
+    <div class="metric"><b>12+ Month LEAP Score:</b> ${a.longTermOptions.twelvePlusLeapScore}/100</div>
+    <div class="metric"><b>Long Bull / Bear:</b> ${a.longTermOptions.longBull}/100 bullish â¢ ${a.longTermOptions.longBear}/100 bearish</div>
+    <div class="metric"><b>Reason:</b> ${a.longTermOptions.reason}</div>
+    <div class="divider"></div>
     <div class="section-title">Predictive Engine</div>
     <div class="metric"><b>Likely Move:</b> <span class="${signalClass(a.predictiveEngine.likelyMove)}">${a.predictiveEngine.likelyMove}</span></div>
     <div class="metric"><b>Move Strength:</b> <span class="${signalClass(a.predictiveEngine.moveStrength)}">${a.predictiveEngine.moveStrength}</span></div>
@@ -2162,7 +2298,7 @@ function renderFull(ticker, a){
 }
 
 function renderCompact(ticker, a){
-  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
@@ -2320,6 +2456,7 @@ async function findBestTrade(){
       <div class="metric"><b>Mode:</b> ${best.a.incomeMode.strategy}</div>
       <div class="metric"><b>Income Setup:</b> ${best.a.incomeMode.spreadType}</div>
       <div class="metric"><b>Wheel Best Action:</b> ${best.a.wheelMode.bestAction}</div>
+      <div class="metric"><b>Best Duration:</b> ${best.a.longTermOptions.bestLabel} (${best.a.longTermOptions.bestScore}/100)</div>
       <div class="metric"><b>Time-to-Target:</b> ${best.a.timeTarget.probability}%</div>
       <div class="metric"><b>Suggested Expiration:</b> ${best.a.expiration}</div>
       <div class="metric"><b>Best Contract:</b> ${best.a.bestContract.label} ${best.a.bestContract.strike}</div>
