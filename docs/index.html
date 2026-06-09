@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v39.7 Expiration Recommendation Confidence</title>
+  <title>Signal Predator AI v40 Secure Stability Core</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v39.7 // expiration recommendation confidence // vehicle selection engine</div>
+  <div class="subtitle">v40 // secure stability core // engine guards // reliability cleanup</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -180,6 +180,13 @@
     <div class="section-title">Reliability Core</div>
     <div class="metric">Protected Button System <span class="green">ACTIVE</span></div>
     <div class="metric muted">Major actions are wrapped in safer error handling so one issue is less likely to freeze the app.</div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">v40 Stability Guard</div>
+    <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
+    <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
+    <div class="metric muted">Protects the app when one advanced engine returns missing or unexpected data.</div>
   </div>
 
   <div class="card">
@@ -366,7 +373,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v39.2",
+    version: "v40",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -381,7 +388,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v39-2.json";
+  a.download = "signal-predator-backup-v40.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -393,7 +400,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v39.2",
+    version: "v40",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -421,6 +428,70 @@ function sanitizeNumber(value, fallback=0){
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
+
+function safeObj(value, fallback={}){
+  return value && typeof value === "object" ? value : fallback;
+}
+
+function safeNum(value, fallback=0){
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function clampScore(n){
+  return Math.max(0, Math.min(100, Math.round(safeNum(n, 0))));
+}
+
+function ensureEngineDefaults(a){
+  a = safeObj(a);
+  a.nextDay = safeObj(a.nextDay, {
+    tomorrowRead:"N/A", chaseRisk:"N/A", overnightRisk:"N/A", reversalTrap:"N/A",
+    buyTrigger:"N/A", invalidation:"N/A", morningChecklist:"N/A",
+    oneDayMovePct:"0", fiveDayMovePct:"0"
+  });
+  a.qualityDecision = safeObj(a.qualityDecision, {decision:"N/A", reason:"N/A"});
+  a.alignmentScore = safeObj(a.alignmentScore, {score:50, label:"N/A"});
+  a.noTradeZone = safeObj(a.noTradeZone, {zone:"CLEAR", reason:"N/A", rangeLocation:"N/A"});
+  a.marketRegimeFilter = safeObj(a.marketRegimeFilter, {state:"N/A", action:"N/A", reason:"N/A"});
+  a.timeTarget = safeObj(a.timeTarget, {probability:50, window:"N/A", bias:"N/A"});
+  a.confirmationHold = safeObj(a.confirmationHold, {
+    holdMinutes:30, earliestEntry:"10:00 AM ET", confirmationStrength:"N/A",
+    entryPermission:"WAIT", openingRule:"N/A", reason:"N/A", checklist:"N/A"
+  });
+  a.wheelMode = safeObj(a.wheelMode, {
+    bestAction:"WAIT", sellPutScore:50, sellCallScore:50, buyCallScore:50, buyPutScore:50,
+    sellPutRead:"WAIT", sellCallRead:"WAIT", buyCallRead:"WAIT", buyPutRead:"WAIT",
+    suggestedPutStrike:"N/A", suggestedCallStrike:"N/A", support:"N/A", resistance:"N/A", wheelWarning:"N/A"
+  });
+  a.wheelExpiration = safeObj(a.wheelExpiration, {
+    bestSide:"N/A", bestDuration:"N/A", bestScore:0, wheelStyle:"N/A", assignmentMode:"N/A",
+    putBestDuration:"N/A", putBestScore:0, callBestDuration:"N/A", callBestScore:0,
+    rows:[
+      {sellPutScore:0,sellCallScore:0},{sellPutScore:0,sellCallScore:0},{sellPutScore:0,sellCallScore:0},
+      {sellPutScore:0,sellCallScore:0},{sellPutScore:0,sellCallScore:0},{sellPutScore:0,sellCallScore:0},{sellPutScore:0,sellCallScore:0}
+    ],
+    reason:"N/A"
+  });
+  a.longTermOptions = safeObj(a.longTermOptions, {
+    bestLabel:"N/A", bestScore:0, favoredDirection:"N/A", expirationFit:"N/A", longTermTrend:"N/A",
+    mismatchRisk:"N/A", weeklyScore:0, biweeklyScore:0, oneToThreeMonthScore:0, threeToSixMonthScore:0,
+    sixToTwelveMonthScore:0, twelvePlusLeapScore:0, longBull:0, longBear:0, reason:"N/A"
+  });
+  a.expirationConfidence = safeObj(a.expirationConfidence, {
+    recommendedDuration:"N/A", recommendedConfidence:0, vehicleType:"N/A", confidenceGrade:"N/A",
+    weekly:0, biweekly:0, oneMonth:0, threeMonth:0, sixMonth:0, twelveMonth:0,
+    warning:"N/A", rule:"N/A"
+  });
+  a.incomeMode = safeObj(a.incomeMode, {strategy:"N/A", incomeSignal:"OFF", spreadType:"N/A", rationale:"N/A"});
+  a.profitScaling = safeObj(a.profitScaling, {action:"N/A", color:"blue", reason:"N/A", runnerPlan:"N/A"});
+  return a;
+}
+
+function safeRender(fn, fallbackHtml){
+  try{ return fn(); }
+  catch(err){ return fallbackHtml || `<div class="card sell-alert"><div class="section-title">Render Guard</div><div class="metric">A display section failed safely: ${err.message}</div></div>`; }
+}
+
 
 let customWatchlist = getStore("ai_options_watchlist", ["AAPL","NVDA","TSLA","SOFI"]);
 let savedPositions = getStore("ai_options_positions", []);
@@ -1767,7 +1838,7 @@ function analyze(closes, livePrice){
   result.confirmationHold = getConfirmationHoldEngine(result);
   result.longTermOptions = getLongTermOptionsEngine(price, closes, result);
   result.expirationConfidence = getExpirationRecommendationConfidence(result);
-  return result;
+  return ensureEngineDefaults(result);
 }
 
 function buildSmartAlerts(results){
@@ -2316,6 +2387,7 @@ function renderPositionCards(results){
 }
 
 function renderFull(ticker, a){
+  a = ensureEngineDefaults(a);
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `<div class="card">
@@ -2508,6 +2580,7 @@ function renderFull(ticker, a){
 }
 
 function renderCompact(ticker, a){
+  a = ensureEngineDefaults(a);
   return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
@@ -2596,8 +2669,8 @@ async function runAI(){
     return;
   }
   const a = analyze(closes, pricePack.price);
-  const fullHtml = renderFull(ticker, a);
-  const compactHtml = renderCompact(ticker, a);
+  const fullHtml = safeRender(()=>renderFull(ticker, a));
+  const compactHtml = safeRender(()=>renderCompact(ticker, a));
   saveLastAnalysis(ticker, fullHtml, compactHtml, a);
   output.innerHTML = mode === "compact" ? compactHtml : fullHtml;
 }
@@ -2704,7 +2777,7 @@ async function scanMyPositions(){
   lastScanCache = cache;
   setStore("ai_options_last_scan_cache", lastScanCache);
   applyPortfolioAlertSummary(results, "TACTICAL LIVE SCAN");
-  output.innerHTML = renderPositionCards(results);
+  output.innerHTML = safeAction('Render Position Cards', async()=>renderPositionCards(results));
 }
 
 function quickRecheckPositions(){
