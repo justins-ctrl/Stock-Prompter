@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v40.1a Live Position Scan Hotfix</title>
+  <title>Signal Predator AI v40.2 Thesis Integrity Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v40.1a // live position scan hotfix // async render repair</div>
+  <div class="subtitle">v40.2 // thesis integrity engine // position scan repair</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -187,6 +187,7 @@
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
+    <div class="metric">Thesis Integrity Engine <span class="green">ACTIVE</span></div>
     <div class="metric muted">Protects the app when one advanced engine returns missing or unexpected data.</div>
   </div>
 
@@ -1952,6 +1953,8 @@ function buildSmartAlerts(results){
     if(r.profitScaling && r.profitScaling.action && r.profitScaling.action.includes("SELL")) alerts.push({level:"green", message:`SCALING ALERT // ${r.ticker} ${r.profitScaling.action}.`});
     if(r.profitScaling && r.profitScaling.action === "EXIT POSITION") alerts.push({level:"red", message:`EXIT ALERT // ${r.ticker} exit position.`});
     if(r.incomeMode && r.incomeMode.incomeSignal === "ON" && r.incomeMode.spreadType !== "WAIT / NO SPREAD") alerts.push({level:"green", message:`INCOME MODE ALERT // ${r.ticker} ${r.incomeMode.spreadType}.`});
+    if(r.thesisIntegrity && r.thesisIntegrity.score < 40) alerts.push({level:"red", message:`THESIS BROKEN // ${r.ticker} exit recommended. Thesis ${r.thesisIntegrity.score}/100.`});
+    if(r.thesisIntegrity && r.thesisIntegrity.score >= 75 && r.approxPnLPercent !== null && r.approxPnLPercent < 0) alerts.push({level:"green", message:`THESIS INTACT // ${r.ticker} red P/L but thesis still strong at ${r.thesisIntegrity.score}/100.`});
     if(r.targetConfidence && r.targetConfidence.holdScore < 50 && r.approxPnLPercent !== null && r.approxPnLPercent > 0) alerts.push({level:"green", message:`EXIT INTELLIGENCE // ${r.ticker} protect profits. Hold score ${r.targetConfidence.holdScore}/100.`});
     if(r.wheelAssignment && r.wheelAssignment.risk === "HIGH") alerts.push({level:"red", message:`WHEEL ALERT // ${r.ticker} ${r.wheelAssignment.outlook}.`});
     if(r.tradeManagement && (r.tradeManagement.decision.includes("TAKE") || r.tradeManagement.decision.includes("LOCK") || r.tradeManagement.decision.includes("SCALE"))) alerts.push({level:"green", message:`MANAGEMENT ALERT // ${r.ticker} ${r.tradeManagement.decision}.`});
@@ -2355,6 +2358,92 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
   };
 }
 
+
+function getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte, timeTarget, status){
+  const type = position.type;
+  const direction = type === "CALL" ? "BUY CALL" : type === "PUT" ? "BUY PUT" : type;
+  const price = Number(livePrice);
+  const align = Number(ai.alignmentScore?.score || 50);
+  const quality = ai.qualityDecision?.decision || "N/A";
+  const noTrade = ai.noTradeZone?.zone || "CLEAR";
+  const marketState = ai.marketRegimeFilter?.state || "N/A";
+  const invalidation = Number(ai.nextDay?.invalidation || NaN);
+  const ttt = Number(timeTarget?.probability || ai.timeTarget?.probability || 50);
+  const momentum = ai.momentumEngine || "Neutral";
+  const trap = ai.trapWarning || "CLEAR";
+  const overnightRisk = ai.nextDay?.overnightRisk || "N/A";
+  const chaseRisk = ai.nextDay?.chaseRisk || "N/A";
+
+  let score = 50;
+  const positives = [];
+  const negatives = [];
+
+  if(quality === "APPROVED"){ score += 18; positives.push("Quality engine still approved."); }
+  else if(quality === "WAIT"){ score -= 4; negatives.push("Quality engine is no longer clean."); }
+  else if(quality === "REJECT"){ score -= 25; negatives.push("Quality engine rejected the setup."); }
+
+  if(align >= 90){ score += 18; positives.push("Alignment remains very strong."); }
+  else if(align >= 75){ score += 10; positives.push("Alignment remains supportive."); }
+  else if(align < 60){ score -= 18; negatives.push("Alignment has weakened."); }
+
+  if(noTrade === "CLEAR"){ score += 8; positives.push("No-trade zone remains clear."); }
+  else { score -= 12; negatives.push("Trade moved into a no-trade zone."); }
+
+  if(marketState === "TRENDING" || marketState === "BREAKOUT"){ score += 8; positives.push("Market state still supports trend continuation."); }
+  if(marketState === "CHOP" || marketState === "RANGE"){ score -= 8; negatives.push("Market state is getting choppy."); }
+
+  if(type === "CALL"){
+    if(momentum.includes("BULLISH")){ score += 12; positives.push("Momentum still supports the call thesis."); }
+    if(momentum.includes("BEARISH")){ score -= 18; negatives.push("Momentum has turned against the call."); }
+    if(Number.isFinite(invalidation)){
+      if(price < invalidation){ score -= 25; negatives.push("Price broke below invalidation."); }
+      else positives.push("Price has not broken invalidation.");
+    }
+  }
+
+  if(type === "PUT"){
+    if(momentum.includes("BEARISH")){ score += 12; positives.push("Momentum still supports the put thesis."); }
+    if(momentum.includes("BULLISH")){ score -= 18; negatives.push("Momentum has turned against the put."); }
+    if(Number.isFinite(invalidation)){
+      if(price > invalidation){ score -= 25; negatives.push("Price reclaimed above invalidation."); }
+      else positives.push("Price has not broken invalidation.");
+    }
+  }
+
+  if(ttt >= 75){ score += 8; positives.push("Time-to-target remains favorable."); }
+  else if(ttt < 50){ score -= 10; negatives.push("Time-to-target has weakened."); }
+
+  if(trap !== "CLEAR"){ score -= 8; negatives.push("Trap warning is active."); }
+  if(overnightRisk === "HIGH"){ score -= 5; negatives.push("Overnight risk is elevated."); }
+  if(chaseRisk === "HIGH"){ score -= 5; negatives.push("Chase risk is elevated."); }
+
+  if(dte !== null && dte <= 2){ score -= 10; negatives.push("Expiration is close, so the trade has less time to recover."); }
+  if(approxPnLPercent !== null && approxPnLPercent <= -35){ score -= 8; negatives.push("Loss is large enough to require discipline."); }
+  if(status === "STRIKE NOW"){ score -= 20; negatives.push("Position scanner has issued a strike/exit warning."); }
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  let label = "CAUTION";
+  let action = "HOLD BUT RECHECK";
+  let color = "yellow";
+  if(score >= 90){ label = "THESIS FULLY INTACT"; action = "HOLD"; color = "green"; }
+  else if(score >= 75){ label = "STRONG HOLD"; action = "HOLD / MONITOR"; color = "green"; }
+  else if(score >= 60){ label = "CAUTION"; action = "HOLD ONLY IF RISK IS ACCEPTABLE"; color = "yellow"; }
+  else if(score >= 40){ label = "WEAK THESIS"; action = "REDUCE RISK / CONSIDER EXIT"; color = "yellow"; }
+  else { label = "THESIS BROKEN"; action = "EXIT RECOMMENDED"; color = "red"; }
+
+  let stopRule = "Do not exit just because the option is red. Exit when thesis integrity breaks.";
+  if(score < 60) stopRule = "Thesis is weakening. Do not give this trade much more room.";
+  if(score < 40) stopRule = "Thesis is broken. Protect capital.";
+
+  return {
+    score, label, action, color,
+    positives: positives.slice(0,4),
+    negatives: negatives.slice(0,4),
+    stopRule
+  };
+}
+
 function analyzePosition(position, livePrice, ai, priceSource){
   if(position.type === "SELL_CALL" || position.type === "SELL_PUT"){
     return analyzeShortOptionPosition(position, livePrice, ai, priceSource);
@@ -2386,19 +2475,24 @@ function analyzePosition(position, livePrice, ai, priceSource){
   const profitScaling = getProfitScaling(status, approxPnLPercent, dte, timeTarget);
   const tradeManagement = getTradeManagement(position, approxPnLPercent, dte, timeTarget, ai, status);
   const targetConfidence = getTargetConfidenceEngine(position, approxPnLPercent, dte, timeTarget, ai, status);
-  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence};
+  const thesisIntegrity = getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte, timeTarget, status);
+  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence,thesisIntegrity};
 }
 
 
 function renderPositionScanSafely(results){
   try{
     if(results && typeof results.then === "function"){
-      results.then(renderPositionScanSafely).catch(err=>showSafeError("Render Position Cards", err));
-      return;
+      results.then(res=>{
+        const output = document.getElementById("output");
+        output.innerHTML = renderPositionScanSafely(res);
+      }).catch(err=>showSafeError("Render Position Cards", err));
+      return "<div class='card'><div class='section-title'>Position Scan</div><div class='metric'>Finishing scan...</div></div>";
     }
-    renderPositionCards(Array.isArray(results) ? results : []);
+    return renderPositionCards(Array.isArray(results) ? results : []);
   }catch(err){
     showSafeError("Render Position Cards", err);
+    return `<div class="card sell-alert"><div class="section-title">Position Scan Error</div><div class="metric">${err.message}</div></div>`;
   }
 }
 
