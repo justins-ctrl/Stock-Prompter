@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v40.1 Multi-Timeframe Entry Engine</title>
+  <title>Signal Predator AI v40.1a Live Position Scan Hotfix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v40.1 // multi-timeframe entry engine // weekly swing leap triggers</div>
+  <div class="subtitle">v40.1a // live position scan hotfix // async render repair</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -186,6 +186,7 @@
     <div class="section-title">v40 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
+    <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
     <div class="metric muted">Protects the app when one advanced engine returns missing or unexpected data.</div>
   </div>
 
@@ -2388,7 +2389,25 @@ function analyzePosition(position, livePrice, ai, priceSource){
   return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence};
 }
 
+
+function renderPositionScanSafely(results){
+  try{
+    if(results && typeof results.then === "function"){
+      results.then(renderPositionScanSafely).catch(err=>showSafeError("Render Position Cards", err));
+      return;
+    }
+    renderPositionCards(Array.isArray(results) ? results : []);
+  }catch(err){
+    showSafeError("Render Position Cards", err);
+  }
+}
+
 function renderPositionCards(results){
+  if(results && typeof results.then === "function"){
+    results.then(renderPositionCards).catch(err=>showSafeError("Render Position Cards", err));
+    return;
+  }
+  results = Array.isArray(results) ? results : [];
   return results.map(r=>`
     <div class="card ${r.cardClass}">
       <div class="section-title">Predator Position Readout</div>
@@ -2870,7 +2889,7 @@ async function scanMyPositions(){
   lastScanCache = cache;
   setStore("ai_options_last_scan_cache", lastScanCache);
   applyPortfolioAlertSummary(results, "TACTICAL LIVE SCAN");
-  output.innerHTML = safeAction('Render Position Cards', async()=>renderPositionCards(results));
+  output.innerHTML = renderPositionScanSafely(results);
 }
 
 function quickRecheckPositions(){
