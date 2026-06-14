@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v40.3 Position Hold Duration Guide</title>
+  <title>Signal Predator AI v41 Predator Command Center</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -156,12 +156,19 @@
       .row{flex-direction:column;align-items:stretch}
       .row button{width:100%;margin-left:0}
     }
-  </style>
+  
+.advanced-panel{display:none}
+body.advanced-on .advanced-panel{display:block}
+.command-action{font-size:22px;font-weight:900;font-family:'Orbitron';letter-spacing:1px;text-align:center;margin:10px 0}
+.command-box{border:1px solid rgba(55,255,159,.28);background:rgba(55,255,159,.07);border-radius:14px;padding:14px;margin-top:12px}
+.toggle-line{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.toggle-line select{max-width:190px;margin-top:0}
+</style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v40.3 // position hold duration guide // bot-style rule engine</div>
+  <div class="subtitle">v41 // predator command center // simple mode + advanced metrics</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -189,6 +196,7 @@
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
     <div class="metric">Thesis Integrity Engine <span class="green">ACTIVE</span></div>
     <div class="metric">Position Hold Duration Guide <span class="green">ACTIVE</span></div>
+    <div class="metric">Predator Command Center <span class="green">ACTIVE</span></div>
     <div class="metric muted">Protects the app when one advanced engine returns missing or unexpected data.</div>
   </div>
 
@@ -208,6 +216,17 @@
     <div class="section-title">Active Alerts Panel</div>
     <div class="metric muted">Triggered alerts appear here during scans and rechecks.</div>
     <div id="activeAlertsPanel" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Predator View Mode</div>
+    <div class="toggle-line">
+      <div class="metric muted">Simple mode shows command-style answers. Advanced mode shows deeper metrics.</div>
+      <select id="predatorViewMode" onchange="setPredatorViewMode()">
+        <option value="simple">Simple</option>
+        <option value="advanced">Advanced</option>
+      </select>
+    </div>
   </div>
 
   <div class="card">
@@ -636,6 +655,7 @@ function addTicker(){
   customWatchlist.push(ticker);
   setStore("ai_options_watchlist", customWatchlist);
   runSecureCoreCheck();
+  initPredatorViewMode();
   renderWatchlist();
   input.value = "";
 }
@@ -2363,6 +2383,89 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
 
 
 
+
+function getPredatorCommandCenter(position, result){
+  const type = result.type || position.type;
+  const thesis = result.thesisIntegrity || {score:50,label:"N/A",action:"N/A"};
+  const hold = result.holdDurationGuide || {botAction:"WAIT / RECHECK", holdStyle:"N/A", suggestedHold:"N/A", reviewFrequency:"N/A", maxHoldRule:"N/A", botGrade:"B"};
+  const target = result.targetConfidence || {recommendedTarget:"N/A", holdScore:50, protectionStatus:"N/A"};
+  const shortMgmt = result.shortManagement || null;
+  const wheelAssign = result.wheelAssignment || null;
+
+  let action = "RECHECK";
+  let confidence = Math.round((Number(thesis.score || 50) + Number(target.holdScore || 50)) / 2);
+  let reason = "System needs a cleaner read.";
+  let nextCheckpoint = "Re-scan before taking action.";
+  let botInstruction = hold.suggestedHold || "Wait for clearer confirmation.";
+
+  if(type === "CALL" || type === "PUT"){
+    if(thesis.score < 40 || hold.botAction.includes("EXIT")){
+      action = "EXIT";
+      confidence = Math.max(70, 100 - Number(thesis.score || 50));
+      reason = "Trade thesis is broken or position rules say exit.";
+      nextCheckpoint = "Do not re-enter unless a fresh scan rebuilds the setup.";
+      botInstruction = "Protect capital first.";
+    }else if(hold.botAction.includes("LOCK") || target.holdLabel === "LOCK PROFITS"){
+      action = "LOCK PROFITS";
+      confidence = Math.max(70, Number(target.holdScore || 50));
+      reason = "Profit protection is more important than chasing more upside.";
+      nextCheckpoint = "If holding, use the thesis score and invalidation as your stop.";
+      botInstruction = "Take profit or use a tight exit rule.";
+    }else if(thesis.score >= 75){
+      action = "HOLD";
+      confidence = Math.min(98, Math.round((Number(thesis.score) + Number(target.holdScore || thesis.score)) / 2));
+      reason = "Thesis remains intact and hold guide supports patience.";
+      nextCheckpoint = hold.maxHoldRule || "Exit if thesis integrity breaks.";
+      botInstruction = hold.suggestedHold || "Hold while structure remains valid.";
+    }else{
+      action = "WATCH CLOSELY";
+      confidence = Math.round(Number(thesis.score || 50));
+      reason = "Trade is not fully broken, but thesis strength is weakening.";
+      nextCheckpoint = "Re-scan after next major candle or price level break.";
+      botInstruction = "Do not add. Hold only if risk is acceptable.";
+    }
+  }else{
+    if(shortMgmt && (shortMgmt.managementDecision || "").includes("TAKE")){
+      action = "TAKE PROFIT";
+      confidence = 85;
+      reason = "Premium capture is strong enough to consider closing.";
+      nextCheckpoint = "Close or keep only if assignment risk remains low.";
+      botInstruction = "Buy back the short option if profit capture meets your goal.";
+    }else if(wheelAssign && wheelAssign.risk === "HIGH"){
+      action = "ROLL / CLOSE / ACCEPT ASSIGNMENT";
+      confidence = 82;
+      reason = "Assignment or call-away risk is high.";
+      nextCheckpoint = "Decide whether you want assignment/call-away before expiration.";
+      botInstruction = "Manage the wheel position defensively.";
+    }else{
+      action = "LET THETA WORK";
+      confidence = wheelAssign ? Math.max(60, 100 - Number(wheelAssign.probability || 40)) : 70;
+      reason = "Premium-selling setup is still manageable.";
+      nextCheckpoint = "Watch strike distance and assignment risk.";
+      botInstruction = hold.suggestedHold || "Hold while risk stays controlled.";
+    }
+  }
+
+  let color = "yellow";
+  if(["HOLD","LET THETA WORK","TAKE PROFIT","LOCK PROFITS"].includes(action)) color = "green";
+  if(action.includes("EXIT") || action.includes("ROLL")) color = "red";
+
+  return {action, confidence, reason, nextCheckpoint, botInstruction, color, grade:hold.botGrade || "B"};
+}
+
+function setPredatorViewMode(){
+  const mode = document.getElementById("predatorViewMode")?.value || "simple";
+  localStorage.setItem("signal_predator_view_mode", mode);
+  document.body.classList.toggle("advanced-on", mode === "advanced");
+}
+
+function initPredatorViewMode(){
+  const mode = localStorage.getItem("signal_predator_view_mode") || "simple";
+  const sel = document.getElementById("predatorViewMode");
+  if(sel) sel.value = mode;
+  document.body.classList.toggle("advanced-on", mode === "advanced");
+}
+
 function getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent, dte, thesisIntegrity, targetConfidence){
   const type = position.type;
   const exp = ai.expirationConfidence || {};
@@ -2576,7 +2679,9 @@ function analyzePosition(position, livePrice, ai, priceSource){
   const targetConfidence = getTargetConfidenceEngine(position, approxPnLPercent, dte, timeTarget, ai, status);
   const thesisIntegrity = getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte, timeTarget, status);
   const holdDurationGuide = getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent, dte, thesisIntegrity, targetConfidence);
-  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence,thesisIntegrity,holdDurationGuide};
+  const baseResult = {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence,thesisIntegrity,holdDurationGuide};
+  baseResult.predatorCommand = getPredatorCommandCenter(position, baseResult);
+  return baseResult;
 }
 
 
@@ -2915,219 +3020,4 @@ async function runFallbackAnalysis(ticker){
       <div class="card sell-alert">
         <div class="section-title">API Diagnostic</div>
         <div class="metric"><b>${ticker}</b> could not load enough data right now.</div>
-        <div class="metric">This usually means Alpha Vantage returned a limit message, temporary API block, invalid symbol, or no data response.</div>
-        <div class="metric">Try one ticker again later, or wait for the daily limit window to reset.</div>
-      </div>`;
-    return;
-  }
-
-  output.innerHTML = `
-    <div class="card weak-alert">
-      <div class="section-title">Quote-Only Fallback Mode</div>
-      <div class="metric"><b>${ticker}</b> â $${price.toFixed(2)}</div>
-      <div class="metric"><b>Status:</b> Price loaded, but historical data was unavailable.</div>
-      <div class="metric"><b>Important:</b> Full Predator Analysis needs daily history for trend, alignment, quality score, and next-day confirmation.</div>
-      <div class="metric"><b>Action:</b> Do not take a new trade from fallback mode alone. Use it only as a price check.</div>
-    </div>`;
-}
-
-function saveLastAnalysis(ticker, analysisHtml, compactHtml, analysisData){
-  setStore("signal_predator_last_analysis", {
-    ticker,
-    savedAt: new Date().toISOString(),
-    analysisHtml,
-    compactHtml,
-    analysisData
-  });
-}
-
-function recheckLastAnalysis(){
-  const output = document.getElementById("output");
-  const cache = getStore("signal_predator_last_analysis", null);
-  if(!cache || !cache.analysisHtml){
-    output.innerHTML = "<div class='card'>No last analysis saved yet. Run Predator Analysis once first.</div>";
-    return;
-  }
-  const mode = document.getElementById("uiMode").value;
-  output.innerHTML = `
-    <div class="card">
-      <div class="section-title">No-API Recheck</div>
-      <div class="metric"><b>Last Ticker:</b> ${cache.ticker}</div>
-      <div class="metric"><b>Saved:</b> ${new Date(cache.savedAt).toLocaleString()}</div>
-      <div class="metric muted">This did not use Alpha Vantage. It is showing your last saved Predator Analysis.</div>
-      <div class="pill green">API SAFE</div>
-    </div>` + (mode === "compact" ? cache.compactHtml : cache.analysisHtml);
-}
-
-async function runAI(){
-  const ticker = normalizeTicker(document.getElementById("ticker").value);
-  const output = document.getElementById("output");
-  const mode = document.getElementById("uiMode").value;
-  if(!ticker){ output.innerHTML = "<div class='card'>Enter a ticker first.</div>"; return; }
-  renderThinkingCard(["TRACKING MARKET MOVEMENT...","LOCKING ONTO TARGET...","CALCULATING STRIKE PROBABILITY..."]);
-  const closes = await getHistory(ticker);
-  if(!closes){ await runFallbackAnalysis(ticker); return; }
-  const pricePack = await getBestAvailablePrice(ticker, closes);
-  if(pricePack.price === null){
-    updateApiStatus("Price unavailable after history loaded.", "yellow");
-    output.innerHTML = "<div class='card'>Price unavailable. Try again later or check the ticker symbol.</div>";
-    return;
-  }
-  const a = analyze(closes, pricePack.price);
-  const fullHtml = safeRender(()=>renderFull(ticker, a));
-  const compactHtml = safeRender(()=>renderCompact(ticker, a));
-  saveLastAnalysis(ticker, fullHtml, compactHtml, a);
-  output.innerHTML = mode === "compact" ? compactHtml : fullHtml;
-}
-
-async function scanList(list, title){
-  renderThinkingCard(["TRACKING MARKET MOVEMENT...","LOCKING ONTO TARGETS...","RANKING CLEANEST SETUPS..."]);
-  let results = [];
-  for(let i=0; i<list.length; i++){
-    const ticker = normalizeTicker(list[i]);
-    const closes = await getHistory(ticker);
-    if(!closes) continue;
-    const pricePack = await getBestAvailablePrice(ticker, closes);
-    if(pricePack.price === null) continue;
-    const a = analyze(closes, pricePack.price);
-    if(a.tradeFilter === "PASS" && passesGradeFilter(a) && a.qualityDecision.decision !== "REJECT") results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability, grade:a.grade, tomorrowRead:a.nextDay.tomorrowRead, chaseRisk:a.nextDay.chaseRisk, quality:a.qualityDecision.decision, alignment:a.alignmentScore.score});
-    await new Promise(r => setTimeout(r, 15000));
-  }
-  results.sort((a,b)=>b.score-a.score || b.timeTarget-a.timeTarget);
-  results = results.slice(0,2);
-  if(results.length === 0){ document.getElementById("output").innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`; return; }
-  document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Grade ${r.grade} â Score ${r.score} â Align ${r.alignment}% â ${r.quality} â TTT ${r.timeTarget}% â ${r.tomorrowRead} â Chase ${r.chaseRisk} â ${r.expiration}</div>`).join("")}</div>`;
-}
-async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
-async function scanMyWatchlist(){
-  if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; }
-  await scanList(customWatchlist, "Top Watchlist Opportunities");
-}
-
-async function findBestTrade(){
-  if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; }
-  renderThinkingCard(["SCANNING WATCHLIST...","RANKING TOP TARGET...","LOCKING BEST TRADE..."]);
-  let best = null;
-  for(let i=0; i<customWatchlist.length; i++){
-    const ticker = normalizeTicker(customWatchlist[i]);
-    const closes = await getHistory(ticker);
-    if(!closes) continue;
-    const pricePack = await getBestAvailablePrice(ticker, closes);
-    if(pricePack.price === null) continue;
-    const a = analyze(closes, pricePack.price);
-    if(a.tradeFilter !== "PASS" || !passesGradeFilter(a) || a.qualityDecision.decision === "REJECT") continue;
-    const rankScore = a.score + (a.timeTarget?.probability || 0) + (a.alignmentScore?.score || 0);
-    if(!best || rankScore > best.rankScore) best = {ticker, a, rankScore};
-    await new Promise(r => setTimeout(r, 15000));
-  }
-  if(!best){ document.getElementById("output").innerHTML = "<div class='card'>No strong trade found in your watchlist right now.</div>"; return; }
-  document.getElementById("output").innerHTML =
-    `<div class="card hold-alert">
-      <div class="section-title">Best Trade of the Day</div>
-      <div class="metric"><b>${best.ticker}</b> â <span class="${signalClass(best.a.direction)}">${best.a.direction}</span></div>
-      <div class="metric"><b>Price:</b> $${best.a.price}</div>
-      <div class="metric"><b>Trade Score:</b> ${best.a.score}/100</div>
-      <div class="metric"><b>Quality Decision:</b> <span class="${signalClass(best.a.qualityDecision.decision)}">${best.a.qualityDecision.decision}</span></div>
-      <div class="metric"><b>Alignment Score:</b> ${best.a.alignmentScore.score}/100</div>
-      <div class="metric"><b>Market State:</b> ${best.a.marketRegimeFilter.state}</div>
-      <div class="metric"><b>No-Trade Zone:</b> ${best.a.noTradeZone.zone}</div>
-      <div class="metric"><b>Confidence Meter:</b> <span class="${best.a.confidenceMeter.color}">${best.a.confidenceMeter.label}</span></div>
-      <div class="metric"><b>Entry Timing:</b> <span class="${signalClass(best.a.entryTiming.label)}">${best.a.entryTiming.label}</span></div>
-      <div class="metric"><b>Entry Read:</b> ${best.a.entryTiming.reason}</div>
-      <div class="metric"><b>Tomorrow Read:</b> <span class="${signalClass(best.a.nextDay.tomorrowRead)}">${best.a.nextDay.tomorrowRead}</span></div>
-      <div class="metric"><b>Buy Trigger:</b> ${best.a.nextDay.buyTrigger === "N/A" ? "N/A" : "$" + best.a.nextDay.buyTrigger}</div>
-      <div class="metric"><b>Invalidation:</b> ${best.a.nextDay.invalidation === "N/A" ? "N/A" : "$" + best.a.nextDay.invalidation}</div>
-      <div class="metric"><b>Chase Risk:</b> ${best.a.nextDay.chaseRisk}</div>
-      <div class="metric"><b>Likely Move:</b> ${best.a.predictiveEngine.likelyMove}</div>
-      <div class="metric"><b>Move Strength:</b> ${best.a.predictiveEngine.moveStrength}</div>
-      <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(best.a.trapWarning)}">${best.a.trapWarning}</span></div>
-      <div class="metric"><b>Mode:</b> ${best.a.incomeMode.strategy}</div>
-      <div class="metric"><b>Income Setup:</b> ${best.a.incomeMode.spreadType}</div>
-      <div class="metric"><b>Wheel Best Action:</b> ${best.a.wheelMode.bestAction}</div>
-      <div class="metric"><b>Wheel Duration:</b> ${best.a.wheelExpiration.bestDuration} (${best.a.wheelExpiration.bestScore}/100)</div>
-      <div class="metric"><b>Best Duration:</b> ${best.a.longTermOptions.bestLabel} (${best.a.longTermOptions.bestScore}/100)</div>
-      <div class="metric"><b>Expiration Confidence:</b> ${best.a.expirationConfidence.recommendedDuration} (${best.a.expirationConfidence.recommendedConfidence}/100)</div>
-      <div class="metric"><b>Entry Style:</b> ${best.a.multiTimeframeEntry.bestEntryStyle}</div>
-      <div class="metric"><b>Time-to-Target:</b> ${best.a.timeTarget.probability}%</div>
-      <div class="metric"><b>Suggested Expiration:</b> ${best.a.expiration}</div>
-      <div class="metric"><b>Best Contract:</b> ${best.a.bestContract.label} ${best.a.bestContract.strike}</div>
-      <div class="metric"><b>OTM Grade:</b> <span class="${signalClass(best.a.otmPreferred.grade)}">${best.a.otmPreferred.grade}</span></div>
-    </div>` + (document.getElementById("uiMode").value === "compact" ? renderCompact(best.ticker, best.a) : renderFull(best.ticker, best.a));
-}
-
-async function scanMyPositions(){
-  const output = document.getElementById("output");
-  if(!savedPositions.length){ output.innerHTML = "<div class='card'>No saved positions yet.</div>"; clearActiveAlertsPanel(); return; }
-  renderThinkingCard(["TRACKING SAVED POSITIONS...","RECALCULATING TARGET ODDS...","CHECKING FOR STRIKE ALERTS..."]);
-  let results = [];
-  let cache = { scannedAt: new Date().toISOString(), results: [] };
-
-  for(let i=0; i<savedPositions.length; i++){
-    const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
-    const closes = await getHistory(ticker);
-    if(!closes){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
-      results.push(item); cache.results.push(item); continue;
-    }
-    const pricePack = await getBestAvailablePrice(ticker, closes);
-    if(pricePack.price === null){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
-      results.push(item); cache.results.push(item); continue;
-    }
-    const ai = analyze(closes, pricePack.price);
-    const monitor = analyzePosition(p, pricePack.price, ai, pricePack.source);
-    results.push(monitor); cache.results.push(monitor);
-    await new Promise(r => setTimeout(r, 5000));
-  }
-
-  lastScanCache = cache;
-  setStore("ai_options_last_scan_cache", lastScanCache);
-  applyPortfolioAlertSummary(results, "TACTICAL LIVE SCAN");
-  output.innerHTML = renderPositionScanSafely(results);
-}
-
-function quickRecheckPositions(){
-  const output = document.getElementById("output");
-  const cache = getStore("ai_options_last_scan_cache", null);
-  if(!cache || !cache.results || !cache.results.length){
-    output.innerHTML = "<div class='card'>No recent live scan found yet. Run <b>Live Position Scan</b> once first, then Quick Recheck will work without API calls.</div>";
-    clearActiveAlertsPanel();
-    return;
-  }
-  const refreshed = cache.results.map(item=>{
-    const copy = {...item};
-    if(copy.expiration && copy.expiration !== "Not set"){
-      const dte = getDTE(copy.expiration);
-      copy.dte = dte === null ? "N/A" : dte;
-      if(dte !== null){
-        if(dte <= 1){ copy.timeRisk = "Extreme"; copy.expirationFit = "Very Short"; }
-        else if(dte <= 3){ copy.timeRisk = "High"; copy.expirationFit = "Tight"; }
-        else if(dte <= 7){ copy.timeRisk = "Moderate"; copy.expirationFit = "Good"; }
-        else { copy.timeRisk = "Low"; copy.expirationFit = "Good"; }
-        if(copy.status === "STALKING" && dte <= 2) copy.reason = "Quick Recheck: target still alive, but expiration is getting very close.";
-        if(copy.status === "TARGET LOCKED" && dte <= 1){
-          copy.status = "STALKING";
-          copy.cardClass = "weak-alert";
-          copy.reason = "Quick Recheck: hold downgraded because expiration is now very close.";
-        }
-      }
-    }
-    copy.priceSource = String(copy.priceSource || "Cached") + " / Quick Recheck";
-    return copy;
-  });
-  applyPortfolioAlertSummary(refreshed, "TACTICAL QUICK RECHECK");
-  output.innerHTML = `<div class='card'><div class='section-title'>Quick Recheck</div><div class='metric'>Using your most recent live scan from ${new Date(cache.scannedAt).toLocaleString()}.</div><div class='metric muted'>No new API calls were used.</div><div class="pill blue">CACHE MODE</div><div class="pill green">API SAFE</div></div>` + renderPositionCards(refreshed);
-}
-
-renderWatchlist();
-renderPositions();
-renderPerformanceTracker();
-renderRiskControlSummary();
-renderClosedTradeJournal();
-renderJournalSummary();
-renderAlertHistory();
-clearActiveAlertsPanel();
-if(typeof renderGradeFilterSummary === 'function') renderGradeFilterSummary();
-</script>
-</body>
-</html>
+        <div class="metric">This usually means Alpha Vantage returned a limit message, temporary API block, 
