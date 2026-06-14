@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v41 Predator Command Center</title>
+  <title>Signal Predator AI v41.5 Refactor Bot Decision Layer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -163,12 +163,24 @@ body.advanced-on .advanced-panel{display:block}
 .command-box{border:1px solid rgba(55,255,159,.28);background:rgba(55,255,159,.07);border-radius:14px;padding:14px;margin-top:12px}
 .toggle-line{display:flex;gap:10px;align-items:center;justify-content:space-between}
 .toggle-line select{max-width:190px;margin-top:0}
+
+.bot-decision-card{border:1px solid rgba(55,255,159,.40);background:linear-gradient(180deg,rgba(55,255,159,.11),rgba(10,20,38,.92));}
+.bot-decision-main{font-size:26px;font-weight:900;font-family:'Orbitron';letter-spacing:1px;text-align:center;margin:10px 0;text-transform:uppercase}
+.bot-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.bot-tile{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;background:rgba(255,255,255,.035)}
+.rank-row{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid rgba(255,255,255,.07);padding:7px 0;font-family:'Share Tech Mono',monospace;font-size:14px}
+.rank-row:last-child{border-bottom:none}
+.simple-focus{display:block}
+body.advanced-on .simple-focus{display:block}
+.advanced-panel{display:none}
+body.advanced-on .advanced-panel{display:block}
+
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v41 // predator command center // simple mode + advanced metrics</div>
+  <div class="subtitle">v41.5 // refactor bot decision layer // simplified command center</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -190,13 +202,14 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v40 Stability Guard</div>
+    <div class="section-title">v41.5 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
     <div class="metric">Thesis Integrity Engine <span class="green">ACTIVE</span></div>
     <div class="metric">Position Hold Duration Guide <span class="green">ACTIVE</span></div>
     <div class="metric">Predator Command Center <span class="green">ACTIVE</span></div>
+    <div class="metric">v41.5 Bot Decision Layer <span class="green">ACTIVE</span></div>
     <div class="metric muted">Protects the app when one advanced engine returns missing or unexpected data.</div>
   </div>
 
@@ -395,7 +408,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v40",
+    version: "v41.5",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -410,7 +423,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v40.json";
+  a.download = "signal-predator-backup-v41-5.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -422,7 +435,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v40",
+    version: "v41.5",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -531,11 +544,12 @@ let lastScanCache = getStore("ai_options_last_scan_cache", null);
 let riskSettings = getStore("signal_predator_risk_settings", {maxRiskPerTrade:100,dailyProfitLock:20,maxPortfolioRisk:25,maxActiveTrades:3});
 
 function signalClass(value){
-  value = String(value || "");
-  if(value.includes("SELL CASH-SECURED PUT") || value.includes("SELL COVERED CALL") || value === "GOOD") return "green";
-  if(value === "AVOID") return "red";
+  value = String(value || "").toUpperCase();
+  if(value.includes("BUY CALL") || value.includes("BUY PUT") || value.includes("SELL CASH-SECURED PUT") || value.includes("SELL COVERED CALL") || value === "GOOD") return "green";
+  if(value.includes("BOT APPROVED") || value.includes("APPROVED") || value.includes("ENTER") || value.includes("HOLD") || value.includes("LET THETA WORK")) return "green";
+  if(value.includes("BOT REJECTED") || value.includes("EXIT") || value.includes("CUT") || value.includes("DO NOT") || value === "AVOID" || value === "REJECT") return "red";
+  if(value.includes("WAIT") || value.includes("WATCH") || value.includes("REDUCED") || value.includes("CAUTION")) return "yellow";
 
-  value = String(value || "");
   if(value.includes("LOCK") || value.includes("TAKE") || value.includes("SCALE") || value.includes("HOLD FOR TARGET") || value.includes("CONTROLLED") || value.includes("CAN ENTER")) return "green";
   if(value.includes("EXIT") || value.includes("CUT") || value.includes("DO NOT HOLD") || value.includes("NOT RECOMMENDED") || value.includes("LOSS CONTROL") || value.includes("ASSIGNMENT") || value.includes("ROLL RISK") || value.includes("DEFENSIVE") || value.includes("DO NOT ENTER")) return "red";
   if(value.includes("MONITOR") || value.includes("TIGHT STOP") || value.includes("ONLY IF") || value.includes("HIGH RISK") || value.includes("ACCEPTABLE ONLY") || value.includes("WATCH") || value.includes("CONSIDER CLOSING") || value.includes("WAIT") || value.includes("WEAK UNTIL")) return "yellow";
@@ -2191,7 +2205,13 @@ function getTargetConfidenceEngine(position, approxPnLPercent, dte, timeTarget, 
     recommendationReason = "Profit is already available and hold score is weakening.";
   }
 
-  return {conservativeGain,idealGain,stretchGain,conservativeTarget,idealTarget,stretchTarget,conservativeConfidence,idealConfidence,stretchConfidence,holdScore,holdLabel,protectionStatus,givebackRisk,recommendedTarget,recommendationReason};
+  const targetOptions = [
+    {name:"CONSERVATIVE", gain:conservativeGain, target:conservativeTarget, confidence:conservativeConfidence},
+    {name:"IDEAL", gain:idealGain, target:idealTarget, confidence:idealConfidence},
+    {name:"STRETCH", gain:stretchGain, target:stretchTarget, confidence:stretchConfidence}
+  ].sort((a,b)=>b.confidence-a.confidence);
+  const bestTarget = targetOptions[0];
+  return {conservativeGain,idealGain,stretchGain,conservativeTarget,idealTarget,stretchTarget,conservativeConfidence,idealConfidence,stretchConfidence,holdScore,holdLabel,protectionStatus,givebackRisk,recommendedTarget,recommendationReason,bestTarget,targetOptions};
 }
 
 function getWheelAssignmentEngine(position, livePrice, ai){
@@ -2383,6 +2403,159 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
 
 
 
+
+
+function getStrategyRankings(a){
+  a = ensureEngineDefaults(a);
+  const wheel = a.wheelMode || {};
+  const rows = [
+    {name:"BUY CALL", score:clampScore(wheel.buyCallScore || 0)},
+    {name:"BUY PUT", score:clampScore(wheel.buyPutScore || 0)},
+    {name:"SELL CASH-SECURED PUT", score:clampScore(wheel.sellPutScore || 0)},
+    {name:"SELL COVERED CALL", score:clampScore(wheel.sellCallScore || 0)}
+  ].sort((x,y)=>y.score-x.score);
+  const best = rows[0] || {name:"WAIT", score:0};
+  return {rows,best};
+}
+
+function getDurationOptimizer(a){
+  a = ensureEngineDefaults(a);
+  const exp = a.expirationConfidence || {};
+  const lt = a.longTermOptions || {};
+  const wheelExp = a.wheelExpiration || {};
+  let duration = exp.recommendedDuration || lt.bestLabel || "N/A";
+  let confidence = clampScore(exp.recommendedConfidence || lt.bestScore || 0);
+  let vehicle = exp.vehicleType || lt.expirationFit || "N/A";
+  let reason = exp.rule || lt.reason || "Use the duration with the strongest confidence and lowest mismatch risk.";
+
+  if((a.wheelMode?.bestAction || "").includes("SELL") && wheelExp.bestDuration){
+    duration = wheelExp.bestDuration;
+    confidence = clampScore(wheelExp.bestScore || confidence);
+    vehicle = "WHEEL / PREMIUM SELLING";
+    reason = wheelExp.reason || reason;
+  }
+
+  return {duration,confidence,vehicle,reason};
+}
+
+function getPredatorBotDecision(a){
+  a = ensureEngineDefaults(a);
+  const rankings = getStrategyRankings(a);
+  const duration = getDurationOptimizer(a);
+
+  const quality = a.qualityDecision?.decision || "N/A";
+  const noTrade = a.noTradeZone?.zone || "CLEAR";
+  const marketState = a.marketRegimeFilter?.state || "N/A";
+  const align = clampScore(a.alignmentScore?.score || 50);
+  const ttt = clampScore(a.timeTarget?.probability || 50);
+  const expConf = clampScore(a.expirationConfidence?.recommendedConfidence || duration.confidence || 50);
+
+  let confidence = clampScore((align * .35) + (ttt * .25) + (expConf * .20) + (a.score * .20));
+  let status = "BOT APPROVED";
+  let action = rankings.best?.name || a.direction || "WAIT";
+  let permission = "APPROVED";
+  let reason = "Trend, timing, and strategy ranking support this setup.";
+  let entryRule = a.confirmationHold?.openingRule || a.nextDay?.morningChecklist || "Wait for confirmation before entering.";
+  let riskRule = "Exit or avoid entry if invalidation breaks, alignment falls below 60, or thesis weakens.";
+  let positionSize = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
+  let grade = a.grade || "C";
+
+  if(a.tradeFilter === "FAIL" || a.direction === "WAIT"){
+    status = "BOT WAIT";
+    permission = "WAIT";
+    action = rankings.best.score >= 75 ? rankings.best.name : "WAIT";
+    confidence = Math.min(confidence, 65);
+    reason = "Base direction is not clean enough for an automatic entry.";
+  }
+
+  if(quality === "REJECT" || noTrade !== "CLEAR" || marketState === "DANGEROUS"){
+    status = "BOT REJECTED";
+    permission = "REJECTED";
+    action = "WAIT / NO TRADE";
+    confidence = Math.min(confidence, 45);
+    reason = quality === "REJECT" ? a.qualityDecision.reason : noTrade !== "CLEAR" ? a.noTradeZone.reason : a.marketRegimeFilter.reason;
+    positionSize = "NO NEW POSITION";
+  }else if(quality === "WAIT" || quality === "REDUCED SIZE" || a.confirmationHold?.entryPermission?.includes("WAIT")){
+    status = "BOT WAIT";
+    permission = "WAIT";
+    confidence = Math.min(confidence, 78);
+    reason = a.confirmationHold?.reason || a.qualityDecision?.reason || "Setup needs confirmation before entry.";
+    positionSize = "REDUCED SIZE / WAIT FOR TRIGGER";
+  }
+
+  if(rankings.best.score < 60){
+    status = "BOT WAIT";
+    permission = "WAIT";
+    action = "WAIT";
+    confidence = Math.min(confidence, 55);
+    reason = "No strategy ranking is strong enough yet.";
+  }
+
+  if(confidence >= 90 && status === "BOT APPROVED") grade = "A+";
+  else if(confidence >= 80 && status !== "BOT REJECTED") grade = "A";
+  else if(confidence >= 70 && status !== "BOT REJECTED") grade = "B";
+  else if(status === "BOT REJECTED") grade = "F";
+
+  const holdStyle = duration.vehicle.includes("SWING") ? "SWING TRADE" :
+                    duration.vehicle.includes("LEAP") || duration.duration.includes("6") || duration.duration.includes("12") ? "POSITION / LEAP TRADE" :
+                    duration.duration.includes("Weekly") || duration.duration.includes("Bi") ? "DAY TRADE / SHORT SWING" :
+                    "TACTICAL TRADE";
+
+  return {status,permission,action,confidence,grade,positionSize,reason,entryRule,riskRule,rankings,duration,holdStyle};
+}
+
+function renderPredatorBotDecision(a){
+  const bot = getPredatorBotDecision(a);
+  const color = bot.status === "BOT APPROVED" ? "green" : bot.status === "BOT REJECTED" ? "red" : "yellow";
+  const trigger = a.nextDay?.buyTrigger && a.nextDay.buyTrigger !== "N/A" ? "$" + a.nextDay.buyTrigger : "N/A";
+  const invalidation = a.nextDay?.invalidation && a.nextDay.invalidation !== "N/A" ? "$" + a.nextDay.invalidation : "N/A";
+  return `
+  <div class="card bot-decision-card">
+    <div class="section-title">Predator Bot Decision</div>
+    <div class="bot-decision-main ${color}">${bot.action}</div>
+    <div class="bot-grid">
+      <div class="bot-tile"><div class="metric"><b>Status:</b><br><span class="${color}">${bot.status}</span></div></div>
+      <div class="bot-tile"><div class="metric"><b>Confidence:</b><br>${bot.confidence}/100</div></div>
+      <div class="bot-tile"><div class="metric"><b>Grade:</b><br><span class="${signalClass(bot.grade)}">${bot.grade}</span></div></div>
+      <div class="bot-tile"><div class="metric"><b>Size:</b><br>${bot.positionSize}</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="metric"><b>Best Expiration:</b> ${bot.duration.duration} (${bot.duration.confidence}/100)</div>
+    <div class="metric"><b>Hold Style:</b> ${bot.holdStyle}</div>
+    <div class="metric"><b>Trigger:</b> ${trigger}</div>
+    <div class="metric"><b>Invalidation:</b> ${invalidation}</div>
+    <div class="metric"><b>Entry Rule:</b> ${bot.entryRule}</div>
+    <div class="metric"><b>Risk Rule:</b> ${bot.riskRule}</div>
+    <div class="metric"><b>Why:</b> ${bot.reason}</div>
+  </div>`;
+}
+
+function renderStrategyRankingCard(a){
+  const bot = getPredatorBotDecision(a);
+  return `
+  <div class="card">
+    <div class="section-title">Strategy Rankings</div>
+    ${bot.rankings.rows.map((r,i)=>`
+      <div class="rank-row">
+        <span>${i+1}. ${r.name}${i===0 ? " â­" : ""}</span>
+        <span class="${signalClass(r.name)}">${r.score}/100</span>
+      </div>`).join("")}
+    <div class="divider"></div>
+    <div class="metric"><b>Recommended Strategy:</b> <span class="${signalClass(bot.rankings.best.name)}">${bot.rankings.best.name}</span></div>
+  </div>`;
+}
+
+function renderDurationOptimizerCard(a){
+  const d = getDurationOptimizer(a);
+  return `
+  <div class="card">
+    <div class="section-title">Duration Optimizer</div>
+    <div class="metric"><b>Best Duration:</b> ${d.duration}</div>
+    <div class="metric"><b>Confidence:</b> ${d.confidence}/100</div>
+    <div class="metric"><b>Vehicle:</b> ${d.vehicle}</div>
+    <div class="metric"><b>Reason:</b> ${d.reason}</div>
+  </div>`;
+}
 
 function getPredatorCommandCenter(position, result){
   const type = result.type || position.type;
@@ -2703,13 +2876,23 @@ function renderPositionScanSafely(results){
 
 function renderPositionCards(results){
   if(results && typeof results.then === "function"){
-    results.then(renderPositionCards).catch(err=>showSafeError("Render Position Cards", err));
-    return;
+    return renderPositionScanSafely(results);
   }
   results = Array.isArray(results) ? results : [];
   return results.map(r=>`
     <div class="card ${r.cardClass}">
-      <div class="section-title">Predator Position Readout</div>
+      <div class="section-title">Predator Command Center</div>
+      ${(()=>{ const cmd = r.predatorCommand || getPredatorCommandCenter({type:r.type}, r); return `
+        <div class="command-box">
+          <div class="command-action ${cmd.color}">${cmd.action}</div>
+          <div class="metric"><b>Confidence:</b> ${cmd.confidence}/100</div>
+          <div class="metric"><b>Instruction:</b> ${cmd.botInstruction}</div>
+          <div class="metric"><b>Reason:</b> ${cmd.reason}</div>
+          <div class="metric"><b>Next Checkpoint:</b> ${cmd.nextCheckpoint}</div>
+        </div>`; })()}
+      <div class="advanced-panel">
+      <div class="divider"></div>
+      <div class="section-title">Advanced Position Readout</div>
       <div class="metric"><b>${r.ticker}</b> ${r.strike} ${r.type}</div>
       <div class="metric"><b>Live Price:</b> ${r.livePrice === "N/A" ? "N/A" : "$" + r.livePrice}</div>
       <div class="metric"><b>Breakeven:</b> $${r.breakeven}</div>
@@ -2789,19 +2972,24 @@ function renderPositionCards(results){
       <div class="metric"><b>Reason:</b> ${r.reason}</div>
       <div class="metric"><b>Price Source:</b> ${r.priceSource}</div>
       ${r.approxPnLPercent !== null ? `<div class="metric"><b>Approx P/L:</b> ${r.approxPnLPercent > 0 ? "+" : ""}${r.approxPnLPercent}%</div>` : ""}
+      </div>
     </div>
   `).join("");
 }
 
 function renderFull(ticker, a){
-  if(typeof ensureEngineDefaults==='function') a = ensureEngineDefaults(a);
-  if(!a.multiTimeframeEntry && typeof getMultiTimeframeEntryEngine==='function') a.multiTimeframeEntry = getMultiTimeframeEntryEngine(a);
   a = ensureEngineDefaults(a);
-  if(!a.multiTimeframeEntry) a.multiTimeframeEntry = getMultiTimeframeEntryEngine(a);
+  if(!a.multiTimeframeEntry && typeof getMultiTimeframeEntryEngine === 'function'){
+    a.multiTimeframeEntry = getMultiTimeframeEntryEngine(a);
+  }
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
-  return `<div class="card">
-    <div class="section-title">Predator Trade Setup</div>
+  return `${renderPredatorBotDecision(a)}
+  ${renderStrategyRankingCard(a)}
+  ${renderDurationOptimizerCard(a)}
+  <div class="advanced-panel">
+  <div class="card">
+    <div class="section-title">Advanced Metrics / Predator Trade Setup</div>
     <div class="metric"><b>Ticker:</b> ${ticker}</div>
     <div class="metric"><b>Price:</b> $${a.price}</div>
     <div class="metric"><b>Market Bias:</b> <span class="${signalClass(a.bias)}">${a.bias}</span></div>
@@ -2986,12 +3174,13 @@ function renderFull(ticker, a){
     <div class="metric"><b>Liquidity:</b> ${a.liquidity}</div>
     <div class="metric"><b>Spread Risk:</b> ${a.spreadRisk}</div>
     <div class="metric"><b>Execution Quality:</b> <span class="${signalClass(a.executionGrade)}">${a.executionGrade}</span></div>
+  </div>
   </div>`;
 }
 
 function renderCompact(ticker, a){
   a = ensureEngineDefaults(a);
-  return `<div class="card"><div class="section-title">Quick Glance</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `${renderPredatorBotDecision(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
@@ -3020,4 +3209,219 @@ async function runFallbackAnalysis(ticker){
       <div class="card sell-alert">
         <div class="section-title">API Diagnostic</div>
         <div class="metric"><b>${ticker}</b> could not load enough data right now.</div>
-        <div class="metric">This usually means Alpha Vantage returned a limit message, temporary API block, 
+        <div class="metric">This usually means Alpha Vantage returned a limit message, temporary API block, invalid symbol, or no data response.</div>
+        <div class="metric">Try one ticker again later, or wait for the daily limit window to reset.</div>
+      </div>`;
+    return;
+  }
+
+  output.innerHTML = `
+    <div class="card weak-alert">
+      <div class="section-title">Quote-Only Fallback Mode</div>
+      <div class="metric"><b>${ticker}</b> â $${price.toFixed(2)}</div>
+      <div class="metric"><b>Status:</b> Price loaded, but historical data was unavailable.</div>
+      <div class="metric"><b>Important:</b> Full Predator Analysis needs daily history for trend, alignment, quality score, and next-day confirmation.</div>
+      <div class="metric"><b>Action:</b> Do not take a new trade from fallback mode alone. Use it only as a price check.</div>
+    </div>`;
+}
+
+function saveLastAnalysis(ticker, analysisHtml, compactHtml, analysisData){
+  setStore("signal_predator_last_analysis", {
+    ticker,
+    savedAt: new Date().toISOString(),
+    analysisHtml,
+    compactHtml,
+    analysisData
+  });
+}
+
+function recheckLastAnalysis(){
+  const output = document.getElementById("output");
+  const cache = getStore("signal_predator_last_analysis", null);
+  if(!cache || !cache.analysisHtml){
+    output.innerHTML = "<div class='card'>No last analysis saved yet. Run Predator Analysis once first.</div>";
+    return;
+  }
+  const mode = document.getElementById("uiMode").value;
+  output.innerHTML = `
+    <div class="card">
+      <div class="section-title">No-API Recheck</div>
+      <div class="metric"><b>Last Ticker:</b> ${cache.ticker}</div>
+      <div class="metric"><b>Saved:</b> ${new Date(cache.savedAt).toLocaleString()}</div>
+      <div class="metric muted">This did not use Alpha Vantage. It is showing your last saved Predator Analysis.</div>
+      <div class="pill green">API SAFE</div>
+    </div>` + (mode === "compact" ? cache.compactHtml : cache.analysisHtml);
+}
+
+async function runAI(){
+  const ticker = normalizeTicker(document.getElementById("ticker").value);
+  const output = document.getElementById("output");
+  const mode = document.getElementById("uiMode").value;
+  if(!ticker){ output.innerHTML = "<div class='card'>Enter a ticker first.</div>"; return; }
+  renderThinkingCard(["TRACKING MARKET MOVEMENT...","LOCKING ONTO TARGET...","CALCULATING STRIKE PROBABILITY..."]);
+  const closes = await getHistory(ticker);
+  if(!closes){ await runFallbackAnalysis(ticker); return; }
+  const pricePack = await getBestAvailablePrice(ticker, closes);
+  if(pricePack.price === null){
+    updateApiStatus("Price unavailable after history loaded.", "yellow");
+    output.innerHTML = "<div class='card'>Price unavailable. Try again later or check the ticker symbol.</div>";
+    return;
+  }
+  const a = analyze(closes, pricePack.price);
+  const fullHtml = safeRender(()=>renderFull(ticker, a));
+  const compactHtml = safeRender(()=>renderCompact(ticker, a));
+  saveLastAnalysis(ticker, fullHtml, compactHtml, a);
+  output.innerHTML = mode === "compact" ? compactHtml : fullHtml;
+}
+
+async function scanList(list, title){
+  renderThinkingCard(["TRACKING MARKET MOVEMENT...","LOCKING ONTO TARGETS...","RANKING CLEANEST SETUPS..."]);
+  let results = [];
+  for(let i=0; i<list.length; i++){
+    const ticker = normalizeTicker(list[i]);
+    const closes = await getHistory(ticker);
+    if(!closes) continue;
+    const pricePack = await getBestAvailablePrice(ticker, closes);
+    if(pricePack.price === null) continue;
+    const a = analyze(closes, pricePack.price);
+    if(a.tradeFilter === "PASS" && passesGradeFilter(a) && a.qualityDecision.decision !== "REJECT") results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability, grade:a.grade, tomorrowRead:a.nextDay.tomorrowRead, chaseRisk:a.nextDay.chaseRisk, quality:a.qualityDecision.decision, alignment:a.alignmentScore.score});
+    await new Promise(r => setTimeout(r, 15000));
+  }
+  results.sort((a,b)=>b.score-a.score || b.timeTarget-a.timeTarget);
+  results = results.slice(0,2);
+  if(results.length === 0){ document.getElementById("output").innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`; return; }
+  document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Grade ${r.grade} â Score ${r.score} â Align ${r.alignment}% â ${r.quality} â TTT ${r.timeTarget}% â ${r.tomorrowRead} â Chase ${r.chaseRisk} â ${r.expiration}</div>`).join("")}</div>`;
+}
+async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
+async function scanMyWatchlist(){
+  if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; }
+  await scanList(customWatchlist, "Top Watchlist Opportunities");
+}
+
+async function findBestTrade(){
+  if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; }
+  renderThinkingCard(["SCANNING WATCHLIST...","RANKING TOP TARGET...","LOCKING BEST TRADE..."]);
+  let best = null;
+  for(let i=0; i<customWatchlist.length; i++){
+    const ticker = normalizeTicker(customWatchlist[i]);
+    const closes = await getHistory(ticker);
+    if(!closes) continue;
+    const pricePack = await getBestAvailablePrice(ticker, closes);
+    if(pricePack.price === null) continue;
+    const a = analyze(closes, pricePack.price);
+    if(a.tradeFilter !== "PASS" || !passesGradeFilter(a) || a.qualityDecision.decision === "REJECT") continue;
+    const rankScore = a.score + (a.timeTarget?.probability || 0) + (a.alignmentScore?.score || 0);
+    if(!best || rankScore > best.rankScore) best = {ticker, a, rankScore};
+    await new Promise(r => setTimeout(r, 15000));
+  }
+  if(!best){ document.getElementById("output").innerHTML = "<div class='card'>No strong trade found in your watchlist right now.</div>"; return; }
+  document.getElementById("output").innerHTML =
+    `<div class="card hold-alert">
+      <div class="section-title">Best Trade of the Day</div>
+      <div class="metric"><b>${best.ticker}</b> â <span class="${signalClass(best.a.direction)}">${best.a.direction}</span></div>
+      <div class="metric"><b>Price:</b> $${best.a.price}</div>
+      <div class="metric"><b>Trade Score:</b> ${best.a.score}/100</div>
+      <div class="metric"><b>Quality Decision:</b> <span class="${signalClass(best.a.qualityDecision.decision)}">${best.a.qualityDecision.decision}</span></div>
+      <div class="metric"><b>Alignment Score:</b> ${best.a.alignmentScore.score}/100</div>
+      <div class="metric"><b>Market State:</b> ${best.a.marketRegimeFilter.state}</div>
+      <div class="metric"><b>No-Trade Zone:</b> ${best.a.noTradeZone.zone}</div>
+      <div class="metric"><b>Confidence Meter:</b> <span class="${best.a.confidenceMeter.color}">${best.a.confidenceMeter.label}</span></div>
+      <div class="metric"><b>Entry Timing:</b> <span class="${signalClass(best.a.entryTiming.label)}">${best.a.entryTiming.label}</span></div>
+      <div class="metric"><b>Entry Read:</b> ${best.a.entryTiming.reason}</div>
+      <div class="metric"><b>Tomorrow Read:</b> <span class="${signalClass(best.a.nextDay.tomorrowRead)}">${best.a.nextDay.tomorrowRead}</span></div>
+      <div class="metric"><b>Buy Trigger:</b> ${best.a.nextDay.buyTrigger === "N/A" ? "N/A" : "$" + best.a.nextDay.buyTrigger}</div>
+      <div class="metric"><b>Invalidation:</b> ${best.a.nextDay.invalidation === "N/A" ? "N/A" : "$" + best.a.nextDay.invalidation}</div>
+      <div class="metric"><b>Chase Risk:</b> ${best.a.nextDay.chaseRisk}</div>
+      <div class="metric"><b>Likely Move:</b> ${best.a.predictiveEngine.likelyMove}</div>
+      <div class="metric"><b>Move Strength:</b> ${best.a.predictiveEngine.moveStrength}</div>
+      <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(best.a.trapWarning)}">${best.a.trapWarning}</span></div>
+      <div class="metric"><b>Mode:</b> ${best.a.incomeMode.strategy}</div>
+      <div class="metric"><b>Income Setup:</b> ${best.a.incomeMode.spreadType}</div>
+      <div class="metric"><b>Wheel Best Action:</b> ${best.a.wheelMode.bestAction}</div>
+      <div class="metric"><b>Wheel Duration:</b> ${best.a.wheelExpiration.bestDuration} (${best.a.wheelExpiration.bestScore}/100)</div>
+      <div class="metric"><b>Best Duration:</b> ${best.a.longTermOptions.bestLabel} (${best.a.longTermOptions.bestScore}/100)</div>
+      <div class="metric"><b>Expiration Confidence:</b> ${best.a.expirationConfidence.recommendedDuration} (${best.a.expirationConfidence.recommendedConfidence}/100)</div>
+      <div class="metric"><b>Entry Style:</b> ${best.a.multiTimeframeEntry.bestEntryStyle}</div>
+      <div class="metric"><b>Time-to-Target:</b> ${best.a.timeTarget.probability}%</div>
+      <div class="metric"><b>Suggested Expiration:</b> ${best.a.expiration}</div>
+      <div class="metric"><b>Best Contract:</b> ${best.a.bestContract.label} ${best.a.bestContract.strike}</div>
+      <div class="metric"><b>OTM Grade:</b> <span class="${signalClass(best.a.otmPreferred.grade)}">${best.a.otmPreferred.grade}</span></div>
+    </div>` + (document.getElementById("uiMode").value === "compact" ? renderCompact(best.ticker, best.a) : renderFull(best.ticker, best.a));
+}
+
+async function scanMyPositions(){
+  const output = document.getElementById("output");
+  if(!savedPositions.length){ output.innerHTML = "<div class='card'>No saved positions yet.</div>"; clearActiveAlertsPanel(); return; }
+  renderThinkingCard(["TRACKING SAVED POSITIONS...","RECALCULATING TARGET ODDS...","CHECKING FOR STRIKE ALERTS..."]);
+  let results = [];
+  let cache = { scannedAt: new Date().toISOString(), results: [] };
+
+  for(let i=0; i<savedPositions.length; i++){
+    const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
+    const closes = await getHistory(ticker);
+    if(!closes){
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
+      results.push(item); cache.results.push(item); continue;
+    }
+    const pricePack = await getBestAvailablePrice(ticker, closes);
+    if(pricePack.price === null){
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
+      results.push(item); cache.results.push(item); continue;
+    }
+    const ai = analyze(closes, pricePack.price);
+    const monitor = analyzePosition(p, pricePack.price, ai, pricePack.source);
+    results.push(monitor); cache.results.push(monitor);
+    await new Promise(r => setTimeout(r, 5000));
+  }
+
+  lastScanCache = cache;
+  setStore("ai_options_last_scan_cache", lastScanCache);
+  applyPortfolioAlertSummary(results, "TACTICAL LIVE SCAN");
+  output.innerHTML = renderPositionScanSafely(results);
+}
+
+function quickRecheckPositions(){
+  const output = document.getElementById("output");
+  const cache = getStore("ai_options_last_scan_cache", null);
+  if(!cache || !cache.results || !cache.results.length){
+    output.innerHTML = "<div class='card'>No recent live scan found yet. Run <b>Live Position Scan</b> once first, then Quick Recheck will work without API calls.</div>";
+    clearActiveAlertsPanel();
+    return;
+  }
+  const refreshed = cache.results.map(item=>{
+    const copy = {...item};
+    if(copy.expiration && copy.expiration !== "Not set"){
+      const dte = getDTE(copy.expiration);
+      copy.dte = dte === null ? "N/A" : dte;
+      if(dte !== null){
+        if(dte <= 1){ copy.timeRisk = "Extreme"; copy.expirationFit = "Very Short"; }
+        else if(dte <= 3){ copy.timeRisk = "High"; copy.expirationFit = "Tight"; }
+        else if(dte <= 7){ copy.timeRisk = "Moderate"; copy.expirationFit = "Good"; }
+        else { copy.timeRisk = "Low"; copy.expirationFit = "Good"; }
+        if(copy.status === "STALKING" && dte <= 2) copy.reason = "Quick Recheck: target still alive, but expiration is getting very close.";
+        if(copy.status === "TARGET LOCKED" && dte <= 1){
+          copy.status = "STALKING";
+          copy.cardClass = "weak-alert";
+          copy.reason = "Quick Recheck: hold downgraded because expiration is now very close.";
+        }
+      }
+    }
+    copy.priceSource = String(copy.priceSource || "Cached") + " / Quick Recheck";
+    return copy;
+  });
+  applyPortfolioAlertSummary(refreshed, "TACTICAL QUICK RECHECK");
+  output.innerHTML = `<div class='card'><div class='section-title'>Quick Recheck</div><div class='metric'>Using your most recent live scan from ${new Date(cache.scannedAt).toLocaleString()}.</div><div class='metric muted'>No new API calls were used.</div><div class="pill blue">CACHE MODE</div><div class="pill green">API SAFE</div></div>` + renderPositionCards(refreshed);
+}
+
+renderWatchlist();
+renderPositions();
+renderPerformanceTracker();
+renderRiskControlSummary();
+renderClosedTradeJournal();
+renderJournalSummary();
+renderAlertHistory();
+clearActiveAlertsPanel();
+if(typeof renderGradeFilterSummary === 'function') renderGradeFilterSummary();
+</script>
+</body>
+</html>
