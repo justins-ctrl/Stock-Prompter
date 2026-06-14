@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v40.2 Thesis Integrity Engine</title>
+  <title>Signal Predator AI v40.3 Position Hold Duration Guide</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -161,7 +161,7 @@
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v40.2 // thesis integrity engine // position scan repair</div>
+  <div class="subtitle">v40.3 // position hold duration guide // bot-style rule engine</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -188,6 +188,7 @@
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
     <div class="metric">Thesis Integrity Engine <span class="green">ACTIVE</span></div>
+    <div class="metric">Position Hold Duration Guide <span class="green">ACTIVE</span></div>
     <div class="metric muted">Protects the app when one advanced engine returns missing or unexpected data.</div>
   </div>
 
@@ -1953,6 +1954,7 @@ function buildSmartAlerts(results){
     if(r.profitScaling && r.profitScaling.action && r.profitScaling.action.includes("SELL")) alerts.push({level:"green", message:`SCALING ALERT // ${r.ticker} ${r.profitScaling.action}.`});
     if(r.profitScaling && r.profitScaling.action === "EXIT POSITION") alerts.push({level:"red", message:`EXIT ALERT // ${r.ticker} exit position.`});
     if(r.incomeMode && r.incomeMode.incomeSignal === "ON" && r.incomeMode.spreadType !== "WAIT / NO SPREAD") alerts.push({level:"green", message:`INCOME MODE ALERT // ${r.ticker} ${r.incomeMode.spreadType}.`});
+    if(r.holdDurationGuide && (r.holdDurationGuide.botAction.includes('EXIT') || r.holdDurationGuide.botAction.includes('LOCK'))) alerts.push({level:r.holdDurationGuide.botAction.includes('EXIT') ? 'red' : 'green', message:`HOLD GUIDE // ${r.ticker}: ${r.holdDurationGuide.botAction}.`});
     if(r.thesisIntegrity && r.thesisIntegrity.score < 40) alerts.push({level:"red", message:`THESIS BROKEN // ${r.ticker} exit recommended. Thesis ${r.thesisIntegrity.score}/100.`});
     if(r.thesisIntegrity && r.thesisIntegrity.score >= 75 && r.approxPnLPercent !== null && r.approxPnLPercent < 0) alerts.push({level:"green", message:`THESIS INTACT // ${r.ticker} red P/L but thesis still strong at ${r.thesisIntegrity.score}/100.`});
     if(r.targetConfidence && r.targetConfidence.holdScore < 50 && r.approxPnLPercent !== null && r.approxPnLPercent > 0) alerts.push({level:"green", message:`EXIT INTELLIGENCE // ${r.ticker} protect profits. Hold score ${r.targetConfidence.holdScore}/100.`});
@@ -2345,6 +2347,7 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
     noTradeZone:ai.noTradeZone,
     confirmationHold:ai.confirmationHold,
     shortManagement:{assignmentRisk, expirationDecision, managementDecision, closePlan, credit:credit || "N/A"},
+    holdDurationGuide:getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent, dte, null, null),
     wheelAssignment:getWheelAssignmentEngine(position, livePrice, ai),
     wheelExpiration:ai.wheelExpiration,
     profitScaling:{
@@ -2358,6 +2361,102 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
   };
 }
 
+
+
+function getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent, dte, thesisIntegrity, targetConfidence){
+  const type = position.type;
+  const exp = ai.expirationConfidence || {};
+  const thesisScore = Number(thesisIntegrity?.score || 50);
+  const holdScore = Number(targetConfidence?.holdScore || 50);
+  const rec = exp.recommendedDuration || "N/A";
+  const expConfidence = Number(exp.recommendedConfidence || 0);
+  const quality = ai.qualityDecision?.decision || "N/A";
+  const mismatch = ai.longTermOptions?.mismatchRisk || "N/A";
+  const overnight = ai.nextDay?.overnightRisk || "N/A";
+
+  let holdStyle = "RECHECK FIRST";
+  let suggestedHold = "No clear hold window.";
+  let botAction = "WAIT / RECHECK";
+  let reason = "The app needs clean alignment before giving a firm hold duration.";
+  let reviewFrequency = "Re-scan before making a decision.";
+  let maxHoldRule = "Do not hold if thesis integrity breaks.";
+
+  if(type === "CALL" || type === "PUT"){
+    if(thesisScore < 40){
+      holdStyle = "EXIT NOW";
+      suggestedHold = "Do not keep holding.";
+      botAction = "EXIT";
+      reason = "Thesis integrity is broken.";
+      reviewFrequency = "No further holding recommended.";
+      maxHoldRule = "Protect capital.";
+    }else if(rec.includes("Weekly") || rec.includes("Bi")){
+      holdStyle = "DAY TRADE / SHORT SWING";
+      suggestedHold = "Intraday to 1-3 trading days.";
+      botAction = "HOLD ONLY WHILE MOMENTUM STAYS VALID";
+      reason = "Short-term expiration confidence is strongest.";
+      reviewFrequency = "Re-scan at least once daily and after large price moves.";
+      maxHoldRule = "Do not hold past thesis weakness or major profit giveback.";
+      if(dte !== null && dte <= 3){
+        suggestedHold = "Same day to next day only.";
+        maxHoldRule = "Avoid holding close to expiration unless thesis is extremely strong.";
+      }
+    }else if(rec.includes("1") || rec.includes("3")){
+      holdStyle = "1-3 MONTH SWING";
+      suggestedHold = "Several days to several weeks, as long as thesis remains intact.";
+      botAction = "HOLD IF THESIS SCORE STAYS ABOVE 60";
+      reason = "Swing duration is favored over forcing a weekly trade.";
+      reviewFrequency = "Re-scan daily or every major support/resistance break.";
+      maxHoldRule = "Exit if thesis score drops below 60 or price breaks invalidation.";
+    }else if(rec.includes("6") || rec.includes("12")){
+      holdStyle = "POSITION / LEAP HOLD";
+      suggestedHold = "Weeks to months, focused on structure instead of daily noise.";
+      botAction = "HOLD WHILE LONG-TERM STRUCTURE HOLDS";
+      reason = "Long-duration vehicle is favored.";
+      reviewFrequency = "Re-scan weekly and after major trend changes.";
+      maxHoldRule = "Exit if long-term trend breaks or thesis score drops below 50.";
+    }
+
+    if(quality === "REJECT"){
+      holdStyle = "EXIT / WAIT";
+      suggestedHold = "Do not hold unless a fresh scan improves.";
+      botAction = "EXIT OR DO NOT ENTER";
+      reason = "Quality engine rejected the trade.";
+    }
+
+    if(thesisScore >= 75 && approxPnLPercent !== null && approxPnLPercent < 0){
+      botAction = "HOLD / DO NOT PANIC SELL";
+      reason = "Position is red, but thesis integrity remains strong.";
+    }
+
+    if(approxPnLPercent !== null && approxPnLPercent >= 25 && holdScore < 60){
+      botAction = "LOCK PROFITS";
+      reason = "Profit is available but hold score is weakening.";
+    }
+
+    if(overnight === "HIGH" && (rec.includes("Weekly") || rec.includes("Bi"))){
+      maxHoldRule = "Avoid overnight unless thesis integrity and hold score remain strong.";
+    }
+
+    if(mismatch === "HIGH"){
+      suggestedHold = "Avoid short-term holding. Use longer duration only if thesis remains strong.";
+    }
+  }else{
+    holdStyle = "PREMIUM SELLING MANAGEMENT";
+    suggestedHold = "Hold while assignment/call-away risk is controlled and premium decay is working.";
+    botAction = "LET THETA WORK / RECHECK RISK";
+    reason = "This is a sold option, so management depends on assignment risk and premium capture.";
+    reviewFrequency = "Re-scan daily near the strike or within 7 DTE.";
+    maxHoldRule = "Close, roll, or accept assignment if risk becomes high.";
+  }
+
+  let botGrade = "B";
+  if(thesisScore >= 85 && expConfidence >= 80 && quality === "APPROVED") botGrade = "A";
+  if(thesisScore >= 90 && expConfidence >= 90 && quality === "APPROVED" && mismatch !== "HIGH") botGrade = "A+";
+  if(thesisScore < 60 || quality === "REJECT") botGrade = "C";
+  if(thesisScore < 40) botGrade = "F";
+
+  return {holdStyle,suggestedHold,botAction,reason,reviewFrequency,maxHoldRule,botGrade,thesisScore,expirationConfidence:expConfidence,mismatch,note:"Rule-based guidance, not a guarantee."};
+}
 
 function getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte, timeTarget, status){
   const type = position.type;
@@ -2476,7 +2575,8 @@ function analyzePosition(position, livePrice, ai, priceSource){
   const tradeManagement = getTradeManagement(position, approxPnLPercent, dte, timeTarget, ai, status);
   const targetConfidence = getTargetConfidenceEngine(position, approxPnLPercent, dte, timeTarget, ai, status);
   const thesisIntegrity = getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte, timeTarget, status);
-  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence,thesisIntegrity};
+  const holdDurationGuide = getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent, dte, thesisIntegrity, targetConfidence);
+  return {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence,thesisIntegrity,holdDurationGuide};
 }
 
 
