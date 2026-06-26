@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v42 Position Intelligence Engine</title>
+  <title>Signal Predator AI v42.1 Confidence Clarity Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -175,17 +175,24 @@ body.advanced-on .simple-focus{display:block}
 .advanced-panel{display:none}
 body.advanced-on .advanced-panel{display:block}
 
+
+.confidence-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+.confidence-tile{border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:12px;background:rgba(255,255,255,.035)}
+.confidence-score{font-family:'Orbitron';font-size:24px;font-weight:900;letter-spacing:1px;margin-top:4px}
+.confidence-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+@media (min-width:521px){.confidence-grid{grid-template-columns:1fr 1fr 1fr}}
+
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v42 // position intelligence engine // entry vs hold separation</div>
+  <div class="subtitle">v42.1 // confidence clarity engine // entry vs position vs thesis</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
     <div class="metric">HUNT ENGINE <span class="blue">ONLINE</span></div>
-    <div class="metric muted">Stable rebuild active â¢ iPhone mode optimized â¢ Existing positions now separate HOLD logic from NEW ENTRY rejection</div>
+    <div class="metric muted">Stable rebuild active â¢ iPhone mode optimized â¢ Existing positions now separate HOLD logic from NEW ENTRY rejection â¢ confidence labels clarified</div>
     <div id="topAlertArea"></div>
   </div>
 
@@ -202,7 +209,7 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v42 Stability Guard</div>
+    <div class="section-title">v42.1 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -408,7 +415,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v42",
+    version: "v42.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -423,7 +430,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v42.json";
+  a.download = "signal-predator-backup-v42-1.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -435,7 +442,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v42",
+    version: "v42.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -2507,6 +2514,81 @@ function getPredatorBotDecision(a){
   return {status,permission,action,confidence,grade,positionSize,reason,entryRule,riskRule,rankings,duration,holdStyle};
 }
 
+
+function getConfidenceClarity(a){
+  a = ensureEngineDefaults(a);
+  const bot = getPredatorBotDecision(a);
+  const entryQuality = clampScore(a.score || 0);
+  const setupQuality = entryQuality;
+  const alignment = clampScore(a.alignmentScore?.score || 50);
+  const timeTarget = clampScore(a.timeTarget?.probability || 50);
+  const expiration = clampScore(a.expirationConfidence?.recommendedConfidence || 50);
+  const botConfidence = clampScore(bot.confidence || 0);
+
+  let entryLabel = "SPECULATIVE";
+  if(entryQuality >= 90) entryLabel = "ELITE ENTRY";
+  else if(entryQuality >= 80) entryLabel = "GOOD ENTRY";
+  else if(entryQuality >= 70) entryLabel = "SELECTIVE ENTRY";
+  else if(entryQuality >= 60) entryLabel = "WEAK ENTRY";
+  else entryLabel = "NO ENTRY";
+
+  let positionQuality = clampScore((botConfidence * 0.45) + (alignment * 0.25) + (timeTarget * 0.15) + (expiration * 0.15));
+  let positionLabel = "WATCH";
+  if(positionQuality >= 90) positionLabel = "STRONG POSITION";
+  else if(positionQuality >= 80) positionLabel = "HOLDABLE";
+  else if(positionQuality >= 70) positionLabel = "MONITOR";
+  else if(positionQuality >= 60) positionLabel = "CAUTION";
+  else positionLabel = "WEAK";
+
+  let thesisScore = clampScore((alignment * 0.40) + (timeTarget * 0.25) + (expiration * 0.20) + (setupQuality * 0.15));
+  let thesisLabel = "CAUTION";
+  if(thesisScore >= 90) thesisLabel = "THESIS VERY STRONG";
+  else if(thesisScore >= 75) thesisLabel = "THESIS INTACT";
+  else if(thesisScore >= 60) thesisLabel = "THESIS HOLDING";
+  else if(thesisScore >= 40) thesisLabel = "THESIS WEAKENING";
+  else thesisLabel = "THESIS BROKEN";
+
+  return {
+    entryQuality, entryLabel, setupQuality, setupGrade:a.grade || "N/A",
+    positionQuality, positionLabel, thesisScore, thesisLabel,
+    botConfidence, botStatus:bot.status,
+    note:"Entry Quality asks if this is good to open now. Position Quality asks if it is good to hold. Thesis asks if the original reason is still intact."
+  };
+}
+
+function renderConfidenceClarityCard(a){
+  const c = getConfidenceClarity(a);
+  return `
+  <div class="card">
+    <div class="section-title">Confidence Clarity Engine</div>
+    <div class="confidence-grid">
+      <div class="confidence-tile">
+        <div class="confidence-label">Entry Quality</div>
+        <div class="confidence-score ${signalClass(c.entryLabel)}">${c.entryQuality}/100</div>
+        <div class="metric">${c.entryLabel}</div>
+        <div class="metric muted">Should I open this trade right now?</div>
+      </div>
+      <div class="confidence-tile">
+        <div class="confidence-label">Position Quality</div>
+        <div class="confidence-score ${signalClass(c.positionLabel)}">${c.positionQuality}/100</div>
+        <div class="metric">${c.positionLabel}</div>
+        <div class="metric muted">If I already own it, should I keep holding?</div>
+      </div>
+      <div class="confidence-tile">
+        <div class="confidence-label">Thesis Integrity</div>
+        <div class="confidence-score ${signalClass(c.thesisLabel)}">${c.thesisScore}/100</div>
+        <div class="metric">${c.thesisLabel}</div>
+        <div class="metric muted">Has the original reason for the trade broken?</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="metric"><b>Setup Quality:</b> ${c.setupQuality}/100 (${c.setupGrade})</div>
+    <div class="metric"><b>Bot Confidence:</b> ${c.botConfidence}/100</div>
+    <div class="metric"><b>Bot Status:</b> <span class="${signalClass(c.botStatus)}">${c.botStatus}</span></div>
+    <div class="metric muted">${c.note}</div>
+  </div>`;
+}
+
 function renderPredatorBotDecision(a){
   const bot = getPredatorBotDecision(a);
   const color = bot.status === "BOT APPROVED" ? "green" : bot.status === "BOT REJECTED" ? "red" : "yellow";
@@ -2518,8 +2600,8 @@ function renderPredatorBotDecision(a){
     <div class="bot-decision-main ${color}">${bot.action}</div>
     <div class="bot-grid">
       <div class="bot-tile"><div class="metric"><b>Status:</b><br><span class="${color}">${bot.status}</span></div></div>
-      <div class="bot-tile"><div class="metric"><b>Confidence:</b><br>${bot.confidence}/100</div></div>
-      <div class="bot-tile"><div class="metric"><b>Grade:</b><br><span class="${signalClass(bot.grade)}">${bot.grade}</span></div></div>
+      <div class="bot-tile"><div class="metric"><b>Bot Confidence:</b><br>${bot.confidence}/100</div></div>
+      <div class="bot-tile"><div class="metric"><b>Setup Grade:</b><br><span class="${signalClass(bot.grade)}">${bot.grade}</span></div></div>
       <div class="bot-tile"><div class="metric"><b>Size:</b><br>${bot.positionSize}</div></div>
     </div>
     <div class="divider"></div>
@@ -2989,7 +3071,7 @@ function renderPositionCards(results){
       ${(()=>{ const cmd = r.predatorCommand || getPredatorCommandCenter({type:r.type}, r); return `
         <div class="command-box">
           <div class="command-action ${cmd.color}">${cmd.action}</div>
-          <div class="metric"><b>Confidence:</b> ${cmd.confidence}/100</div>
+          <div class="metric"><b>Position Command Confidence:</b> ${cmd.confidence}/100</div>
           <div class="metric"><b>Instruction:</b> ${cmd.botInstruction}</div>
           <div class="metric"><b>Reason:</b> ${cmd.reason}</div>
           <div class="metric"><b>Next Checkpoint:</b> ${cmd.nextCheckpoint}</div>
@@ -3099,6 +3181,7 @@ function renderFull(ticker, a){
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderPredatorBotDecision(a)}
+  ${renderConfidenceClarityCard(a)}
   ${renderStrategyRankingCard(a)}
   ${renderDurationOptimizerCard(a)}
   <div class="advanced-panel">
@@ -3110,7 +3193,7 @@ function renderFull(ticker, a){
     <div class="divider"></div>
     <div class="section-title">Predator Decision</div>
     <div class="metric"><b>Direction:</b> <span class="${signalClass(a.direction)}">${a.direction}</span></div>
-    <div class="metric"><b>Confidence:</b> <span class="${signalClass(a.confidence)}">${a.confidence}</span></div>
+    <div class="metric"><b>Raw Momentum Confidence:</b> <span class="${signalClass(a.confidence)}">${a.confidence}</span></div>
     <div class="metric"><b>Trade Score:</b> ${a.score}/100 (<span class="${signalClass(a.grade)}">${a.grade}</span>)</div>
     <div class="bar"><div class="fill" style="width:${a.score}%"></div></div>
     <div class="metric"><b>Trade Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div>
@@ -3134,7 +3217,7 @@ function renderFull(ticker, a){
     <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(a.timeTarget.bias)}">${a.timeTarget.bias}</span></div>
     <div class="divider"></div>
     <div class="section-title">Confidence Meter</div>
-    <div class="metric"><b>Confidence Meter:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div>
+    <div class="metric"><b>Raw Confidence Meter:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div>
     <div class="section-title">Entry Timing</div>
     <div class="metric"><b>Entry Signal:</b> <span class="${signalClass(a.entryTiming.label)}">${a.entryTiming.label}</span></div>
     <div class="metric"><b>Entry Read:</b> ${a.entryTiming.reason}</div>
@@ -3294,7 +3377,7 @@ function renderFull(ticker, a){
 
 function renderCompact(ticker, a){
   a = ensureEngineDefaults(a);
-  return `${renderPredatorBotDecision(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `${renderPredatorBotDecision(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
