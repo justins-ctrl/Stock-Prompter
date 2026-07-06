@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v42.1 Confidence Clarity Engine</title>
+  <title>Signal Predator AI v42.2 Entry Readiness Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -182,17 +182,26 @@ body.advanced-on .advanced-panel{display:block}
 .confidence-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
 @media (min-width:521px){.confidence-grid{grid-template-columns:1fr 1fr 1fr}}
 
+
+.entry-status-banner{border:1px solid rgba(255,216,79,.40);background:linear-gradient(180deg,rgba(255,216,79,.10),rgba(10,20,38,.92));}
+.entry-status-main{font-size:24px;font-weight:900;font-family:'Orbitron';letter-spacing:1px;text-align:center;margin:8px 0;text-transform:uppercase}
+.readiness-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:9px 0;font-family:'Share Tech Mono',monospace;font-size:14px}
+.readiness-track{height:8px;flex:1;background:#0b1830;border-radius:999px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.readiness-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--green),#67ffd0)}
+.plain-rule{padding:12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);margin-top:10px}
+.big-simple{font-size:18px;font-weight:800;letter-spacing:.4px}
+
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v42.1 // confidence clarity engine // entry vs position vs thesis</div>
+  <div class="subtitle">v42.2 // entry readiness engine // beginner-friendly bot confirmation</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
     <div class="metric">HUNT ENGINE <span class="blue">ONLINE</span></div>
-    <div class="metric muted">Stable rebuild active â¢ iPhone mode optimized â¢ Existing positions now separate HOLD logic from NEW ENTRY rejection â¢ confidence labels clarified</div>
+    <div class="metric muted">Stable rebuild active â¢ iPhone mode optimized â¢ Existing positions now separate HOLD logic from NEW ENTRY rejection â¢ confidence labels clarified â¢ entry readiness explains why the bot waits</div>
     <div id="topAlertArea"></div>
   </div>
 
@@ -209,7 +218,7 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v42.1 Stability Guard</div>
+    <div class="section-title">v42.2 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -415,7 +424,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v42.1",
+    version: "v42.2",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -430,7 +439,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v42-1.json";
+  a.download = "signal-predator-backup-v42-2.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -442,7 +451,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v42.1",
+    version: "v42.2",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -2589,6 +2598,103 @@ function renderConfidenceClarityCard(a){
   </div>`;
 }
 
+
+function getEntryReadinessEngine(a){
+  a = ensureEngineDefaults(a);
+  const bot = getPredatorBotDecision(a);
+  const triggerNum = parseFloat(a.nextDay?.buyTrigger || "NaN");
+  const priceNum = parseFloat(a.price || "NaN");
+  const invalidation = a.nextDay?.invalidation || "N/A";
+  const holdMinutes = Number(a.confirmationHold?.holdMinutes || 30);
+  const entryPermission = a.confirmationHold?.entryPermission || "WAIT";
+  const quality = a.qualityDecision?.decision || "N/A";
+
+  const trendScore = clampScore(a.alignmentScore?.score || 50);
+  const momentumScore = clampScore(a.timeTarget?.probability || 50);
+  const thesisScore = clampScore(getConfidenceClarity(a).thesisScore || 50);
+  const durationScore = clampScore(a.expirationConfidence?.recommendedConfidence || 50);
+
+  let priceConfirm = 50;
+  if(Number.isFinite(triggerNum) && Number.isFinite(priceNum)){
+    if(a.direction === "BUY CALL"){
+      priceConfirm = priceNum >= triggerNum ? 85 : Math.max(10, Math.min(75, 75 - ((triggerNum - priceNum) / Math.max(priceNum, .01) * 1000)));
+    }else if(a.direction === "BUY PUT"){
+      priceConfirm = priceNum <= triggerNum ? 85 : Math.max(10, Math.min(75, 75 - ((priceNum - triggerNum) / Math.max(priceNum, .01) * 1000)));
+    }
+  }
+  priceConfirm = clampScore(priceConfirm);
+
+  let openingConfirm = 0;
+  if(entryPermission.includes("CAN ENTER")) openingConfirm = 85;
+  else if(entryPermission.includes("WAIT 15")) openingConfirm = 55;
+  else if(entryPermission.includes("WAIT 30")) openingConfirm = 35;
+  else if(entryPermission.includes("WAIT FOR PULLBACK")) openingConfirm = 15;
+  else if(entryPermission.includes("DO NOT")) openingConfirm = 0;
+  else openingConfirm = 30;
+
+  const currentReadiness = clampScore(trendScore*.22 + momentumScore*.18 + thesisScore*.18 + durationScore*.17 + priceConfirm*.15 + openingConfirm*.10);
+  const confirmedReadiness = clampScore(trendScore*.22 + momentumScore*.18 + thesisScore*.18 + durationScore*.17 + 95*.15 + 90*.10);
+
+  let conviction = "PASS";
+  if(thesisScore >= 95 && trendScore >= 95 && momentumScore >= 80 && durationScore >= 85) conviction = "ELITE SETUP";
+  else if(thesisScore >= 85 && trendScore >= 85 && momentumScore >= 70) conviction = "HIGH-CONVICTION SETUP";
+  else if(thesisScore >= 75 && trendScore >= 75) conviction = "GOOD WATCHLIST SETUP";
+  else if(thesisScore >= 60) conviction = "SPECULATIVE WATCH";
+
+  let entryStatus = "WAIT FOR CONFIRMATION", bannerColor = "yellow";
+  if(bot.status === "BOT REJECTED" || quality === "REJECT"){ entryStatus = "DO NOT ENTER YET"; bannerColor = "red"; }
+  else if(bot.status === "BOT APPROVED" && currentReadiness >= 85 && priceConfirm >= 80 && openingConfirm >= 70){ entryStatus = "ENTRY READY"; bannerColor = "green"; }
+  else if(bot.status === "BOT APPROVED" && currentReadiness >= 70){ entryStatus = "APPROVED SETUP â WAITING ON TRIGGER"; }
+  else if(bot.status === "BOT WAIT" && thesisScore >= 80){ entryStatus = "GOOD SETUP â NOT READY YET"; }
+
+  let missingPiece = "Needs cleaner confirmation.";
+  if(priceConfirm < 80 && Number.isFinite(triggerNum)){
+    missingPiece = a.direction === "BUY CALL" ? `Price has not held above $${a.nextDay.buyTrigger} yet.` :
+                   a.direction === "BUY PUT" ? `Price has not held below $${a.nextDay.buyTrigger} yet.` : "No clean directional trigger is active.";
+  }
+  if(openingConfirm < 70) missingPiece += ` Wait for the ${holdMinutes}-minute confirmation rule.`;
+
+  const plainEnglish = entryStatus === "ENTRY READY" ? "The bot would allow the trade because price and confirmation have both lined up." :
+    entryStatus.includes("APPROVED SETUP") ? "The setup is strong, but the bot is waiting for the market to prove the entry." :
+    entryStatus.includes("GOOD SETUP") ? "This may be worth watching, but the entry is not clean enough right now." :
+    "The bot does not have enough confirmation to justify a new trade right now.";
+
+  const ifThenRule = Number.isFinite(triggerNum) ? (
+    a.direction === "BUY CALL" ? `If price holds above $${a.nextDay.buyTrigger} for ${holdMinutes} minutes and does not break below $${invalidation}, the bot would be much closer to executing.` :
+    a.direction === "BUY PUT" ? `If price holds below $${a.nextDay.buyTrigger} for ${holdMinutes} minutes and does not reclaim above $${invalidation}, the bot would be much closer to executing.` :
+    "No clean directional trigger is active."
+  ) : "No valid trigger is active.";
+
+  return {entryStatus,bannerColor,conviction,currentReadiness,confirmedReadiness,trendScore,momentumScore,thesisScore,durationScore,priceConfirm,openingConfirm,trigger:a.nextDay?.buyTrigger||"N/A",invalidation,holdMinutes,missingPiece,plainEnglish,ifThenRule};
+}
+
+function renderEntryReadinessCard(a){
+  const e = getEntryReadinessEngine(a);
+  function row(label, val){
+    return `<div class="readiness-row"><span>${label}</span><div class="readiness-track"><div class="readiness-fill" style="width:${val}%"></div></div><span>${val}/100</span></div>`;
+  }
+  return `
+  <div class="card entry-status-banner">
+    <div class="section-title">Predator Entry Readiness</div>
+    <div class="entry-status-main ${e.bannerColor}">${e.entryStatus}</div>
+    <div class="metric"><b>Conviction:</b> <span class="${signalClass(e.conviction)}">${e.conviction}</span></div>
+    <div class="metric"><b>Current Readiness:</b> ${e.currentReadiness}/100</div>
+    <div class="metric"><b>If Trigger Confirms:</b> ${e.confirmedReadiness}/100</div>
+    <div class="plain-rule">
+      <div class="big-simple">${e.plainEnglish}</div>
+      <div class="metric" style="margin-top:8px;"><b>Why waiting:</b> ${e.missingPiece}</div>
+      <div class="metric"><b>Plain Rule:</b> ${e.ifThenRule}</div>
+    </div>
+    <div class="divider"></div>
+    ${row("Trend Alignment", e.trendScore)}
+    ${row("Momentum / Timing", e.momentumScore)}
+    ${row("Thesis Strength", e.thesisScore)}
+    ${row("Expiration Fit", e.durationScore)}
+    ${row("Price Confirmation", e.priceConfirm)}
+    ${row("Opening Hold Rule", e.openingConfirm)}
+  </div>`;
+}
+
 function renderPredatorBotDecision(a){
   const bot = getPredatorBotDecision(a);
   const color = bot.status === "BOT APPROVED" ? "green" : bot.status === "BOT REJECTED" ? "red" : "yellow";
@@ -2609,7 +2715,7 @@ function renderPredatorBotDecision(a){
     <div class="metric"><b>Hold Style:</b> ${bot.holdStyle}</div>
     <div class="metric"><b>Trigger:</b> ${trigger}</div>
     <div class="metric"><b>Invalidation:</b> ${invalidation}</div>
-    <div class="metric"><b>Entry Rule:</b> ${bot.entryRule}</div>
+    <div class="metric"><b>Entry Rule:</b> ${bot.entryRule}</div><div class="metric muted">If status says BOT WAIT, the strategy is the favored direction, not permission to enter immediately.</div>
     <div class="metric"><b>Risk Rule:</b> ${bot.riskRule}</div>
     <div class="metric"><b>Why:</b> ${bot.reason}</div>
   </div>`;
@@ -3181,6 +3287,7 @@ function renderFull(ticker, a){
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderPredatorBotDecision(a)}
+  ${renderEntryReadinessCard(a)}
   ${renderConfidenceClarityCard(a)}
   ${renderStrategyRankingCard(a)}
   ${renderDurationOptimizerCard(a)}
@@ -3377,7 +3484,7 @@ function renderFull(ticker, a){
 
 function renderCompact(ticker, a){
   a = ensureEngineDefaults(a);
-  return `${renderPredatorBotDecision(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `${renderPredatorBotDecision(a)}${renderEntryReadinessCard(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
