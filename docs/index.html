@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v42.2 Entry Readiness Engine</title>
+  <title>Signal Predator AI v42.3 Human Decision Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -191,12 +191,23 @@ body.advanced-on .advanced-panel{display:block}
 .plain-rule{padding:12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);margin-top:10px}
 .big-simple{font-size:18px;font-weight:800;letter-spacing:.4px}
 
+
+.patience-card{border:1px solid rgba(142,203,255,.32);background:linear-gradient(180deg,rgba(142,203,255,.09),rgba(10,20,38,.92));}
+.patience-main{font-size:24px;font-weight:900;font-family:'Orbitron';letter-spacing:1px;text-align:center;margin:8px 0;text-transform:uppercase}
+.coach-card{border:1px solid rgba(55,255,159,.35);background:linear-gradient(180deg,rgba(55,255,159,.08),rgba(10,20,38,.92));}
+.coach-text{font-size:16px;line-height:1.65;font-weight:700;color:rgba(255,255,255,.92)}
+.timeline{border-left:2px solid rgba(55,255,159,.35);margin-left:10px;padding-left:16px}
+.timeline-step{margin:10px 0;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}
+.compare-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+.compare-box{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;background:rgba(255,255,255,.035)}
+@media (min-width:521px){.compare-grid{grid-template-columns:1fr 1fr}}
+
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v42.2 // entry readiness engine // beginner-friendly bot confirmation</div>
+  <div class="subtitle">v42.3 // human decision engine // patience meter + coach mode</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -218,7 +229,7 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v42.2 Stability Guard</div>
+    <div class="section-title">v42.3 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -424,7 +435,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v42.2",
+    version: "v42.3",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -439,7 +450,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v42-2.json";
+  a.download = "signal-predator-backup-v42-3.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -451,7 +462,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v42.2",
+    version: "v42.3",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -2695,6 +2706,111 @@ function renderEntryReadinessCard(a){
   </div>`;
 }
 
+
+function getHumanDecisionEngine(a){
+  a = ensureEngineDefaults(a);
+  const readiness = typeof getEntryReadinessEngine === "function" ? getEntryReadinessEngine(a) : {
+    entryStatus:"WAIT FOR CONFIRMATION", bannerColor:"yellow", conviction:"WATCHLIST SETUP",
+    currentReadiness:50, confirmedReadiness:75, trigger:a.nextDay?.buyTrigger || "N/A",
+    invalidation:a.nextDay?.invalidation || "N/A", holdMinutes:a.confirmationHold?.holdMinutes || 30,
+    plainEnglish:"The bot is waiting for confirmation.", missingPiece:"Needs confirmation.", ifThenRule:"Wait for trigger confirmation.",
+    trendScore:a.alignmentScore?.score || 50, momentumScore:a.timeTarget?.probability || 50,
+    thesisScore:75, durationScore:a.expirationConfidence?.recommendedConfidence || 50,
+    priceConfirm:50, openingConfirm:30
+  };
+  const bot = getPredatorBotDecision(a);
+  const direction = a.direction || bot.action || "WAIT";
+  const isCall = direction === "BUY CALL";
+  const isPut = direction === "BUY PUT";
+
+  let patienceStatus = "WAIT FOR CONFIRMATION";
+  let patienceColor = "yellow";
+  if(bot.status === "BOT REJECTED"){ patienceStatus = "DO NOT TRADE"; patienceColor = "red"; }
+  else if(readiness.entryStatus === "ENTRY READY"){ patienceStatus = "ENTER NOW"; patienceColor = "green"; }
+  else if(readiness.entryStatus.includes("APPROVED") || readiness.entryStatus.includes("GOOD SETUP")){ patienceStatus = "WAIT FOR CONFIRMATION"; patienceColor = "yellow"; }
+
+  const trigger = readiness.trigger || a.nextDay?.buyTrigger || "N/A";
+  const invalidation = readiness.invalidation || a.nextDay?.invalidation || "N/A";
+  const holdMinutes = readiness.holdMinutes || a.confirmationHold?.holdMinutes || 30;
+
+  const step1 = bot.status === "BOT REJECTED" ? "NO" : readiness.conviction.includes("ELITE") || readiness.conviction.includes("HIGH") ? "YES â HIGH QUALITY" : "MAYBE â WATCHLIST ONLY";
+  const step2 = patienceStatus === "ENTER NOW" ? "YES â ENTRY READY" : "NOT YET";
+  const step3 = isCall ? `Wait for price to hold above $${trigger} for ${holdMinutes} minutes.` : isPut ? `Wait for price to hold below $${trigger} for ${holdMinutes} minutes.` : "Wait for a clean directional trigger.";
+  const step4 = patienceStatus === "ENTER NOW" ? `${direction} is allowed now under the bot rules.` : `If confirmation happens, the favored action becomes ${direction}.`;
+  const step5 = `If price invalidates near $${invalidation}, do nothing and protect capital.`;
+
+  let coach = "";
+  if(bot.status === "BOT REJECTED"){
+    coach = "Predator does not like this trade right now. Too many pieces are not aligned, so entering would rely more on hope than probability. The professional move is to pass and wait for a cleaner opportunity.";
+  }else if(patienceStatus === "ENTER NOW"){
+    coach = "Predator sees a confirmed trade. The setup, timing, and confirmation have aligned. Even with a strong signal, respect position size and use the invalidation level as the line where the thesis starts to fail.";
+  }else{
+    const side = isPut ? "sellers" : isCall ? "buyers" : "the market";
+    coach = `This is a strong ${isPut ? "bearish" : isCall ? "bullish" : "directional"} setup, but Predator is waiting for today's market to prove the move. Yesterday's data can look excellent, but the opening bell often creates fakeouts. If ${side} hold the trigger for ${holdMinutes} minutes, confidence improves. If price breaks the invalidation level, the trade loses its edge. Patience is increasing probability, not reducing opportunity.`;
+  }
+
+  let lesson = "High-quality trades often require waiting. Professionals do not get paid for trading often; they get paid for trading well.";
+  if(a.noTradeZone?.zone !== "CLEAR") lesson = "A strong stock can still be a bad trade if price is sitting in a poor entry zone.";
+  else if(a.nextDay?.chaseRisk === "HIGH") lesson = "When chase risk is high, the goal is not to predict harder. The goal is to wait for a better price.";
+  else if(a.confirmationHold?.entryPermission?.includes("WAIT")) lesson = "Waiting after the open helps avoid fakeouts created by overnight gaps and emotional first candles.";
+
+  return {
+    patienceStatus,patienceColor,readiness,bot,step1,step2,step3,step4,step5,coach,lesson,
+    ifBuyEarlyRisk: readiness.openingConfirm < 70 ? "HIGH" : "MEDIUM",
+    ifWaitBenefit: readiness.confirmedReadiness,
+    currentTiming: readiness.currentReadiness,
+    perfectEntry: readiness.confirmedReadiness,
+    confirmation: Math.round((readiness.priceConfirm + readiness.openingConfirm) / 2),
+    chaseRiskScore: a.nextDay?.chaseRisk === "HIGH" ? 80 : a.nextDay?.chaseRisk === "MEDIUM" ? 50 : 25
+  };
+}
+
+function renderPatienceMeterCard(a){
+  const h = getHumanDecisionEngine(a);
+  function bar(label, val){ return `<div class="readiness-row"><span>${label}</span><div class="readiness-track"><div class="readiness-fill" style="width:${val}%"></div></div><span>${val}/100</span></div>`; }
+  return `<div class="card patience-card">
+    <div class="section-title">Predator Patience Meter</div>
+    <div class="patience-main ${h.patienceColor}">${h.patienceStatus}</div>
+    <div class="metric"><b>Simple Meaning:</b> ${h.patienceStatus === "ENTER NOW" ? "The bot has permission to enter." : h.patienceStatus === "DO NOT TRADE" ? "The bot does not want this trade." : "The bot likes the setup, but wants confirmation first."}</div>
+    <div class="divider"></div>${bar("Current Timing", h.currentTiming)}${bar("Perfect Entry If Confirmed", h.perfectEntry)}${bar("Confirmation", h.confirmation)}${bar("Chase Risk", h.chaseRiskScore)}
+  </div>`;
+}
+
+function renderWhyWaitingCard(a){
+  const h = getHumanDecisionEngine(a), r = h.readiness;
+  return `<div class="card">
+    <div class="section-title">Why Predator Is Waiting</div>
+    <div class="metric"><b>Current Status:</b> <span class="${h.patienceColor}">${h.patienceStatus}</span></div>
+    <div class="metric"><b>Why:</b> ${r.missingPiece}</div>
+    <div class="plain-rule"><div class="big-simple">If this happens:</div><div class="metric">â ${h.step3}</div><div class="metric">â Price does not invalidate near $${r.invalidation}</div><div class="metric">â Confirmation hold rule is satisfied</div></div>
+    <div class="divider"></div><div class="metric"><b>Then:</b> ${h.step4}</div><div class="metric"><b>Confidence Now:</b> ${r.currentReadiness}/100</div><div class="metric"><b>Confidence After Confirmation:</b> ${r.confirmedReadiness}/100</div>
+  </div>`;
+}
+
+function renderDecisionTimelineCard(a){
+  const h = getHumanDecisionEngine(a);
+  return `<div class="card"><div class="section-title">Predator Decision Timeline</div><div class="timeline">
+    <div class="timeline-step"><b>Step 1 â Opportunity:</b> ${h.step1}</div>
+    <div class="timeline-step"><b>Step 2 â Entry Now:</b> ${h.step2}</div>
+    <div class="timeline-step"><b>Step 3 â Trigger:</b> ${h.step3}</div>
+    <div class="timeline-step"><b>Step 4 â If Confirmed:</b> ${h.step4}</div>
+    <div class="timeline-step"><b>Step 5 â If Not Confirmed:</b> ${h.step5}</div>
+  </div></div>`;
+}
+
+function renderIgnorePredatorCard(a){
+  const h = getHumanDecisionEngine(a);
+  return `<div class="card"><div class="section-title">If You Ignore Predator</div><div class="compare-grid">
+    <div class="compare-box"><div class="metric"><b>If You Buy Early:</b></div><div class="metric"><b>Whipsaw Risk:</b> <span class="${signalClass(h.ifBuyEarlyRisk)}">${h.ifBuyEarlyRisk}</span></div><div class="metric">Opening candles can fake direction before the real move appears.</div></div>
+    <div class="compare-box"><div class="metric"><b>If You Wait:</b></div><div class="metric"><b>Expected Confidence:</b> ${h.ifWaitBenefit}/100</div><div class="metric">You may miss a small part of the move, but you reduce emotional and fakeout risk.</div></div>
+  </div></div>`;
+}
+
+function renderPredatorCoachCard(a){
+  const h = getHumanDecisionEngine(a);
+  return `<div class="card coach-card"><div class="section-title">Predator Coach</div><div class="coach-text">${h.coach}</div><div class="divider"></div><div class="metric"><b>Today's Lesson:</b> ${h.lesson}</div></div>`;
+}
+
 function renderPredatorBotDecision(a){
   const bot = getPredatorBotDecision(a);
   const color = bot.status === "BOT APPROVED" ? "green" : bot.status === "BOT REJECTED" ? "red" : "yellow";
@@ -3287,7 +3403,12 @@ function renderFull(ticker, a){
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderPredatorBotDecision(a)}
+  ${renderPatienceMeterCard(a)}
   ${renderEntryReadinessCard(a)}
+  ${renderWhyWaitingCard(a)}
+  ${renderDecisionTimelineCard(a)}
+  ${renderIgnorePredatorCard(a)}
+  ${renderPredatorCoachCard(a)}
   ${renderConfidenceClarityCard(a)}
   ${renderStrategyRankingCard(a)}
   ${renderDurationOptimizerCard(a)}
@@ -3484,7 +3605,7 @@ function renderFull(ticker, a){
 
 function renderCompact(ticker, a){
   a = ensureEngineDefaults(a);
-  return `${renderPredatorBotDecision(a)}${renderEntryReadinessCard(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `${renderPredatorBotDecision(a)}${renderPatienceMeterCard(a)}${renderEntryReadinessCard(a)}${renderWhyWaitingCard(a)}${renderDecisionTimelineCard(a)}${renderIgnorePredatorCard(a)}${renderPredatorCoachCard(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
