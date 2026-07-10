@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v43 Predator Brain</title>
+  <title>Signal Predator AI v44 Predator Data Intelligence</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -220,12 +220,20 @@ body.advanced-on .advanced-panel{display:block}
 .position-coach-card{border:1px solid rgba(142,203,255,.35);background:linear-gradient(180deg,rgba(142,203,255,.09),rgba(10,20,38,.94));}
 @media (max-width:520px){.brain-grid{grid-template-columns:1fr}}
 
+
+.data-card{border:1px solid rgba(142,203,255,.38);background:linear-gradient(180deg,rgba(142,203,255,.10),rgba(10,20,38,.94));}
+.data-status{font-size:24px;font-weight:900;font-family:'Orbitron';letter-spacing:1px;text-align:center;margin:8px 0;text-transform:uppercase}
+.data-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.data-tile{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;background:rgba(255,255,255,.035)}
+.feed-step{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);margin:8px 0;font-family:'Share Tech Mono',monospace}
+@media (max-width:520px){.data-grid{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v43 // predator brain // final verdict + position coach</div>
+  <div class="subtitle">v44 // predator data intelligence // api health + smart diagnostics</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -247,7 +255,7 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v43 Stability Guard</div>
+    <div class="section-title">v44 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -453,7 +461,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v43",
+    version: "v44",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -468,7 +476,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v43.json";
+  a.download = "signal-predator-backup-v44.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -480,7 +488,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v43",
+    version: "v44",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -999,12 +1007,171 @@ function getRiskControlAdvice(){
   return advice;
 }
 
+
+let predatorDataLog = getStore("signal_predator_data_log", {requests:[], providers:{alpha:{success:0,fail:0}, quote:{success:0,fail:0}, intraday:{success:0,fail:0}, daily:{success:0,fail:0}}});
+
+function saveDataLog(){
+  predatorDataLog.requests = (predatorDataLog.requests || []).slice(-250);
+  setStore("signal_predator_data_log", predatorDataLog);
+}
+
+function logDataRequest(provider, ok, message){
+  try{
+    predatorDataLog.requests = predatorDataLog.requests || [];
+    predatorDataLog.providers = predatorDataLog.providers || {};
+    predatorDataLog.providers[provider] = predatorDataLog.providers[provider] || {success:0,fail:0};
+    if(ok) predatorDataLog.providers[provider].success += 1;
+    else predatorDataLog.providers[provider].fail += 1;
+    predatorDataLog.requests.push({provider,ok,message:String(message || ""),time:new Date().toISOString()});
+    saveDataLog();
+  }catch(e){}
+}
+
+function getMarketClock(){
+  const now = new Date();
+  const minutes = now.getHours()*60 + now.getMinutes();
+  const open = 9*60 + 30;
+  const close = 16*60;
+  let status = "CLOSED";
+  let detail = "Using previous close or cached data.";
+  if(minutes >= open && minutes < close){
+    status = "OPEN";
+    const remaining = close - minutes;
+    detail = `${Math.floor(remaining/60)}h ${remaining%60}m until close.`;
+  }else if(minutes < open){
+    status = "PREMARKET";
+    const until = open - minutes;
+    detail = `${Math.floor(until/60)}h ${until%60}m until open.`;
+  }else{
+    status = "AFTER HOURS";
+    detail = "Regular session is closed.";
+  }
+  return {status,detail};
+}
+
+function getApiUsageEstimate(){
+  const today = new Date().toISOString().slice(0,10);
+  const now = Date.now();
+  const reqs = (predatorDataLog.requests || []).filter(r => String(r.time || "").slice(0,10) === today);
+  const minuteReqs = reqs.filter(r => now - new Date(r.time).getTime() < 60000);
+  return {
+    today:reqs.length,
+    minute:minuteReqs.length,
+    dailyLimit:500,
+    minuteLimit:75,
+    safe:reqs.length < 450 && minuteReqs.length < 60
+  };
+}
+
+function providerReliability(provider){
+  const p = predatorDataLog.providers?.[provider] || {success:0,fail:0};
+  const total = p.success + p.fail;
+  if(!total) return 100;
+  return Math.round((p.success / total) * 100);
+}
+
+function getPredatorDataIntelligence(reasonMessage){
+  const usage = getApiUsageEstimate();
+  const clock = getMarketClock();
+  const alphaRel = providerReliability("alpha");
+  const dailyRel = providerReliability("daily");
+  const quoteRel = providerReliability("quote");
+  const intradayRel = providerReliability("intraday");
+  const recent = (predatorDataLog.requests || []).slice(-12);
+  const recentFails = recent.filter(r => !r.ok).length;
+  const recentSuccess = recent.filter(r => r.ok).length;
+
+  let status = "SYSTEM HEALTHY";
+  let color = "green";
+  let ready = 96;
+  let diagnosis = "Market data appears usable.";
+  let recommendation = "Proceed with scan.";
+
+  if(recentFails >= 3 && recentSuccess === 0){
+    status = "DATA FEED UNSTABLE";
+    color = "red";
+    ready = 48;
+    diagnosis = "Recent API calls failed across multiple endpoints. This is likely a provider throttle, temporary API outage, or connection issue.";
+    recommendation = "Wait 2-5 minutes, then retry one ticker.";
+  }else if(recentFails >= 2){
+    status = "CAUTION";
+    color = "yellow";
+    ready = 68;
+    diagnosis = "Some API calls are failing. Analysis may need cached or previous-close data.";
+    recommendation = "Use extra caution and avoid forcing new trades until data stabilizes.";
+  }else if(!usage.safe){
+    status = "REQUEST LIMIT CAUTION";
+    color = "yellow";
+    ready = 70;
+    diagnosis = "The app has made many recent requests. Soft throttling may occur even before the daily limit.";
+    recommendation = "Slow scans down for a few minutes.";
+  }
+
+  if(reasonMessage){
+    diagnosis = reasonMessage;
+    if(status === "SYSTEM HEALTHY"){
+      status = "DATA WARNING";
+      color = "yellow";
+      ready = 72;
+      recommendation = "Retry shortly or scan one major ticker like SPY.";
+    }
+  }
+
+  const feeds = [
+    {name:"Daily Candles", score:dailyRel},
+    {name:"Global Quote", score:quoteRel},
+    {name:"Intraday", score:intradayRel},
+    {name:"Alpha Vantage Overall", score:alphaRel}
+  ];
+
+  return {status,color,ready,diagnosis,recommendation,usage,clock,feeds,recent};
+}
+
+function renderDataIntelligenceCard(reasonMessage){
+  const d = getPredatorDataIntelligence(reasonMessage);
+  return `
+  <div class="card data-card">
+    <div class="section-title">Predator Data Intelligence</div>
+    <div class="data-status ${d.color}">${d.status}</div>
+    <div class="data-grid">
+      <div class="data-tile"><div class="metric"><b>Predator Ready:</b><br>${d.ready}/100</div></div>
+      <div class="data-tile"><div class="metric"><b>Market:</b><br>${d.clock.status}</div></div>
+      <div class="data-tile"><div class="metric"><b>Today's Requests:</b><br>${d.usage.today}/${d.usage.dailyLimit}</div></div>
+      <div class="data-tile"><div class="metric"><b>Minute Requests:</b><br>${d.usage.minute}/${d.usage.minuteLimit}</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="metric"><b>Diagnosis:</b> ${d.diagnosis}</div>
+    <div class="metric"><b>Recommendation:</b> ${d.recommendation}</div>
+    <div class="metric"><b>Market Clock:</b> ${d.clock.detail}</div>
+    <div class="divider"></div>
+    <div class="section-title">Feed Quality Meter</div>
+    ${d.feeds.map(f=>`<div class="readiness-row"><span>${f.name}</span><div class="readiness-track"><div class="readiness-fill" style="width:${f.score}%"></div></div><span>${f.score}%</span></div>`).join("")}
+    <div class="divider"></div>
+    <div class="section-title">Recent Data Attempts</div>
+    ${d.recent.length ? d.recent.slice(-6).reverse().map(r=>`<div class="feed-step"><span class="${r.ok ? "green" : "red"}">${r.ok ? "â" : "â"}</span> ${r.provider} â ${r.message || (r.ok ? "Success" : "Failed")}</div>`).join("") : "<div class='muted'>No API attempts logged yet.</div>"}
+  </div>`;
+}
+
+function renderApiFailureDiagnostic(ticker, reasonMessage){
+  const reason = reasonMessage || "Alpha Vantage returned no usable data from daily, quote, and intraday endpoints.";
+  return `
+    ${renderDataIntelligenceCard(reason)}
+    <div class="card sell-alert">
+      <div class="section-title">API Diagnostic</div>
+      <div class="metric"><b>${ticker}</b> could not load enough data right now.</div>
+      <div class="metric">Predator checked the data feed and did not receive enough usable market data to build a trustworthy analysis.</div>
+      <div class="metric"><b>Most likely cause:</b> temporary provider throttle, empty API response, or Alpha Vantage server issue.</div>
+      <div class="metric"><b>What to do:</b> Wait 2-5 minutes, then retry one ticker. If SPY also fails, the issue is almost certainly the data provider, not the ticker.</div>
+    </div>`;
+}
+
 async function fetchJson(url){
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), APP_CONFIG.apiTimeoutMs);
   try{
     const r = await fetch(url, {signal: controller.signal});
     const data = await r.json();
+    logDataRequest("alpha", true, "Response received");
 
     if(data.Note || data.Information || data["Error Message"]){
       const msg = data.Note || data.Information || data["Error Message"];
@@ -1020,6 +1187,7 @@ async function fetchJson(url){
     if(box){
       box.innerHTML = `<div class="metric"><b>API Request Failed:</b> ${err.name === "AbortError" ? "Request timed out." : err.message}</div>`;
     }
+    logDataRequest("alpha", false, err.name === "AbortError" ? "Request timed out" : err.message);
     throw err;
   }finally{
     clearTimeout(timeout);
@@ -1047,6 +1215,7 @@ async function getHistory(symbol){
       return null;
     }
 
+    logDataRequest("daily", true, "Daily candles loaded");
     updateApiStatus("Daily history loaded successfully.", "green");
     return Object.values(s).slice(0,60).map(v=>parseFloat(v["4. close"])).filter(v=>!Number.isNaN(v));
   }catch(e){
@@ -1058,7 +1227,7 @@ async function getGlobalQuotePrice(symbol){
   try{
     const qd = await fetchJson(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`);
     const qp = parseFloat(qd?.["Global Quote"]?.["05. price"]);
-    if(!Number.isNaN(qp) && qp > 0) return qp;
+    if(!Number.isNaN(qp) && qp > 0){ logDataRequest("quote", true, "Global quote loaded"); return qp; }
   }catch(e){}
   return null;
 }
@@ -1069,7 +1238,7 @@ async function getIntradayPrice(symbol){
     if(!series) return null;
     const latestKey = Object.keys(series)[0];
     const ip = parseFloat(series[latestKey]["4. close"]);
-    if(!Number.isNaN(ip) && ip > 0) return ip;
+    if(!Number.isNaN(ip) && ip > 0){ logDataRequest("intraday", true, "Intraday price loaded"); return ip; }
   }catch(e){}
   return null;
 }
@@ -3712,7 +3881,8 @@ function renderFull(ticker, a){
   }
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
-  return `${renderPredatorBrainCard(a)}
+  return `${renderDataIntelligenceCard()}
+  ${renderPredatorBrainCard(a)}
   ${renderPredatorBotDecision(a)}
   ${renderMarketSessionCard(a)}
   ${renderPatienceMeterCard(a)}
@@ -3917,7 +4087,7 @@ function renderFull(ticker, a){
 
 function renderCompact(ticker, a){
   a = ensureEngineDefaults(a);
-  return `${renderPredatorBrainCard(a)}${renderPredatorBotDecision(a)}${renderMarketSessionCard(a)}${renderPatienceMeterCard(a)}${renderEntryReadinessCard(a)}${renderWhyWaitingCard(a)}${renderDecisionTimelineCard(a)}${renderIgnorePredatorCard(a)}${renderPredatorCoachCard(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `${renderDataIntelligenceCard()}${renderPredatorBrainCard(a)}${renderPredatorBotDecision(a)}${renderMarketSessionCard(a)}${renderPatienceMeterCard(a)}${renderEntryReadinessCard(a)}${renderWhyWaitingCard(a)}${renderDecisionTimelineCard(a)}${renderIgnorePredatorCard(a)}${renderPredatorCoachCard(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
@@ -3942,13 +4112,7 @@ async function runFallbackAnalysis(ticker){
   const price = quote || intra;
 
   if(!price){
-    output.innerHTML = `
-      <div class="card sell-alert">
-        <div class="section-title">API Diagnostic</div>
-        <div class="metric"><b>${ticker}</b> could not load enough data right now.</div>
-        <div class="metric">This usually means Alpha Vantage returned a limit message, temporary API block, invalid symbol, or no data response.</div>
-        <div class="metric">Try one ticker again later, or wait for the daily limit window to reset.</div>
-      </div>`;
+    output.innerHTML = renderApiFailureDiagnostic(ticker);
     return;
   }
 
