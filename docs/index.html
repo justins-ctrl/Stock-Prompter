@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v44 Predator Data Intelligence</title>
+  <title>Signal Predator AI v45 Account Growth Opportunity Desk</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -228,12 +228,22 @@ body.advanced-on .advanced-panel{display:block}
 .feed-step{padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);margin:8px 0;font-family:'Share Tech Mono',monospace}
 @media (max-width:520px){.data-grid{grid-template-columns:1fr}}
 
+
+.account-card{border:1px solid rgba(55,255,159,.36);background:linear-gradient(180deg,rgba(55,255,159,.08),rgba(10,20,38,.94));}
+.opportunity-card{border:1px solid rgba(142,203,255,.36);background:linear-gradient(180deg,rgba(142,203,255,.08),rgba(10,20,38,.94));}
+.opportunity-row{padding:12px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);margin-top:10px}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:34px;border-radius:999px;background:#11213f;font-family:'Orbitron';font-weight:900;margin-right:8px}
+.fit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.fit-tile{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px;background:rgba(255,255,255,.035)}
+.scan-note{padding:10px;border-radius:10px;background:rgba(255,216,79,.08);border:1px solid rgba(255,216,79,.22);margin-top:10px}
+@media (max-width:520px){.fit-grid{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v44 // predator data intelligence // api health + smart diagnostics</div>
+  <div class="subtitle">v45 // account growth intelligence // elite watchlists + opportunity board</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -255,7 +265,7 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v44 Stability Guard</div>
+    <div class="section-title">v45 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -380,6 +390,36 @@ body.advanced-on .advanced-panel{display:block}
     <div class="metric">Wheel mode uses trend, support/resistance, quality, next-day risk, and income mode logic.</div>
   </div>
 
+
+  <div class="card account-card">
+    <div class="section-title">Predator Account Intelligence</div>
+    <div class="metric muted">Signal Predator will grow with the account and filter out trades that require too much capital.</div>
+    <div class="grid-2">
+      <input id="portfolioValue" type="number" min="100" step="100" placeholder="Portfolio Value ($)">
+      <select id="accountTradingStyle">
+        <option value="BOTH">Momentum + Wheel</option>
+        <option value="MOMENTUM">Momentum Options Only</option>
+        <option value="WHEEL">Wheel Income Only</option>
+      </select>
+      <input id="maxOptionAllocationPct" type="number" min="1" max="50" step="1" placeholder="Max Option Allocation %">
+      <input id="maxWheelUsagePct" type="number" min="10" max="100" step="5" placeholder="Max Wheel Capital %">
+    </div>
+    <button onclick="safeAction('Save Account Profile', saveAccountProfile)">Save Account Profile</button>
+    <div id="accountIntelligenceSummary" style="margin-top:12px;"></div>
+  </div>
+
+  <div class="card opportunity-card">
+    <div class="section-title">Predator Elite Opportunity Desk</div>
+    <div class="metric muted">Uses an API-saving previous-close scan first, then ranks only the best stocks for a detailed live scan.</div>
+    <div class="grid-2">
+      <button onclick="safeAction('Momentum Desk Scan', scanMomentumDesk)">Scan Momentum Desk</button>
+      <button onclick="safeAction('Small Account Wheel Scan', scanWheelDesk)">Scan Wheel Desk</button>
+    </div>
+    <button class="secondary" onclick="safeAction('Best Strategy Scan', scanBestStrategyDesk)">Find Best Strategy</button>
+    <div class="scan-note">Quick desk scans use daily candles onlyânormally one request per ticker. Run the full live analysis only on the top one or two results.</div>
+    <div id="opportunityBoard" style="margin-top:12px;"></div>
+  </div>
+
   <div class="card">
     <div class="section-title">Target Watchlist</div>
     <div class="row" style="margin-top:12px;">
@@ -461,13 +501,15 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v44",
+    version: "v45",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
     closedTradeJournal: typeof closedTradeJournal !== "undefined" ? closedTradeJournal : [],
     performanceTrades,
     riskSettings,
+    accountProfile,
+    opportunityHistory,
     gradeFilterSetting: typeof gradeFilterSetting !== "undefined" ? gradeFilterSetting : "A_AND_APLUS",
     lastAnalysis: getStore("signal_predator_last_analysis", null)
   };
@@ -476,7 +518,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v44.json";
+  a.download = "signal-predator-backup-v45.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -488,13 +530,15 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v44",
+    version: "v45",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
     closedTradeJournal: typeof closedTradeJournal !== "undefined" ? closedTradeJournal : [],
     performanceTrades,
     riskSettings,
+    accountProfile,
+    opportunityHistory,
     gradeFilterSetting: typeof gradeFilterSetting !== "undefined" ? gradeFilterSetting : "A_AND_APLUS"
   };
   const box = document.getElementById("backupBox");
@@ -585,6 +629,315 @@ function ensureEngineDefaults(a){
 function safeRender(fn, fallbackHtml){
   try{ return fn(); }
   catch(err){ return fallbackHtml || `<div class="card sell-alert"><div class="section-title">Render Guard</div><div class="metric">A display section failed safely: ${err.message}</div></div>`; }
+}
+
+
+
+const MOMENTUM_ELITE_UNIVERSE = Object.freeze([
+  "SPY","QQQ","IWM","AAPL","MSFT","NVDA","META","AMZN","AMD","TSLA","AVGO","NFLX"
+]);
+
+// Broad candidate pool. Live price, wheel score, trend, and account fit decide eligibility.
+// A ticker is never recommended merely because it appears in this list.
+const SMALL_ACCOUNT_WHEEL_UNIVERSE = Object.freeze([
+  "SOFI","F","T","PFE","INTC","BAC","AAL","CCL","SNAP","WBD","NOK","RIVN","HOOD","NU","PLTR"
+]);
+
+let accountProfile = getStore("signal_predator_account_profile", {
+  portfolioValue:3000,
+  tradingStyle:"BOTH",
+  maxOptionAllocationPct:15,
+  maxWheelUsagePct:70
+});
+
+let opportunityHistory = getStore("signal_predator_opportunity_history", {});
+
+function getAccountTier(value){
+  const v = Math.max(0, Number(value || 0));
+  if(v < 5000) return {name:"STARTER", maxDeskTickers:6, note:"Focus on one contract, low concentration, and only the cleanest setups."};
+  if(v < 10000) return {name:"EMERGING", maxDeskTickers:8, note:"A slightly wider universe is available, but position size still matters more than frequency."};
+  if(v < 25000) return {name:"GROWTH", maxDeskTickers:10, note:"More wheel candidates and diversified positions become practical."};
+  return {name:"ADVANCED", maxDeskTickers:12, note:"The larger universe is available, but account rules still protect against concentration."};
+}
+
+function normalizeAccountProfile(){
+  accountProfile = {
+    portfolioValue:Math.max(100, safeNum(accountProfile.portfolioValue, 3000)),
+    tradingStyle:["BOTH","MOMENTUM","WHEEL"].includes(accountProfile.tradingStyle) ? accountProfile.tradingStyle : "BOTH",
+    maxOptionAllocationPct:Math.max(1, Math.min(50, safeNum(accountProfile.maxOptionAllocationPct, 15))),
+    maxWheelUsagePct:Math.max(10, Math.min(100, safeNum(accountProfile.maxWheelUsagePct, 70)))
+  };
+  return accountProfile;
+}
+
+function saveAccountProfile(){
+  accountProfile = {
+    portfolioValue:sanitizeNumber(document.getElementById("portfolioValue").value, 3000),
+    tradingStyle:document.getElementById("accountTradingStyle").value,
+    maxOptionAllocationPct:sanitizeNumber(document.getElementById("maxOptionAllocationPct").value, 15),
+    maxWheelUsagePct:sanitizeNumber(document.getElementById("maxWheelUsagePct").value, 70)
+  };
+  normalizeAccountProfile();
+  setStore("signal_predator_account_profile", accountProfile);
+  renderAccountIntelligenceSummary();
+}
+
+function getAccountFit(a, strategy){
+  normalizeAccountProfile();
+  const portfolio = accountProfile.portfolioValue;
+  const optionBudget = portfolio * (accountProfile.maxOptionAllocationPct / 100);
+  const wheelBudget = portfolio * (accountProfile.maxWheelUsagePct / 100);
+
+  if(strategy === "WHEEL"){
+    const strike = Math.max(1, safeNum(a.wheelMode?.suggestedPutStrike, safeNum(a.price, 0)));
+    const capitalRequired = strike * 100;
+    const usagePct = portfolio > 0 ? (capitalRequired / portfolio) * 100 : 999;
+    const affordable = capitalRequired <= wheelBudget;
+    let fit = "TOO LARGE";
+    let score = 15;
+    if(affordable && usagePct <= 40){ fit = "EXCELLENT FIT"; score = 95; }
+    else if(affordable && usagePct <= 60){ fit = "GOOD FIT"; score = 82; }
+    else if(affordable){ fit = "HIGH CONCENTRATION"; score = 62; }
+    return {
+      strategy:"SELL CASH-SECURED PUT",
+      capitalRequired,
+      usagePct:Math.round(usagePct),
+      budget:wheelBudget,
+      affordable,
+      fit,
+      score,
+      note:affordable
+        ? "The cash-secured put fits the selected wheel-capital limit, but assignment still means owning 100 shares."
+        : "This wheel trade requires more cash than the account profile allows."
+    };
+  }
+
+  const premium = safeNum(a.bestContract?.premium, Math.max(.35, safeNum(a.price,0)*.015));
+  const capitalRequired = premium * 100;
+  const usagePct = portfolio > 0 ? (capitalRequired / portfolio) * 100 : 999;
+  const affordable = capitalRequired <= optionBudget;
+  let fit = "TOO LARGE";
+  let score = 20;
+  if(affordable && usagePct <= 8){ fit = "EXCELLENT FIT"; score = 95; }
+  else if(affordable && usagePct <= 15){ fit = "GOOD FIT"; score = 84; }
+  else if(affordable){ fit = "ACCEPTABLE"; score = 70; }
+  return {
+    strategy:a.direction || "BUY OPTION",
+    capitalRequired,
+    usagePct:Math.round(usagePct),
+    budget:optionBudget,
+    affordable,
+    fit,
+    score,
+    note:affordable
+      ? "Estimated one-contract cost fits the option-allocation rule."
+      : "Estimated one-contract cost exceeds the account's option-allocation limit."
+  };
+}
+
+function renderAccountIntelligenceSummary(){
+  normalizeAccountProfile();
+  const tier = getAccountTier(accountProfile.portfolioValue);
+  const el = document.getElementById("accountIntelligenceSummary");
+  if(!el) return;
+
+  const fields = {
+    portfolioValue:accountProfile.portfolioValue,
+    accountTradingStyle:accountProfile.tradingStyle,
+    maxOptionAllocationPct:accountProfile.maxOptionAllocationPct,
+    maxWheelUsagePct:accountProfile.maxWheelUsagePct
+  };
+  Object.entries(fields).forEach(([id,val])=>{
+    const input = document.getElementById(id);
+    if(input) input.value = val;
+  });
+
+  const optionBudget = accountProfile.portfolioValue * accountProfile.maxOptionAllocationPct / 100;
+  const wheelBudget = accountProfile.portfolioValue * accountProfile.maxWheelUsagePct / 100;
+
+  el.innerHTML = `
+    <div class="fit-grid">
+      <div class="fit-tile"><div class="metric"><b>Account Tier:</b><br><span class="green">${tier.name}</span></div></div>
+      <div class="fit-tile"><div class="metric"><b>Portfolio:</b><br>$${Math.round(accountProfile.portfolioValue).toLocaleString()}</div></div>
+      <div class="fit-tile"><div class="metric"><b>Option Budget:</b><br>$${Math.round(optionBudget).toLocaleString()}</div></div>
+      <div class="fit-tile"><div class="metric"><b>Wheel Capital Limit:</b><br>$${Math.round(wheelBudget).toLocaleString()}</div></div>
+    </div>
+    <div class="metric muted">${tier.note}</div>
+    <div class="metric yellow"><b>Wheel reminder:</b> A $3,000 account can only cash-secure relatively low strikes, and one assignment may concentrate most of the account in one company.</div>`;
+}
+
+function getDeskVerdict(a, strategy){
+  const brain = typeof getPredatorBrain === "function" ? getPredatorBrain(a) : null;
+  if(strategy === "WHEEL"){
+    const score = safeNum(a.wheelMode?.sellPutScore, 0);
+    if(a.qualityDecision?.decision === "REJECT" || a.noTradeZone?.zone !== "CLEAR") return "PASS";
+    if(score >= 80 && a.wheelMode?.sellPutRead === "GOOD") return "SELL PUT CANDIDATE";
+    if(score >= 68) return "WATCH FOR SELL PUT";
+    return "PASS";
+  }
+  if(brain?.finalVerdict) return brain.finalVerdict;
+  if(a.qualityDecision?.decision === "APPROVED" && a.score >= 85) return "BUY AFTER TRIGGER";
+  if(a.score >= 70) return "WATCHLIST";
+  return "PASS";
+}
+
+function saveOpportunitySnapshot(rows, desk){
+  const day = new Date().toISOString().slice(0,10);
+  opportunityHistory[day] = opportunityHistory[day] || {};
+  opportunityHistory[day][desk] = rows.slice(0,10).map(r=>({
+    ticker:r.ticker, verdict:r.verdict, focusScore:r.focusScore, strategy:r.strategy
+  }));
+  const keys = Object.keys(opportunityHistory).sort().slice(-30);
+  const trimmed = {};
+  keys.forEach(k=>trimmed[k]=opportunityHistory[k]);
+  opportunityHistory = trimmed;
+  setStore("signal_predator_opportunity_history", opportunityHistory);
+}
+
+function getPreviousOpportunity(ticker, desk){
+  const days = Object.keys(opportunityHistory).sort().reverse();
+  const today = new Date().toISOString().slice(0,10);
+  for(const day of days){
+    if(day === today) continue;
+    const row = (opportunityHistory[day]?.[desk] || []).find(x=>x.ticker===ticker);
+    if(row) return row;
+  }
+  return null;
+}
+
+function renderOpportunityBoard(rows, title, desk){
+  const el = document.getElementById("opportunityBoard");
+  if(!el) return;
+  if(!rows.length){
+    el.innerHTML = `<div class="card"><div class="section-title">${title}</div><div class="metric">No account-suitable opportunities passed the desk filters.</div></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="card" style="margin-top:8px;">
+      <div class="section-title">${title}</div>
+      <div class="metric muted">Detailed live analysis is recommended only for the top one or two names.</div>
+      ${rows.map((r,i)=>{
+        const prev = getPreviousOpportunity(r.ticker, desk);
+        const evolution = prev
+          ? `${prev.verdict} ${prev.focusScore} â ${r.verdict} ${r.focusScore}`
+          : "First ranked scan";
+        return `<div class="opportunity-row">
+          <div class="metric"><span class="rank-badge">${i+1}</span><b>${r.ticker}</b> â <span class="${signalClass(r.verdict)}">${r.verdict}</span></div>
+          <div class="metric"><b>Best Strategy:</b> ${r.strategy}</div>
+          <div class="metric"><b>Focus Score:</b> ${r.focusScore}/100</div>
+          <div class="metric"><b>Account Fit:</b> <span class="${signalClass(r.accountFit.fit)}">${r.accountFit.fit}</span></div>
+          <div class="metric"><b>Estimated Capital:</b> $${Math.round(r.accountFit.capitalRequired).toLocaleString()} (${r.accountFit.usagePct}% of account)</div>
+          <div class="metric"><b>Setup:</b> ${r.a.grade} / ${r.a.score} â Alignment ${r.a.alignmentScore?.score || 0}</div>
+          <div class="metric"><b>Evolution:</b> ${evolution}</div>
+          <button class="small-btn" onclick="loadDeskTicker('${r.ticker}')">Load ${r.ticker}</button>
+        </div>`;
+      }).join("")}
+    </div>`;
+}
+
+function loadDeskTicker(ticker){
+  const input = document.getElementById("ticker");
+  if(input) input.value = ticker;
+  window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"});
+}
+
+async function runEfficientOpportunityDesk(universe, title, deskMode){
+  normalizeAccountProfile();
+  const tier = getAccountTier(accountProfile.portfolioValue);
+  const maxTickers = Math.min(tier.maxDeskTickers, universe.length);
+  const list = universe.slice(0,maxTickers);
+  renderThinkingCard([
+    `RUNNING ${title.toUpperCase()}...`,
+    "USING API-SAVING PREVIOUS-CLOSE MODE...",
+    "FILTERING FOR ACCOUNT FIT..."
+  ]);
+
+  const rows = [];
+  for(let i=0;i<list.length;i++){
+    const ticker = normalizeTicker(list[i]);
+    const closes = await getHistory(ticker);
+    if(!closes) continue;
+
+    // One-request quick scan: use the latest daily close. The user can run full live analysis on finalists.
+    const a = analyze(closes, closes[0]);
+    const momentumFit = getAccountFit(a, "MOMENTUM");
+    const wheelFit = getAccountFit(a, "WHEEL");
+
+    let strategy = "MOMENTUM";
+    let accountFit = momentumFit;
+    let strategyScore = safeNum(a.score,0);
+
+    if(deskMode === "WHEEL"){
+      strategy = "WHEEL";
+      accountFit = wheelFit;
+      strategyScore = safeNum(a.wheelMode?.sellPutScore,0);
+    }else if(deskMode === "BEST"){
+      const momentumComposite = safeNum(a.score,0) * .45 + safeNum(a.alignmentScore?.score,0) * .25 + momentumFit.score * .30;
+      const wheelComposite = safeNum(a.wheelMode?.sellPutScore,0) * .55 + safeNum(a.longTermOptions?.longBull,0) * .15 + wheelFit.score * .30;
+      if(wheelComposite > momentumComposite){
+        strategy = "WHEEL";
+        accountFit = wheelFit;
+        strategyScore = Math.round(wheelComposite);
+      }else{
+        strategy = "MOMENTUM";
+        accountFit = momentumFit;
+        strategyScore = Math.round(momentumComposite);
+      }
+    }
+
+    if(!accountFit.affordable) continue;
+
+    const verdict = getDeskVerdict(a, strategy);
+    const qualityBonus = a.qualityDecision?.decision === "APPROVED" ? 8 : a.qualityDecision?.decision === "REDUCED SIZE" ? 2 : -12;
+    const focusScore = clampScore(
+      strategyScore * .40 +
+      safeNum(a.alignmentScore?.score,50) * .20 +
+      safeNum(a.timeTarget?.probability,50) * .15 +
+      accountFit.score * .25 +
+      qualityBonus
+    );
+
+    rows.push({ticker,a,strategy,accountFit,verdict,focusScore});
+    if(i < list.length-1) await new Promise(r=>setTimeout(r,15000));
+  }
+
+  rows.sort((x,y)=>y.focusScore-x.focusScore);
+  const finalists = rows.filter(r=>r.verdict!=="PASS").slice(0,5);
+  saveOpportunitySnapshot(finalists, deskMode);
+  renderOpportunityBoard(finalists, title, deskMode);
+
+  const output = document.getElementById("output");
+  if(output){
+    output.innerHTML = `
+      <div class="card opportunity-card">
+        <div class="section-title">${title} Complete</div>
+        <div class="metric"><b>Tickers checked:</b> ${list.length}</div>
+        <div class="metric"><b>Account-suitable finalists:</b> ${finalists.length}</div>
+        <div class="metric"><b>API-saving mode:</b> Daily candles / previous close</div>
+        <div class="metric muted">Tap Load on the Opportunity Board, then run one full Predator Analysis for current quote and detailed confirmation.</div>
+      </div>`;
+  }
+}
+
+async function scanMomentumDesk(){
+  if(accountProfile.tradingStyle === "WHEEL"){
+    document.getElementById("opportunityBoard").innerHTML = "<div class='metric yellow'>Account profile is set to Wheel Income Only. Change it to Both or Momentum to use this desk.</div>";
+    return;
+  }
+  await runEfficientOpportunityDesk(MOMENTUM_ELITE_UNIVERSE, "Momentum Opportunity Board", "MOMENTUM");
+}
+
+async function scanWheelDesk(){
+  if(accountProfile.tradingStyle === "MOMENTUM"){
+    document.getElementById("opportunityBoard").innerHTML = "<div class='metric yellow'>Account profile is set to Momentum Only. Change it to Both or Wheel to use this desk.</div>";
+    return;
+  }
+  await runEfficientOpportunityDesk(SMALL_ACCOUNT_WHEEL_UNIVERSE, "Small Account Wheel Board", "WHEEL");
+}
+
+async function scanBestStrategyDesk(){
+  const mixed = [...new Set([...MOMENTUM_ELITE_UNIVERSE.slice(0,6), ...SMALL_ACCOUNT_WHEEL_UNIVERSE.slice(0,6)])];
+  await runEfficientOpportunityDesk(mixed, "Best Strategy Opportunity Board", "BEST");
 }
 
 
@@ -4034,7 +4387,16 @@ function renderFull(ticker, a){
     <div class="metric"><b>Suggested Risk Posture:</b> ${riskPosture}</div>
     <div class="metric"><b>Discipline Note:</b> ${discipline}</div>
     <div class="divider"></div>
-    <div class="section-title">Position Sizing</div>
+
+    <div class="divider"></div>
+    <div class="section-title">Account Suitability</div>
+    ${(()=>{ const m=getAccountFit(a,"MOMENTUM"), w=getAccountFit(a,"WHEEL"); return `
+      <div class="metric"><b>Portfolio:</b> $${Math.round(accountProfile.portfolioValue).toLocaleString()}</div>
+      <div class="metric"><b>Buy-Option Fit:</b> <span class="${signalClass(m.fit)}">${m.fit}</span> â Est. $${Math.round(m.capitalRequired)} (${m.usagePct}%)</div>
+      <div class="metric"><b>Cash-Secured Put Fit:</b> <span class="${signalClass(w.fit)}">${w.fit}</span> â Est. $${Math.round(w.capitalRequired).toLocaleString()} (${w.usagePct}%)</div>
+      <div class="metric muted">${m.note}</div>`; })()}
+
+        <div class="section-title">Position Sizing</div>
     <div class="metric"><b>Suggested Contracts:</b> ${a.contracts}</div>
     <div class="metric"><b>Capital Allocation:</b> ${a.allocation}</div>
     <div class="metric"><b>Risk Level:</b> <span class="${signalClass(a.risk)}">${a.risk}</span></div>
