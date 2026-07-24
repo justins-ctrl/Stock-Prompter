@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v45 Account Growth Opportunity Desk</title>
+  <title>Signal Predator AI v46 Conviction and Capital Commander</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -238,12 +238,24 @@ body.advanced-on .advanced-panel{display:block}
 .scan-note{padding:10px;border-radius:10px;background:rgba(255,216,79,.08);border:1px solid rgba(255,216,79,.22);margin-top:10px}
 @media (max-width:520px){.fit-grid{grid-template-columns:1fr}}
 
+
+.conviction-card{border:1px solid rgba(255,216,79,.38);background:linear-gradient(180deg,rgba(255,216,79,.09),rgba(10,20,38,.95));}
+.conviction-verdict{font-size:30px;font-weight:900;font-family:'Orbitron';letter-spacing:1px;text-align:center;margin:10px 0;text-transform:uppercase}
+.commander-card{border:1px solid rgba(55,255,159,.38);background:linear-gradient(180deg,rgba(55,255,159,.08),rgba(10,20,38,.95));}
+.commander-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.commander-tile{border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:11px;background:rgba(255,255,255,.035)}
+.pro-list{margin-top:10px}
+.pro-row{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.07);font-family:'Share Tech Mono',monospace}
+.pro-row:last-child{border-bottom:none}
+.conviction-note{padding:10px;border-radius:10px;background:rgba(142,203,255,.07);border:1px solid rgba(142,203,255,.18);margin-top:10px}
+@media (max-width:520px){.commander-grid{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v45 // account growth intelligence // elite watchlists + opportunity board</div>
+  <div class="subtitle">v46 // conviction engine // capital commander + professional coach</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -265,7 +277,7 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v45 Stability Guard</div>
+    <div class="section-title">v46 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -391,6 +403,17 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
 
+
+  <div class="card">
+    <div class="section-title">v46 Conviction Rules</div>
+    <div class="metric"><span class="green">95â100:</span> Elite Buy only after trigger confirmation.</div>
+    <div class="metric"><span class="green">88â94:</span> Good Buy at half size after confirmation.</div>
+    <div class="metric"><span class="yellow">82â87:</span> Speculative or Wait, depending on trigger status.</div>
+    <div class="metric"><span class="yellow">72â81:</span> Watchlist only.</div>
+    <div class="metric"><span class="red">Below 72 or rejected:</span> Pass.</div>
+    <div class="metric muted">The engine sizes trades according to the saved account profile and never treats conviction as a guaranteed probability of profit.</div>
+  </div>
+
   <div class="card account-card">
     <div class="section-title">Predator Account Intelligence</div>
     <div class="metric muted">Signal Predator will grow with the account and filter out trades that require too much capital.</div>
@@ -501,7 +524,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v45",
+    version: "v46",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -518,7 +541,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v45.json";
+  a.download = "signal-predator-backup-v46.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -530,7 +553,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v45",
+    version: "v46",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -3511,6 +3534,262 @@ function renderPredatorCoachCard(a){
 }
 
 
+
+function getPredatorConvictionEngine(a){
+  a = ensureEngineDefaults(a);
+  const brain = typeof getPredatorBrain === "function" ? getPredatorBrain(a) : null;
+  const session = typeof getDynamicConfirmationEngine === "function" ? getDynamicConfirmationEngine(a) : null;
+  const fit = typeof getAccountFit === "function" ? getAccountFit(a, "MOMENTUM") : {
+    affordable:true, fit:"N/A", score:70, capitalRequired:0, usagePct:0
+  };
+
+  const setup = clampScore(a.score || 0);
+  const alignment = clampScore(a.alignmentScore?.score || 50);
+  const timing = clampScore(a.timeTarget?.probability || 50);
+  const expiration = clampScore(a.expirationConfidence?.recommendedConfidence || 50);
+  const dataReadiness = typeof getPredatorDataIntelligence === "function"
+    ? clampScore(getPredatorDataIntelligence().ready || 70)
+    : 70;
+  const triggerConfidence = clampScore(session?.triggerConfidence || 50);
+  const accountFit = clampScore(fit.score || 50);
+
+  let conviction = clampScore(
+    setup * .22 +
+    alignment * .20 +
+    timing * .17 +
+    expiration * .13 +
+    triggerConfidence * .12 +
+    accountFit * .10 +
+    dataReadiness * .06
+  );
+
+  if(a.qualityDecision?.decision === "REJECT") conviction -= 24;
+  if(a.noTradeZone?.zone !== "CLEAR") conviction -= 16;
+  if(a.marketRegimeFilter?.state === "DANGEROUS") conviction -= 18;
+  if(a.nextDay?.chaseRisk === "HIGH") conviction -= 8;
+  if(a.nextDay?.overnightRisk === "HIGH") conviction -= 6;
+  if(a.trapWarning && a.trapWarning !== "CLEAR") conviction -= 8;
+  if(!fit.affordable) conviction -= 25;
+  conviction = clampScore(conviction);
+
+  const triggerReady = brain
+    ? String(brain.finalVerdict || "").includes("BUY")
+    : a.entryTiming?.label === "ENTER NOW";
+
+  let tier = "PASS";
+  let color = "red";
+  let sizeLabel = "NO POSITION";
+  let riskPct = 0;
+  let capitalPct = 0;
+  let aggression = "NONE";
+  let coach = "Save your buying power. The setup does not justify risking capital.";
+
+  if(conviction >= 95 && triggerReady && a.qualityDecision?.decision === "APPROVED"){
+    tier = "ELITE BUY";
+    color = "green";
+    sizeLabel = "FULL ALLOWED SIZE";
+    riskPct = 3;
+    capitalPct = Math.min(accountProfile?.maxOptionAllocationPct || 15, 15);
+    aggression = "HIGH â WITH DISCIPLINE";
+    coach = "If I were following these rules with my own money, this is the type of confirmed setup I would consider taking at the full allowed size.";
+  }else if(conviction >= 88 && triggerReady){
+    tier = "GOOD BUY";
+    color = "green";
+    sizeLabel = "HALF SIZE";
+    riskPct = 2;
+    capitalPct = Math.min(accountProfile?.maxOptionAllocationPct || 15, 10);
+    aggression = "MODERATE";
+    coach = "This is a calculated trade, but not a maximum-conviction trade. Participate smaller and respect the invalidation.";
+  }else if(conviction >= 82 && triggerReady){
+    tier = "SPECULATIVE BUY";
+    color = "yellow";
+    sizeLabel = "QUARTER SIZE";
+    riskPct = 1;
+    capitalPct = Math.min(accountProfile?.maxOptionAllocationPct || 15, 5);
+    aggression = "LOW";
+    coach = "The trade has an edge, but the evidence is not strong enough for normal size. Only take it if you accept the added uncertainty.";
+  }else if(conviction >= 82 && !triggerReady){
+    tier = "WAIT â GOOD SETUP";
+    color = "yellow";
+    sizeLabel = "NO ENTRY YET";
+    riskPct = 0;
+    capitalPct = 0;
+    aggression = "PATIENT";
+    coach = "The setup is attractive, but the market has not granted entry permission. Wait for the trigger instead of anticipating it.";
+  }else if(conviction >= 72){
+    tier = "WATCHLIST ONLY";
+    color = "yellow";
+    sizeLabel = "NO POSITION";
+    riskPct = 0;
+    capitalPct = 0;
+    aggression = "NONE";
+    coach = "There is enough potential to keep watching, but not enough agreement to risk money.";
+  }
+
+  if(a.qualityDecision?.decision === "REJECT" || a.noTradeZone?.zone !== "CLEAR" || !fit.affordable){
+    tier = "PASS";
+    color = "red";
+    sizeLabel = "NO POSITION";
+    riskPct = 0;
+    capitalPct = 0;
+    aggression = "NONE";
+    coach = !fit.affordable
+      ? "The setup may look interesting, but it does not fit this account safely."
+      : "Save your buying power. This is the kind of trade that can slowly drain an account when the evidence is incomplete.";
+  }
+
+  const portfolio = Math.max(100, safeNum(accountProfile?.portfolioValue, 3000));
+  const riskDollars = Math.round(portfolio * (riskPct / 100));
+  const maxCapital = Math.round(portfolio * (capitalPct / 100));
+  const estimatedContractCost = Math.max(0, Math.round(safeNum(fit.capitalRequired, 0)));
+  const contracts = tier.includes("BUY") && estimatedContractCost > 0
+    ? Math.max(0, Math.floor(maxCapital / estimatedContractCost))
+    : 0;
+  const finalContracts = tier.includes("BUY") ? Math.max(estimatedContractCost <= maxCapital ? 1 : 0, Math.min(contracts, 3)) : 0;
+
+  const reasonsFor = [];
+  const reasonsAgainst = [];
+  if(alignment >= 80) reasonsFor.push("Trend and directional alignment are strong.");
+  else reasonsAgainst.push("Trend alignment is not strong enough.");
+  if(timing >= 75) reasonsFor.push("Timing and time-to-target remain supportive.");
+  else reasonsAgainst.push("Timing is not yet strong enough.");
+  if(a.qualityDecision?.decision === "APPROVED") reasonsFor.push("The quality filter approved the setup.");
+  else reasonsAgainst.push(`Quality decision is ${a.qualityDecision?.decision || "unclear"}.`);
+  if(a.noTradeZone?.zone === "CLEAR") reasonsFor.push("Price is outside the major no-trade zones.");
+  else reasonsAgainst.push(`Price is in ${a.noTradeZone?.zone}.`);
+  if(triggerReady) reasonsFor.push("The entry trigger is confirmed under the current rules.");
+  else reasonsAgainst.push("Entry confirmation is still incomplete.");
+  if(fit.affordable) reasonsFor.push("One contract fits the account allocation rule.");
+  else reasonsAgainst.push("The estimated contract cost is too large for the account rule.");
+  if(a.nextDay?.chaseRisk === "HIGH") reasonsAgainst.push("Chase risk is high.");
+  if(a.nextDay?.overnightRisk === "HIGH") reasonsAgainst.push("Overnight risk is elevated.");
+
+  const nextAction = tier.includes("BUY")
+    ? `Take no more than ${finalContracts} contract${finalContracts===1?"":"s"} and exit if the invalidation breaks.`
+    : tier.startsWith("WAIT")
+      ? `Wait for ${brain?.upgradeRule || "the trigger to confirm"}.`
+      : tier === "WATCHLIST ONLY"
+        ? "Recheck later only if momentum and confirmation improve."
+        : "Move on to a better opportunity.";
+
+  return {
+    conviction,tier,color,sizeLabel,riskPct,riskDollars,capitalPct,maxCapital,
+    estimatedContractCost,contracts:finalContracts,aggression,coach,nextAction,
+    reasonsFor:reasonsFor.slice(0,5),reasonsAgainst:reasonsAgainst.slice(0,5),
+    fit,triggerReady,
+    note:"Conviction is a rule-based setup score, not a guaranteed win probability."
+  };
+}
+
+function renderPredatorConvictionCard(a){
+  const c = getPredatorConvictionEngine(a);
+  return `
+  <div class="card conviction-card">
+    <div class="section-title">Predator Conviction Engine</div>
+    <div class="conviction-verdict ${c.color}">${c.tier}</div>
+    <div class="brain-sentence">${c.coach}</div>
+    <div class="commander-grid">
+      <div class="commander-tile"><div class="metric"><b>Conviction:</b><br>${c.conviction}/100</div></div>
+      <div class="commander-tile"><div class="metric"><b>Recommended Size:</b><br>${c.sizeLabel}</div></div>
+      <div class="commander-tile"><div class="metric"><b>Aggression:</b><br>${c.aggression}</div></div>
+      <div class="commander-tile"><div class="metric"><b>Contracts:</b><br>${c.contracts}</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="metric"><b>Next Action:</b> ${c.nextAction}</div>
+    <div class="conviction-note">${c.note}</div>
+  </div>`;
+}
+
+function renderCapitalCommanderCard(a){
+  const c = getPredatorConvictionEngine(a);
+  return `
+  <div class="card commander-card">
+    <div class="section-title">Capital Commander</div>
+    <div class="commander-grid">
+      <div class="commander-tile"><div class="metric"><b>Account Size:</b><br>$${Math.round(accountProfile.portfolioValue).toLocaleString()}</div></div>
+      <div class="commander-tile"><div class="metric"><b>Suggested Risk:</b><br>$${c.riskDollars} (${c.riskPct}%)</div></div>
+      <div class="commander-tile"><div class="metric"><b>Maximum Capital:</b><br>$${c.maxCapital} (${c.capitalPct}%)</div></div>
+      <div class="commander-tile"><div class="metric"><b>Estimated Contract:</b><br>$${c.estimatedContractCost}</div></div>
+    </div>
+    <div class="divider"></div>
+    <div class="metric"><b>Account Fit:</b> <span class="${signalClass(c.fit.fit)}">${c.fit.fit}</span></div>
+    <div class="metric"><b>Capital Usage:</b> ${c.fit.usagePct}%</div>
+    <div class="metric"><b>Position Rule:</b> Never exceed the smaller of the account allocation limit or the amount you are genuinely willing to lose.</div>
+  </div>`;
+}
+
+function renderProfessionalReasonCard(a){
+  const c = getPredatorConvictionEngine(a);
+  return `
+  <div class="card">
+    <div class="section-title">Why a Disciplined Trader Would ${c.tier === "PASS" ? "Avoid" : c.tier.startsWith("WAIT") || c.tier === "WATCHLIST ONLY" ? "Wait" : "Consider This"}</div>
+    <div class="pro-list">
+      ${c.reasonsFor.map(x=>`<div class="pro-row"><span class="green">â</span> ${x}</div>`).join("")}
+      ${c.reasonsAgainst.map(x=>`<div class="pro-row"><span class="red">â</span> ${x}</div>`).join("")}
+    </div>
+    <div class="divider"></div>
+    <div class="metric"><b>Predator Coach:</b> ${c.coach}</div>
+  </div>`;
+}
+
+function getPositionConvictionCoach(r){
+  const command = r.predatorCommand || {};
+  const thesis = safeNum(r.thesisIntegrity?.score, 50);
+  const holdScore = safeNum(r.targetConfidence?.holdScore, 50);
+  const ttt = safeNum(r.timeTarget?.probability, 50);
+  const pnl = typeof r.approxPnLPercent === "number" ? r.approxPnLPercent : null;
+
+  let commitment = clampScore(thesis * .45 + holdScore * .35 + ttt * .20);
+  let decision = "HOLD NORMALLY";
+  let color = "green";
+  let instruction = "The trade remains healthy. Continue following the plan.";
+
+  if(command.action && String(command.action).includes("EXIT")){
+    decision = "EXIT NOW";
+    color = "red";
+    commitment = Math.max(80, 100 - thesis);
+    instruction = "The original thesis is no longer strong enough. Protect capital.";
+  }else if(pnl !== null && pnl >= 40){
+    decision = "TAKE PROFIT / KEEP SMALL RUNNER";
+    color = "green";
+    instruction = "A meaningful profit is available. Lock most of it and keep only a small runner if the thesis remains strong.";
+  }else if(pnl !== null && pnl >= 20 && holdScore < 65){
+    decision = "START TAKING PROFIT";
+    color = "yellow";
+    instruction = "Profit is available while hold quality is weakening. Reduce risk now.";
+  }else if(thesis < 45){
+    decision = "PREPARE TO EXIT";
+    color = "red";
+    instruction = "The thesis is close to breaking. Do not give the trade much more room.";
+  }else if(thesis < 60 || holdScore < 55){
+    decision = "REDUCE RISK";
+    color = "yellow";
+    instruction = "The position is still alive, but conviction has weakened. Do not add.";
+  }else if(thesis >= 85 && holdScore >= 75){
+    decision = "HOLD AGGRESSIVELY";
+    color = "green";
+    instruction = pnl !== null && pnl < 0
+      ? "The option is red, but the thesis is still very strong. Avoid panic selling unless invalidation breaks."
+      : "Nothing meaningful has broken. Give the winner room while respecting the invalidation.";
+  }
+
+  return {decision,color,commitment,instruction};
+}
+
+function renderPositionConvictionCoach(r){
+  const c = getPositionConvictionCoach(r);
+  return `
+  <div class="card conviction-card">
+    <div class="section-title">Position Commitment Meter</div>
+    <div class="conviction-verdict ${c.color}">${c.decision}</div>
+    <div class="metric"><b>Commitment:</b> ${c.commitment}/100</div>
+    <div class="bar"><div class="fill" style="width:${c.commitment}%"></div></div>
+    <div class="brain-sentence">${c.instruction}</div>
+    <div class="conviction-note">This score measures rule alignment for managing the position. It is not a guarantee that the trade will recover or remain profitable.</div>
+  </div>`;
+}
+
+
 function getPredatorBrain(a){
   a = ensureEngineDefaults(a);
   const bot = getPredatorBotDecision(a);
@@ -4235,6 +4514,9 @@ function renderFull(ticker, a){
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderDataIntelligenceCard()}
+  ${renderPredatorConvictionCard(a)}
+  ${renderCapitalCommanderCard(a)}
+  ${renderProfessionalReasonCard(a)}
   ${renderPredatorBrainCard(a)}
   ${renderPredatorBotDecision(a)}
   ${renderMarketSessionCard(a)}
@@ -4449,7 +4731,7 @@ function renderFull(ticker, a){
 
 function renderCompact(ticker, a){
   a = ensureEngineDefaults(a);
-  return `${renderDataIntelligenceCard()}${renderPredatorBrainCard(a)}${renderPredatorBotDecision(a)}${renderMarketSessionCard(a)}${renderPatienceMeterCard(a)}${renderEntryReadinessCard(a)}${renderWhyWaitingCard(a)}${renderDecisionTimelineCard(a)}${renderIgnorePredatorCard(a)}${renderPredatorCoachCard(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `${renderDataIntelligenceCard()}${renderPredatorConvictionCard(a)}${renderCapitalCommanderCard(a)}${renderProfessionalReasonCard(a)}${renderPredatorBrainCard(a)}${renderPredatorBotDecision(a)}${renderMarketSessionCard(a)}${renderPatienceMeterCard(a)}${renderEntryReadinessCard(a)}${renderWhyWaitingCard(a)}${renderDecisionTimelineCard(a)}${renderIgnorePredatorCard(a)}${renderPredatorCoachCard(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
