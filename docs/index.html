@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v46 Conviction and Capital Commander</title>
+  <title>Signal Predator AI v46.1 Swing Buy + Wheel Income Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -250,12 +250,21 @@ body.advanced-on .advanced-panel{display:block}
 .conviction-note{padding:10px;border-radius:10px;background:rgba(142,203,255,.07);border:1px solid rgba(142,203,255,.18);margin-top:10px}
 @media (max-width:520px){.commander-grid{grid-template-columns:1fr}}
 
+
+.final-answer-card{border:2px solid rgba(55,255,159,.45);background:linear-gradient(180deg,rgba(55,255,159,.10),rgba(10,20,38,.97));}
+.final-answer-word{font-family:'Orbitron';font-size:38px;font-weight:900;text-align:center;letter-spacing:2px;margin:8px 0 12px;text-transform:uppercase}
+.final-answer-sub{font-size:17px;line-height:1.5;text-align:center;margin-bottom:12px}
+.strategy-chip{display:inline-block;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.12);margin:3px;font-family:'Share Tech Mono',monospace}
+.expiration-policy{border:1px solid rgba(142,203,255,.32);background:linear-gradient(180deg,rgba(142,203,255,.07),rgba(10,20,38,.95));}
+.simple-rule{padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.simple-rule:last-child{border-bottom:none}
+
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v46 // conviction engine // capital commander + professional coach</div>
+  <div class="subtitle">v46.1 // monthly swing buys + weekly/biweekly wheel income</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -277,7 +286,7 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v46 Stability Guard</div>
+    <div class="section-title">v46.1 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -404,6 +413,15 @@ body.advanced-on .advanced-panel{display:block}
 
 
 
+
+  <div class="card expiration-policy">
+    <div class="section-title">v46.1 Strategy Split</div>
+    <div class="metric"><span class="green"><b>Buying calls/puts:</b></span> Monthly only, 30â90 DTE. Preferred 45â75 DTE.</div>
+    <div class="metric"><span class="green"><b>Selling puts/calls:</b></span> Weekly or biweekly only.</div>
+    <div class="metric"><b>User-facing decision:</b> BUY, WAIT, or PASS â with a plain-English reason and exact next step.</div>
+    <div class="metric muted">The advanced scoring remains available below the final answer for transparency.</div>
+  </div>
+
   <div class="card">
     <div class="section-title">v46 Conviction Rules</div>
     <div class="metric"><span class="green">95â100:</span> Elite Buy only after trigger confirmation.</div>
@@ -524,7 +542,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v46",
+    version: "v46.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -541,7 +559,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v46.json";
+  a.download = "signal-predator-backup-v46-1.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -553,7 +571,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v46",
+    version: "v46.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -1945,8 +1963,8 @@ function getMultiTimeframeEntryEngine(a){
     }
   }
 
-  let weeklyRule = "For weekly/bi-weekly trades, obey the exact trigger and hold requirement.";
-  let swingRule = "For 1-3 month trades, trigger is preferred, but invalidation and structure matter more.";
+  let weeklyRule = "Weekly/biweekly BUY trades are disabled in v46.1. These durations are reserved for Wheel selling.";
+  let swingRule = "For monthly 30-90 DTE buys, daily structure and invalidation matter more than perfect short-term timing.";
   let leapRule = "For 6-12+ month trades, long-term trend structure matters more than a few cents around the trigger.";
 
   if(direction === "BUY PUT"){
@@ -1999,64 +2017,53 @@ function getExpirationRecommendationConfidence(a){
 
   function clamp(n){ return Math.max(0, Math.min(100, Math.round(n))); }
 
-  let weekly = Number(lt.weeklyScore || ttt);
-  let biweekly = Number(lt.biweeklyScore || ttt);
-  let oneMonth = Number(lt.oneToThreeMonthScore || 50);
-  let threeMonth = Number(lt.threeToSixMonthScore || 50);
-  let sixMonth = Number(lt.sixToTwelveMonthScore || 50);
-  let twelveMonth = Number(lt.twelvePlusLeapScore || 50);
+  // Scores are preserved for diagnostics, but v46.1 does not allow weekly/biweekly BUY recommendations.
+  let weekly = clamp(Number(lt.weeklyScore || ttt));
+  let biweekly = clamp(Number(lt.biweeklyScore || ttt));
+  let oneMonth = Number(lt.oneToThreeMonthScore || 55);
+  let threeMonth = Number(lt.threeToSixMonthScore || 55);
 
-  if(quality === "APPROVED"){ weekly += 5; biweekly += 6; }
-  else if(quality === "WAIT"){ weekly -= 8; biweekly -= 4; oneMonth += 3; }
-  else if(quality === "REJECT"){ weekly -= 20; biweekly -= 14; oneMonth -= 4; }
+  if(quality === "APPROVED"){ oneMonth += 8; threeMonth += 6; }
+  else if(quality === "WAIT"){ oneMonth += 3; threeMonth += 5; }
+  else if(quality === "REJECT"){ oneMonth -= 12; threeMonth -= 10; }
 
-  if(confirmation.holdMinutes >= 60){ weekly -= 15; biweekly -= 8; oneMonth += 4; threeMonth += 5; }
-  else if(confirmation.holdMinutes === 30){ weekly -= 6; biweekly += 2; oneMonth += 3; }
-  else if(confirmation.holdMinutes === 15){ weekly += 5; biweekly += 5; }
+  if(confirmation.holdMinutes >= 60){ oneMonth += 4; threeMonth += 8; }
+  else if(confirmation.holdMinutes === 30){ oneMonth += 6; threeMonth += 4; }
+  else if(confirmation.holdMinutes === 15){ oneMonth += 7; threeMonth += 3; }
 
-  if(nextDay.chaseRisk === "HIGH"){ weekly -= 14; biweekly -= 8; oneMonth += 4; }
-  if(nextDay.overnightRisk === "HIGH"){ weekly -= 10; biweekly -= 5; oneMonth += 4; threeMonth += 4; }
-  if(nextDay.reversalTrap === "HIGH"){ weekly -= 12; biweekly -= 8; }
+  if(nextDay.chaseRisk === "HIGH"){ oneMonth -= 5; threeMonth += 5; }
+  if(nextDay.overnightRisk === "HIGH"){ oneMonth -= 3; threeMonth += 5; }
+  if(nextDay.reversalTrap === "HIGH"){ oneMonth -= 4; threeMonth += 3; }
+  if(align >= 85){ oneMonth += 7; threeMonth += 7; }
+  if(ttt >= 80){ oneMonth += 5; threeMonth += 4; }
 
-  if(align >= 85){ oneMonth += 4; threeMonth += 6; sixMonth += 5; }
-
-  weekly = clamp(weekly);
-  biweekly = clamp(biweekly);
   oneMonth = clamp(oneMonth);
   threeMonth = clamp(threeMonth);
-  sixMonth = clamp(sixMonth);
-  twelveMonth = clamp(twelveMonth);
 
-  const options = [
-    {label:"Weekly", confidence:weekly},
-    {label:"Bi-Weekly", confidence:biweekly},
-    {label:"1 Month", confidence:oneMonth},
-    {label:"3 Month", confidence:threeMonth},
-    {label:"6 Month", confidence:sixMonth},
-    {label:"12+ Month", confidence:twelveMonth}
-  ].sort((a,b)=>b.confidence-a.confidence);
+  // Internal monthly buckets: 30â60 DTE versus 60â90 DTE.
+  const monthlyOptions = [
+    {label:"45â60 DTE Monthly", confidence:oneMonth},
+    {label:"60â90 DTE Monthly", confidence:threeMonth}
+  ].sort((x,y)=>y.confidence-x.confidence);
 
-  const best = options[0];
-  let vehicleType = "SHORT-TERM OPTION";
-  if(best.label === "1 Month" || best.label === "3 Month") vehicleType = "SWING OPTION";
-  if(best.label === "6 Month" || best.label === "12+ Month") vehicleType = "LEAP / POSITION OPTION";
-
+  const best = monthlyOptions[0];
   let confidenceGrade = "WEAK";
   if(best.confidence >= 90) confidenceGrade = "ELITE";
   else if(best.confidence >= 80) confidenceGrade = "STRONG";
   else if(best.confidence >= 70) confidenceGrade = "GOOD";
   else if(best.confidence >= 60) confidenceGrade = "SPECULATIVE";
 
-  let rule = "Use the duration with the highest confidence while respecting risk warnings.";
-  if(best.label === "Weekly" || best.label === "Bi-Weekly") rule = "Short-term option is acceptable only if confirmation hold is satisfied.";
-  else if(best.label === "1 Month" || best.label === "3 Month") rule = "Swing duration is favored. Give the thesis time to develop.";
-  else rule = "Long-duration option is favored. Avoid forcing a weekly trade.";
-
-  let warning = "NONE";
-  if((weekly < 60 || biweekly < 60) && best.confidence >= 80) warning = "DO NOT FORCE WEEKLY";
-  if(quality === "REJECT" && (best.label === "Weekly" || best.label === "Bi-Weekly")) warning = "SHORT-TERM SETUP REJECTED";
-
-  return {weekly,biweekly,oneMonth,threeMonth,sixMonth,twelveMonth,recommendedDuration:best.label,recommendedConfidence:best.confidence,vehicleType,confidenceGrade,rule,warning};
+  return {
+    weekly,biweekly,
+    oneMonth,threeMonth,
+    sixMonth:0,twelveMonth:0,
+    recommendedDuration:best.label,
+    recommendedConfidence:best.confidence,
+    vehicleType:"MONTHLY SWING OPTION",
+    confidenceGrade,
+    rule:"Long call/put purchases use monthly expirations only, normally 30â90 DTE with 45â75 DTE preferred.",
+    warning:"WEEKLY BUYING DISABLED"
+  };
 }
 
 function getWheelExpirationEngine(a){
@@ -2131,12 +2138,7 @@ function getWheelExpirationEngine(a){
 
   const rows = [
     {label:"Weekly", days:7},
-    {label:"Bi-Weekly", days:14},
-    {label:"30-45 DTE", days:45},
-    {label:"45-60 DTE", days:60},
-    {label:"60-90 DTE", days:90},
-    {label:"3-6 Months", days:180},
-    {label:"6-12 Months", days:365}
+    {label:"Bi-Weekly", days:14}
   ].map(r => ({...r, sellPutScore:durationScore(r.days,"PUT"), sellCallScore:durationScore(r.days,"CALL")}));
 
   const bestPut = [...rows].sort((a,b)=>b.sellPutScore-a.sellPutScore)[0];
@@ -2155,7 +2157,7 @@ function getWheelExpirationEngine(a){
   if(best.days <= 14 && (overnightRisk === "HIGH" || chaseRisk === "HIGH")) assignmentMode = "FAST BUT HIGHER RISK";
   if(best.days >= 180) assignmentMode = "LOWER THETA EFFICIENCY / LONG CAPITAL HOLD";
 
-  let reason = "30-45 DTE often offers the best balance of premium, theta decay, and management flexibility.";
+  let reason = "v46.1 limits Wheel income recommendations to weekly and biweekly expirations so the income strategy stays separate from monthly option buying.";
   if(best.days <= 14) reason = "Short duration can generate faster income, but requires tighter management.";
   if(best.days >= 90) reason = "Longer duration gives more premium but can tie up capital and reduce theta efficiency.";
   if(bestSide === "SELL PUT" && bias === "Bullish") reason += " Bullish bias favors selling puts.";
@@ -3535,6 +3537,170 @@ function renderPredatorCoachCard(a){
 
 
 
+
+function getStrategyExpirationPolicy(a){
+  a = ensureEngineDefaults(a);
+  const wheel = a.wheelMode || {};
+  const conviction = typeof getPredatorConvictionEngine === "function"
+    ? getPredatorConvictionEngine(a)
+    : {tier:"PASS", conviction:0, triggerReady:false};
+
+  const buyDirection = a.direction === "BUY CALL" || a.direction === "BUY PUT" ? a.direction : "WAIT";
+  const buyScore = buyDirection === "BUY CALL"
+    ? safeNum(wheel.buyCallScore, 0)
+    : buyDirection === "BUY PUT"
+      ? safeNum(wheel.buyPutScore, 0)
+      : 0;
+
+  let buyWindow = "45â75 DTE MONTHLY";
+  let buyWindowReason = "Default swing-buy window gives the directional thesis time to develop while avoiding weekly time pressure.";
+
+  if(a.nextDay?.overnightRisk === "HIGH" || a.nextDay?.chaseRisk === "HIGH" || a.confirmationHold?.holdMinutes >= 60){
+    buyWindow = "60â90 DTE MONTHLY";
+    buyWindowReason = "Elevated timing risk favors more time for the swing thesis to work.";
+  } else if(a.alignmentScore?.score >= 85 && a.timeTarget?.probability >= 80 && a.nextDay?.chaseRisk !== "HIGH"){
+    buyWindow = "45â60 DTE MONTHLY";
+    buyWindowReason = "Strong alignment supports the shorter end of the monthly swing window.";
+  }
+
+  // Wheel selling is deliberately restricted to weekly/biweekly.
+  const weeklyPut = safeNum(a.wheelExpiration?.rows?.find(x=>x.label==="Weekly")?.sellPutScore, wheel.sellPutScore);
+  const biPut = safeNum(a.wheelExpiration?.rows?.find(x=>x.label==="Bi-Weekly")?.sellPutScore, wheel.sellPutScore);
+  const weeklyCall = safeNum(a.wheelExpiration?.rows?.find(x=>x.label==="Weekly")?.sellCallScore, wheel.sellCallScore);
+  const biCall = safeNum(a.wheelExpiration?.rows?.find(x=>x.label==="Bi-Weekly")?.sellCallScore, wheel.sellCallScore);
+
+  const putDuration = biPut >= weeklyPut ? "BI-WEEKLY (ABOUT 8â14 DTE)" : "WEEKLY (ABOUT 5â7 DTE)";
+  const callDuration = biCall >= weeklyCall ? "BI-WEEKLY (ABOUT 8â14 DTE)" : "WEEKLY (ABOUT 5â7 DTE)";
+
+  return {
+    buyDirection,
+    buyScore,
+    buyWindow,
+    buyWindowReason,
+    sellPutWindow:putDuration,
+    sellCallWindow:callDuration,
+    weeklyPutScore:Math.round(weeklyPut),
+    biPutScore:Math.round(biPut),
+    weeklyCallScore:Math.round(weeklyCall),
+    biCallScore:Math.round(biCall),
+    rule:"BUY calls/puts use monthly expirations only. SELL puts/calls use weekly or biweekly expirations only."
+  };
+}
+
+function getSimplePredatorDecision(a){
+  a = ensureEngineDefaults(a);
+  const conviction = getPredatorConvictionEngine(a);
+  const policy = getStrategyExpirationPolicy(a);
+  const fit = getAccountFit(a, "MOMENTUM");
+  const brain = typeof getPredatorBrain === "function" ? getPredatorBrain(a) : null;
+
+  let decision = "PASS";
+  let color = "red";
+  let direction = policy.buyDirection;
+  let reason = "The setup does not provide a strong enough directional edge to justify buying an option.";
+  let action = "Move to the next ticker.";
+  let upgrade = "A new scan must produce a stronger directional setup.";
+  let expiration = policy.buyWindow;
+
+  const validDirection = direction === "BUY CALL" || direction === "BUY PUT";
+  const strongSwingStructure =
+    validDirection &&
+    safeNum(a.alignmentScore?.score,0) >= 70 &&
+    safeNum(a.timeTarget?.probability,0) >= 65 &&
+    a.noTradeZone?.zone === "CLEAR" &&
+    a.marketRegimeFilter?.state !== "DANGEROUS" &&
+    a.qualityDecision?.decision !== "REJECT" &&
+    fit.affordable;
+
+  // v46.1 intentionally stops requiring a near-perfect intraday trigger for
+  // 30â90 DTE swing buys. Short-term timing still affects BUY vs WAIT.
+  const acceptableSwingEntry =
+    strongSwingStructure &&
+    safeNum(conviction.conviction,0) >= 82 &&
+    a.nextDay?.chaseRisk !== "HIGH" &&
+    a.nextDay?.tomorrowRead !== "WAIT FOR PULLBACK" &&
+    a.entryTiming?.label !== "WAIT FOR PULLBACK";
+
+  if(acceptableSwingEntry){
+    decision = "BUY";
+    color = "green";
+    reason = `${direction === "BUY CALL" ? "Bullish" : "Bearish"} daily structure, timing, and account fit are strong enough for a monthly swing option. The trade does not need weekly-style perfection because the contract has 30â90 days to work.`;
+    action = `Use a monthly ${direction === "BUY CALL" ? "call" : "put"} in the ${policy.buyWindow} window and stay within the saved account-size limit.`;
+    upgrade = "Already approved.";
+  }else if(strongSwingStructure){
+    decision = "WAIT";
+    color = "yellow";
+
+    if(a.nextDay?.chaseRisk === "HIGH" || a.entryTiming?.label === "WAIT FOR PULLBACK"){
+      reason = "The swing thesis is valid, but price is too extended right now. Buying here would create poor risk-to-reward.";
+      action = "Wait for the pullback or reclaim level shown by Predator. Do not chase.";
+      upgrade = `Upgrade to BUY when the entry improves while the ${direction === "BUY CALL" ? "bullish" : "bearish"} daily structure remains intact.`;
+    }else if(safeNum(conviction.conviction,0) < 82){
+      reason = "The direction is promising, but the combined swing-quality score is not strong enough yet.";
+      action = "Keep it on the watchlist and scan again after the next meaningful price move.";
+      upgrade = "Upgrade to BUY when alignment, timing, or momentum improves without breaking the thesis.";
+    }else{
+      reason = "The longer-term setup is acceptable, but one entry-quality condition is still incomplete.";
+      action = "Wait for the stated entry condition instead of forcing the trade.";
+      upgrade = brain?.upgradeRule || "Upgrade when entry quality improves.";
+    }
+  }else{
+    if(!fit.affordable && validDirection){
+      reason = "The directional setup may be interesting, but the estimated one-contract cost does not fit the saved account allocation.";
+      action = "Pass on this contract and look for a more affordable ticker or expiration.";
+    }else if(a.noTradeZone?.zone !== "CLEAR"){
+      reason = `Price is currently in ${a.noTradeZone?.zone}. That is not a clean place to buy a monthly option.`;
+      action = "Pass for now and wait for a cleaner structure.";
+    }else if(a.qualityDecision?.decision === "REJECT"){
+      reason = `The quality engine rejected the setup: ${a.qualityDecision?.reason || "insufficient trade quality"}.`;
+      action = "Move on to the next ticker.";
+    }
+  }
+
+  const invalidation = a.nextDay?.invalidation || "N/A";
+
+  return {
+    decision,color,direction,reason,action,upgrade,expiration,invalidation,
+    conviction:conviction.conviction,
+    accountFit:fit.fit,
+    policy
+  };
+}
+
+function renderSimplePredatorDecision(a){
+  const d = getSimplePredatorDecision(a);
+  const directionText = d.direction === "WAIT" ? "No directional buy" : d.direction;
+  return `
+  <div class="card final-answer-card">
+    <div class="section-title">Predator Final Answer</div>
+    <div class="final-answer-word ${d.color}">${d.decision}</div>
+    <div class="final-answer-sub">${d.reason}</div>
+    <div style="text-align:center;margin-bottom:10px;">
+      <span class="strategy-chip"><b>Trade:</b> ${directionText}</span>
+      <span class="strategy-chip"><b>Expiration:</b> ${d.expiration}</span>
+      <span class="strategy-chip"><b>Account Fit:</b> ${d.accountFit}</span>
+    </div>
+    <div class="metric"><b>What to do:</b> ${d.action}</div>
+    ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
+    <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
+    <div class="metric muted">Predator still calculates the advanced scores underneath, but the user-facing answer is simply BUY, WAIT, or PASS.</div>
+  </div>`;
+}
+
+function renderExpirationPolicyCard(a){
+  const p = getStrategyExpirationPolicy(a);
+  return `
+  <div class="card expiration-policy">
+    <div class="section-title">v46.1 Expiration Rules</div>
+    <div class="simple-rule"><span class="green"><b>BUY CALL / BUY PUT:</b></span> Monthly expirations only â normally ${p.buyWindow}.</div>
+    <div class="simple-rule"><span class="green"><b>SELL CASH-SECURED PUT:</b></span> ${p.sellPutWindow}.</div>
+    <div class="simple-rule"><span class="green"><b>SELL COVERED CALL:</b></span> ${p.sellCallWindow}.</div>
+    <div class="simple-rule"><b>Why:</b> ${p.buyWindowReason}</div>
+    <div class="metric muted">Weekly and biweekly contracts are retained for Wheel income, not for normal long call/put purchases.</div>
+  </div>`;
+}
+
+
 function getPredatorConvictionEngine(a){
   a = ensureEngineDefaults(a);
   const brain = typeof getPredatorBrain === "function" ? getPredatorBrain(a) : null;
@@ -4513,7 +4679,9 @@ function renderFull(ticker, a){
   }
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
-  return `${renderDataIntelligenceCard()}
+  return `${renderSimplePredatorDecision(a)}
+  ${renderExpirationPolicyCard(a)}
+  ${renderDataIntelligenceCard()}
   ${renderPredatorConvictionCard(a)}
   ${renderCapitalCommanderCard(a)}
   ${renderProfessionalReasonCard(a)}
@@ -4731,7 +4899,7 @@ function renderFull(ticker, a){
 
 function renderCompact(ticker, a){
   a = ensureEngineDefaults(a);
-  return `${renderDataIntelligenceCard()}${renderPredatorConvictionCard(a)}${renderCapitalCommanderCard(a)}${renderProfessionalReasonCard(a)}${renderPredatorBrainCard(a)}${renderPredatorBotDecision(a)}${renderMarketSessionCard(a)}${renderPatienceMeterCard(a)}${renderEntryReadinessCard(a)}${renderWhyWaitingCard(a)}${renderDecisionTimelineCard(a)}${renderIgnorePredatorCard(a)}${renderPredatorCoachCard(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `${renderSimplePredatorDecision(a)}${renderExpirationPolicyCard(a)}${renderDataIntelligenceCard()}${renderPredatorConvictionCard(a)}${renderCapitalCommanderCard(a)}${renderProfessionalReasonCard(a)}${renderPredatorBrainCard(a)}${renderPredatorBotDecision(a)}${renderMarketSessionCard(a)}${renderPatienceMeterCard(a)}${renderEntryReadinessCard(a)}${renderWhyWaitingCard(a)}${renderDecisionTimelineCard(a)}${renderIgnorePredatorCard(a)}${renderPredatorCoachCard(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
