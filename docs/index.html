@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v46.1 Swing Buy + Wheel Income Engine</title>
+  <title>Signal Predator AI v46.1.1 Swing Buy + Wheel Income Engine Hotfix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -264,7 +264,7 @@ body.advanced-on .advanced-panel{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v46.1 // monthly swing buys + weekly/biweekly wheel income</div>
+  <div class="subtitle">v46.1.1 // monthly swing buys + weekly/biweekly wheel income // render hotfix</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -286,7 +286,7 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v46.1 Stability Guard</div>
+    <div class="section-title">v46.1.1 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -542,7 +542,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v46.1",
+    version: "v46.1.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -559,7 +559,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v46-1.json";
+  a.download = "signal-predator-backup-v46-1-1.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -571,7 +571,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v46.1",
+    version: "v46.1.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -4817,19 +4817,16 @@ function renderFull(ticker, a){
     <div class="metric"><b>Wheel Warning:</b> ${a.wheelMode.wheelWarning}</div>
     <div class="divider"></div>
     <div class="section-title">Wheel Expiration Engine</div>
+    <div class="metric muted">Wheel selling durations shown below are generated dynamically from the active strategy policy.</div>
     <div class="metric"><b>Best Wheel Action:</b> <span class="${signalClass(a.wheelExpiration.bestSide)}">${a.wheelExpiration.bestSide}</span></div>
     <div class="metric"><b>Best Duration:</b> ${a.wheelExpiration.bestDuration} â ${a.wheelExpiration.bestScore}/100</div>
     <div class="metric"><b>Wheel Style:</b> ${a.wheelExpiration.wheelStyle}</div>
     <div class="metric"><b>Assignment Mode:</b> ${a.wheelExpiration.assignmentMode}</div>
     <div class="metric"><b>Best Sell Put Duration:</b> ${a.wheelExpiration.putBestDuration} â ${a.wheelExpiration.putBestScore}/100</div>
     <div class="metric"><b>Best Sell Call Duration:</b> ${a.wheelExpiration.callBestDuration} â ${a.wheelExpiration.callBestScore}/100</div>
-    <div class="metric"><b>Weekly:</b> Put ${a.wheelExpiration.rows[0].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[0].sellCallScore}/100</div>
-    <div class="metric"><b>Bi-Weekly:</b> Put ${a.wheelExpiration.rows[1].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[1].sellCallScore}/100</div>
-    <div class="metric"><b>30-45 DTE:</b> Put ${a.wheelExpiration.rows[2].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[2].sellCallScore}/100</div>
-    <div class="metric"><b>45-60 DTE:</b> Put ${a.wheelExpiration.rows[3].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[3].sellCallScore}/100</div>
-    <div class="metric"><b>60-90 DTE:</b> Put ${a.wheelExpiration.rows[4].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[4].sellCallScore}/100</div>
-    <div class="metric"><b>3-6 Months:</b> Put ${a.wheelExpiration.rows[5].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[5].sellCallScore}/100</div>
-    <div class="metric"><b>6-12 Months:</b> Put ${a.wheelExpiration.rows[6].sellPutScore}/100 â¢ Call ${a.wheelExpiration.rows[6].sellCallScore}/100</div>
+    ${(a.wheelExpiration?.rows || []).map(row => `
+      <div class="metric"><b>${row.label}:</b> Put ${row.sellPutScore}/100 â¢ Call ${row.sellCallScore}/100</div>
+    `).join("")}
     <div class="metric"><b>Reason:</b> ${a.wheelExpiration.reason}</div>
     <div class="divider"></div>
     <div class="section-title">Risk Control</div>
