@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v46.1.1 Swing Buy + Wheel Income Engine Hotfix</title>
+  <title>Signal Predator AI v46.2 Simple Decision Interface</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -259,12 +259,22 @@ body.advanced-on .advanced-panel{display:block}
 .simple-rule{padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07)}
 .simple-rule:last-child{border-bottom:none}
 
+
+.scan-support{display:none}
+body.advanced-on .scan-support{display:block}
+.simple-summary-card{border:1px solid rgba(142,203,255,.28);background:rgba(10,20,38,.94)}
+.simple-summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
+.simple-summary-tile{padding:10px;border:1px solid rgba(255,255,255,.07);border-radius:11px;background:rgba(255,255,255,.03)}
+.api-warning-only{border:1px solid rgba(255,216,79,.42);background:rgba(120,92,12,.14)}
+.scan-details-button{margin-top:10px}
+@media(max-width:520px){.simple-summary-grid{grid-template-columns:1fr 1fr}}
+
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v46.1.1 // monthly swing buys + weekly/biweekly wheel income // render hotfix</div>
+  <div class="subtitle">v46.2 // simple BUY WAIT PASS interface // advanced details on demand</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -286,7 +296,7 @@ body.advanced-on .advanced-panel{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v46.1.1 Stability Guard</div>
+    <div class="section-title">v46.2 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -320,8 +330,8 @@ body.advanced-on .advanced-panel{display:block}
     <div class="toggle-line">
       <div class="metric muted">Simple mode shows command-style answers. Advanced mode shows deeper metrics.</div>
       <select id="predatorViewMode" onchange="setPredatorViewMode()">
-        <option value="simple">Simple</option>
-        <option value="advanced">Advanced</option>
+        <option value="simple">Simple Decision Mode</option>
+        <option value="advanced">Advanced Analysis Mode</option>
       </select>
     </div>
   </div>
@@ -542,7 +552,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v46.1.1",
+    version: "v46.2",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -559,7 +569,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v46-1-1.json";
+  a.download = "signal-predator-backup-v46-2.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -571,7 +581,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v46.1.1",
+    version: "v46.2",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -1521,6 +1531,58 @@ function getPredatorDataIntelligence(reasonMessage){
   return {status,color,ready,diagnosis,recommendation,usage,clock,feeds,recent};
 }
 
+
+function renderApiWarningOnly(reasonMessage){
+  const d = getPredatorDataIntelligence(reasonMessage);
+  const hasWarning = !!reasonMessage || d.status !== "SYSTEM HEALTHY";
+  if(!hasWarning) return "";
+  return `
+    <div class="card api-warning-only">
+      <div class="section-title">API Warning</div>
+      <div class="metric"><b>Status:</b> <span class="${d.color}">${d.status}</span></div>
+      <div class="metric"><b>What happened:</b> ${d.diagnosis}</div>
+      <div class="metric"><b>What to do:</b> ${d.recommendation}</div>
+    </div>`;
+}
+
+function renderSimpleDecisionSnapshot(a){
+  const d = getSimplePredatorDecision(a);
+  const c = getPredatorConvictionEngine(a);
+  const direction = d.direction === "WAIT" ? "NONE" : d.direction;
+  return `
+    <div class="card simple-summary-card">
+      <div class="section-title">Decision Snapshot</div>
+      <div class="simple-summary-grid">
+        <div class="simple-summary-tile"><div class="metric"><b>Direction</b><br>${direction}</div></div>
+        <div class="simple-summary-tile"><div class="metric"><b>Bot Confidence</b><br>${c.conviction}/100</div></div>
+        <div class="simple-summary-tile"><div class="metric"><b>Expiration</b><br>${d.expiration}</div></div>
+        <div class="simple-summary-tile"><div class="metric"><b>Account Fit</b><br>${d.accountFit}</div></div>
+      </div>
+      <div class="divider"></div>
+      <div class="metric"><b>Why:</b> ${d.reason}</div>
+      <div class="metric"><b>Next Step:</b> ${d.action}</div>
+      ${d.decision === "WAIT" ? `<div class="metric"><b>What turns this into BUY:</b> ${d.upgrade}</div>` : ""}
+      <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
+    </div>`;
+}
+
+function renderAdvancedScanToggle(){
+  return `
+    <button class="secondary scan-details-button" onclick="toggleAdvancedScanDetails()">
+      Show / Hide Advanced Analysis
+    </button>`;
+}
+
+function toggleAdvancedScanDetails(){
+  document.body.classList.toggle("advanced-on");
+  const sel = document.getElementById("predatorViewMode");
+  if(sel){
+    sel.value = document.body.classList.contains("advanced-on") ? "advanced" : "simple";
+    localStorage.setItem("signal_predator_view_mode", sel.value);
+  }
+}
+
+
 function renderDataIntelligenceCard(reasonMessage){
   const d = getPredatorDataIntelligence(reasonMessage);
   return `
@@ -1549,7 +1611,7 @@ function renderDataIntelligenceCard(reasonMessage){
 function renderApiFailureDiagnostic(ticker, reasonMessage){
   const reason = reasonMessage || "Alpha Vantage returned no usable data from daily, quote, and intraday endpoints.";
   return `
-    ${renderDataIntelligenceCard(reason)}
+    ${renderApiWarningOnly(reason)}
     <div class="card sell-alert">
       <div class="section-title">API Diagnostic</div>
       <div class="metric"><b>${ticker}</b> could not load enough data right now.</div>
@@ -4680,24 +4742,27 @@ function renderFull(ticker, a){
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderSimplePredatorDecision(a)}
-  ${renderExpirationPolicyCard(a)}
-  ${renderDataIntelligenceCard()}
-  ${renderPredatorConvictionCard(a)}
-  ${renderCapitalCommanderCard(a)}
-  ${renderProfessionalReasonCard(a)}
-  ${renderPredatorBrainCard(a)}
-  ${renderPredatorBotDecision(a)}
-  ${renderMarketSessionCard(a)}
-  ${renderPatienceMeterCard(a)}
-  ${renderEntryReadinessCard(a)}
-  ${renderWhyWaitingCard(a)}
-  ${renderDecisionTimelineCard(a)}
-  ${renderIgnorePredatorCard(a)}
-  ${renderPredatorCoachCard(a)}
-  ${renderConfidenceClarityCard(a)}
-  ${renderStrategyRankingCard(a)}
-  ${renderDurationOptimizerCard(a)}
-  <div class="advanced-panel">
+  ${renderSimpleDecisionSnapshot(a)}
+  ${renderApiWarningOnly()}
+  ${renderAdvancedScanToggle()}
+  <div class="scan-support">
+    ${renderExpirationPolicyCard(a)}
+    ${renderPredatorConvictionCard(a)}
+    ${renderCapitalCommanderCard(a)}
+    ${renderProfessionalReasonCard(a)}
+    ${renderPredatorBrainCard(a)}
+    ${renderPredatorBotDecision(a)}
+    ${renderMarketSessionCard(a)}
+    ${renderPatienceMeterCard(a)}
+    ${renderEntryReadinessCard(a)}
+    ${renderWhyWaitingCard(a)}
+    ${renderDecisionTimelineCard(a)}
+    ${renderIgnorePredatorCard(a)}
+    ${renderPredatorCoachCard(a)}
+    ${renderConfidenceClarityCard(a)}
+    ${renderStrategyRankingCard(a)}
+    ${renderDurationOptimizerCard(a)}
+    <div class="advanced-panel">
   <div class="card">
     <div class="section-title">Advanced Metrics / Predator Trade Setup</div>
     <div class="metric"><b>Ticker:</b> ${ticker}</div>
@@ -4891,12 +4956,29 @@ function renderFull(ticker, a){
     <div class="metric"><b>Spread Risk:</b> ${a.spreadRisk}</div>
     <div class="metric"><b>Execution Quality:</b> <span class="${signalClass(a.executionGrade)}">${a.executionGrade}</span></div>
   </div>
+  </div>
   </div>`;
 }
 
 function renderCompact(ticker, a){
   a = ensureEngineDefaults(a);
-  return `${renderSimplePredatorDecision(a)}${renderExpirationPolicyCard(a)}${renderDataIntelligenceCard()}${renderPredatorConvictionCard(a)}${renderCapitalCommanderCard(a)}${renderProfessionalReasonCard(a)}${renderPredatorBrainCard(a)}${renderPredatorBotDecision(a)}${renderMarketSessionCard(a)}${renderPatienceMeterCard(a)}${renderEntryReadinessCard(a)}${renderWhyWaitingCard(a)}${renderDecisionTimelineCard(a)}${renderIgnorePredatorCard(a)}${renderPredatorCoachCard(a)}${renderConfidenceClarityCard(a)}${renderStrategyRankingCard(a)}<div class="advanced-panel"><div class="card"><div class="section-title">Quick Glance / Advanced</div><div class="metric"><b>${ticker}</b> â $${a.price}</div><div class="metric"><span class="${signalClass(a.direction)}">${a.direction}</span> â¢ <span class="${signalClass(a.grade)}">${a.grade}</span> â¢ Score ${a.score}</div><div class="bar"><div class="fill" style="width:${a.score}%"></div></div><div class="metric"><b>Time-to-Target:</b> ${a.timeTarget.probability}%</div><div class="metric"><b>Window:</b> ${a.timeTarget.window}</div><div class="metric"><b>Quality:</b> ${a.qualityDecision.decision}</div><div class="metric"><b>Alignment:</b> ${a.alignmentScore.score}/100</div><div class="metric"><b>Confidence:</b> <span class="${a.confidenceMeter.color}">${a.confidenceMeter.label}</span></div><div class="metric"><b>Entry:</b> ${a.entryTiming.label}</div><div class="metric"><b>Tomorrow:</b> ${a.nextDay.tomorrowRead}</div><div class="metric"><b>Hold Rule:</b> ${a.confirmationHold.holdMinutes} min / ${a.confirmationHold.earliestEntry}</div><div class="metric"><b>Chase Risk:</b> ${a.nextDay.chaseRisk}</div><div class="metric"><b>Likely Move:</b> ${a.predictiveEngine.likelyMove}</div><div class="metric"><b>Trap:</b> ${a.trapWarning}</div><div class="metric"><b>Mode:</b> ${a.incomeMode.strategy}</div><div class="metric"><b>Wheel:</b> ${a.wheelMode.bestAction}</div><div class="metric"><b>Wheel Duration:</b> ${a.wheelExpiration.bestDuration} (${a.wheelExpiration.bestScore}/100)</div><div class="metric"><b>Best Duration:</b> ${a.longTermOptions.bestLabel} (${a.longTermOptions.bestScore}/100)</div><div class="metric"><b>Expiration Confidence:</b> ${a.expirationConfidence.recommendedDuration} (${a.expirationConfidence.recommendedConfidence}/100)</div><div class="metric"><b>Entry Style:</b> ${a.multiTimeframeEntry.bestEntryStyle}</div><div class="metric"><b>Risk:</b> ${a.score >= 85 ? "NORMAL" : a.score >= 70 ? "REDUCED" : "MICRO / WAIT"}</div><div class="metric"><b>Best Contract:</b> ${a.bestContract.label} ${a.bestContract.strike}</div><div class="metric"><b>Expiration:</b> ${a.expiration}</div><div class="metric"><b>Filter:</b> <span class="${a.tradeFilter==='PASS'?'green':'red'}">${a.tradeFilter}</span></div></div>`;
+  return `${renderSimplePredatorDecision(a)}
+  ${renderSimpleDecisionSnapshot(a)}
+  ${renderApiWarningOnly()}
+  ${renderAdvancedScanToggle()}
+  <div class="scan-support">
+    ${renderExpirationPolicyCard(a)}
+    ${renderPredatorConvictionCard(a)}
+    ${renderCapitalCommanderCard(a)}
+    ${renderProfessionalReasonCard(a)}
+    ${renderPredatorBrainCard(a)}
+    ${renderPredatorBotDecision(a)}
+    ${renderMarketSessionCard(a)}
+    ${renderPatienceMeterCard(a)}
+    ${renderEntryReadinessCard(a)}
+    ${renderConfidenceClarityCard(a)}
+    ${renderStrategyRankingCard(a)}
+  </div>`;
 }
 
 function applyPortfolioAlertSummary(results, sourceLabel){
