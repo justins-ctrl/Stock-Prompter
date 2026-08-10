@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v46.2 Simple Decision Interface</title>
+  <title>Signal Predator AI v46.2.1 Unified Final Decision Hotfix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v46.2 // simple BUY WAIT PASS interface // advanced details on demand</div>
+  <div class="subtitle">v46.2.1 // one final decision authority // monthly buy consistency</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -296,7 +296,7 @@ body.advanced-on .scan-support{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v46.2 Stability Guard</div>
+    <div class="section-title">v46.2.1 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -552,7 +552,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v46.2",
+    version: "v46.2.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -569,7 +569,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v46-2.json";
+  a.download = "signal-predator-backup-v46-2-1.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -581,7 +581,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v46.2",
+    version: "v46.2.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -1548,21 +1548,15 @@ function renderApiWarningOnly(reasonMessage){
 function renderSimpleDecisionSnapshot(a){
   const d = getSimplePredatorDecision(a);
   const c = getPredatorConvictionEngine(a);
-  const direction = d.direction === "WAIT" ? "NONE" : d.direction;
+
   return `
     <div class="card simple-summary-card">
-      <div class="section-title">Decision Snapshot</div>
+      <div class="section-title">Quick Read</div>
       <div class="simple-summary-grid">
-        <div class="simple-summary-tile"><div class="metric"><b>Direction</b><br>${direction}</div></div>
         <div class="simple-summary-tile"><div class="metric"><b>Bot Confidence</b><br>${c.conviction}/100</div></div>
-        <div class="simple-summary-tile"><div class="metric"><b>Expiration</b><br>${d.expiration}</div></div>
-        <div class="simple-summary-tile"><div class="metric"><b>Account Fit</b><br>${d.accountFit}</div></div>
+        <div class="simple-summary-tile"><div class="metric"><b>Setup</b><br>${d.setupStatus}</div></div>
       </div>
-      <div class="divider"></div>
-      <div class="metric"><b>Why:</b> ${d.reason}</div>
-      <div class="metric"><b>Next Step:</b> ${d.action}</div>
-      ${d.decision === "WAIT" ? `<div class="metric"><b>What turns this into BUY:</b> ${d.upgrade}</div>` : ""}
-      <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
+      ${d.decision === "WAIT" ? `<div class="metric"><b>Entry Status:</b> ${d.entryStatus}</div>` : ""}
     </div>`;
 }
 
@@ -1727,8 +1721,8 @@ function buildExpirationChoices(confidence, theta){
   const weekly = nextFridayFrom(today);
   const biweekly = new Date(weekly); biweekly.setDate(weekly.getDate()+7);
   let suggested = "5-10 Days";
-  if(confidence === "High" && theta === "Low") suggested = "3-5 Days (Weekly)";
-  if(theta === "High") suggested = "10-14 Days (Bi-Weekly)";
+  if(confidence === "High" && theta === "Low") suggested = "45â75 DTE Monthly";
+  if(theta === "High") suggested = "45â75 DTE Monthly";
   return { suggested, weeklyLabel:`${formatDate(weekly)} (Weekly)`, biweeklyLabel:`${formatDate(biweekly)} (Bi-Weekly)` };
 }
 function buildContractLadder(price, direction, expectedMove, regime){
@@ -3651,101 +3645,146 @@ function getStrategyExpirationPolicy(a){
 
 function getSimplePredatorDecision(a){
   a = ensureEngineDefaults(a);
-  const conviction = getPredatorConvictionEngine(a);
+
   const policy = getStrategyExpirationPolicy(a);
+  const conviction = getPredatorConvictionEngine(a);
   const fit = getAccountFit(a, "MOMENTUM");
   const brain = typeof getPredatorBrain === "function" ? getPredatorBrain(a) : null;
+  const session = typeof getDynamicConfirmationEngine === "function" ? getDynamicConfirmationEngine(a) : null;
+
+  const direction = policy.buyDirection;
+  const validDirection = direction === "BUY CALL" || direction === "BUY PUT";
+  const alignment = safeNum(a.alignmentScore?.score, 0);
+  const timing = safeNum(a.timeTarget?.probability, 0);
+  const quality = a.qualityDecision?.decision || "N/A";
+  const noTrade = a.noTradeZone?.zone || "CLEAR";
+  const marketState = a.marketRegimeFilter?.state || "N/A";
+
+  const botStatus = String(brain?.botStatus || brain?.status || "").toUpperCase();
+  const brainVerdict = String(brain?.finalVerdict || brain?.verdict || "").toUpperCase();
+  const entryPermission = String(a.confirmationHold?.entryPermission || "").toUpperCase();
+  const entryTiming = String(a.entryTiming?.label || "").toUpperCase();
+  const tomorrowRead = String(a.nextDay?.tomorrowRead || "").toUpperCase();
+
+  const hardReject =
+    !validDirection ||
+    !fit.affordable ||
+    quality === "REJECT" ||
+    noTrade !== "CLEAR" ||
+    marketState === "DANGEROUS" ||
+    alignment < 60;
+
+  const setupIsGood =
+    validDirection &&
+    fit.affordable &&
+    quality !== "REJECT" &&
+    noTrade === "CLEAR" &&
+    marketState !== "DANGEROUS" &&
+    alignment >= 70 &&
+    timing >= 65 &&
+    safeNum(conviction.conviction,0) >= 75;
+
+  // SINGLE AUTHORITY ENTRY GATE:
+  // A monthly swing BUY still needs explicit permission. Strong setup alone = WAIT.
+  const explicitBuyPermission =
+    entryPermission.includes("CAN ENTER") ||
+    entryPermission.includes("APPROVED") ||
+    entryTiming === "ENTER NOW" ||
+    brainVerdict === "BUY" ||
+    botStatus === "BOT APPROVED";
+
+  const explicitWaitSignal =
+    entryPermission.includes("WAIT") ||
+    entryTiming.includes("WAIT") ||
+    tomorrowRead.includes("WAIT") ||
+    tomorrowRead.includes("CONFIRM") ||
+    botStatus.includes("WAIT") ||
+    brainVerdict.includes("WATCHLIST") ||
+    brainVerdict.includes("WAIT");
 
   let decision = "PASS";
   let color = "red";
-  let direction = policy.buyDirection;
-  let reason = "The setup does not provide a strong enough directional edge to justify buying an option.";
+  let reason = "The setup does not provide enough agreement to justify buying an option.";
   let action = "Move to the next ticker.";
-  let upgrade = "A new scan must produce a stronger directional setup.";
+  let upgrade = "A new scan must produce a stronger setup.";
   let expiration = policy.buyWindow;
+  let invalidation = a.nextDay?.invalidation || "N/A";
 
-  const validDirection = direction === "BUY CALL" || direction === "BUY PUT";
-  const strongSwingStructure =
-    validDirection &&
-    safeNum(a.alignmentScore?.score,0) >= 70 &&
-    safeNum(a.timeTarget?.probability,0) >= 65 &&
-    a.noTradeZone?.zone === "CLEAR" &&
-    a.marketRegimeFilter?.state !== "DANGEROUS" &&
-    a.qualityDecision?.decision !== "REJECT" &&
-    fit.affordable;
-
-  // v46.1 intentionally stops requiring a near-perfect intraday trigger for
-  // 30â90 DTE swing buys. Short-term timing still affects BUY vs WAIT.
-  const acceptableSwingEntry =
-    strongSwingStructure &&
-    safeNum(conviction.conviction,0) >= 82 &&
-    a.nextDay?.chaseRisk !== "HIGH" &&
-    a.nextDay?.tomorrowRead !== "WAIT FOR PULLBACK" &&
-    a.entryTiming?.label !== "WAIT FOR PULLBACK";
-
-  if(acceptableSwingEntry){
+  if(hardReject){
+    if(!validDirection){
+      reason = "Predator does not see a clear directional call or put setup.";
+      action = "Pass and move to the next ticker.";
+    }else if(!fit.affordable){
+      reason = "The setup may be interesting, but the estimated contract cost does not fit the saved account allocation.";
+      action = "Pass and look for a more affordable monthly option setup.";
+    }else if(noTrade !== "CLEAR"){
+      reason = `Price is currently in ${noTrade}. That is not a clean place to open a monthly option.`;
+      action = "Pass for now and wait for a cleaner structure.";
+    }else if(quality === "REJECT"){
+      reason = `The quality engine rejected the setup: ${a.qualityDecision?.reason || "trade quality is too weak"}.`;
+      action = "Pass and move on.";
+    }else if(alignment < 60){
+      reason = "Trend alignment is too weak for a new monthly option position.";
+      action = "Pass and wait for stronger alignment.";
+    }
+  }else if(setupIsGood && explicitBuyPermission && !explicitWaitSignal){
     decision = "BUY";
     color = "green";
-    reason = `${direction === "BUY CALL" ? "Bullish" : "Bearish"} daily structure, timing, and account fit are strong enough for a monthly swing option. The trade does not need weekly-style perfection because the contract has 30â90 days to work.`;
+    reason = `${direction === "BUY CALL" ? "Bullish" : "Bearish"} swing structure is strong, the monthly expiration fits the thesis, and the entry gate is approved.`;
     action = `Use a monthly ${direction === "BUY CALL" ? "call" : "put"} in the ${policy.buyWindow} window and stay within the saved account-size limit.`;
     upgrade = "Already approved.";
-  }else if(strongSwingStructure){
+  }else if(setupIsGood){
     decision = "WAIT";
     color = "yellow";
 
-    if(a.nextDay?.chaseRisk === "HIGH" || a.entryTiming?.label === "WAIT FOR PULLBACK"){
-      reason = "The swing thesis is valid, but price is too extended right now. Buying here would create poor risk-to-reward.";
-      action = "Wait for the pullback or reclaim level shown by Predator. Do not chase.";
-      upgrade = `Upgrade to BUY when the entry improves while the ${direction === "BUY CALL" ? "bullish" : "bearish"} daily structure remains intact.`;
-    }else if(safeNum(conviction.conviction,0) < 82){
-      reason = "The direction is promising, but the combined swing-quality score is not strong enough yet.";
-      action = "Keep it on the watchlist and scan again after the next meaningful price move.";
-      upgrade = "Upgrade to BUY when alignment, timing, or momentum improves without breaking the thesis.";
+    if(a.nextDay?.chaseRisk === "HIGH" || entryTiming === "WAIT FOR PULLBACK"){
+      reason = "The monthly swing thesis is good, but price is too extended right now. Predator wants a better entry instead of chasing.";
+      action = "Wait for the pullback or reclaim condition shown below.";
+      upgrade = brain?.upgradeRule || "Upgrade to BUY when price improves while the swing thesis stays intact.";
     }else{
-      reason = "The longer-term setup is acceptable, but one entry-quality condition is still incomplete.";
-      action = "Wait for the stated entry condition instead of forcing the trade.";
-      upgrade = brain?.upgradeRule || "Upgrade when entry quality improves.";
+      reason = "The monthly swing setup is good, but entry confirmation is not complete yet. The bot likes the trade direction, but has not granted permission to enter.";
+      action = "Wait. Do not buy yet.";
+      upgrade = brain?.upgradeRule || session?.plainRule || "Upgrade to BUY only after the entry confirmation rule is satisfied.";
     }
   }else{
-    if(!fit.affordable && validDirection){
-      reason = "The directional setup may be interesting, but the estimated one-contract cost does not fit the saved account allocation.";
-      action = "Pass on this contract and look for a more affordable ticker or expiration.";
-    }else if(a.noTradeZone?.zone !== "CLEAR"){
-      reason = `Price is currently in ${a.noTradeZone?.zone}. That is not a clean place to buy a monthly option.`;
-      action = "Pass for now and wait for a cleaner structure.";
-    }else if(a.qualityDecision?.decision === "REJECT"){
-      reason = `The quality engine rejected the setup: ${a.qualityDecision?.reason || "insufficient trade quality"}.`;
-      action = "Move on to the next ticker.";
-    }
+    decision = "PASS";
+    color = "red";
+    reason = "Predator sees some potential, but the setup quality is not strong enough for a monthly option purchase.";
+    action = "Pass and keep scanning for a stronger setup.";
   }
-
-  const invalidation = a.nextDay?.invalidation || "N/A";
 
   return {
     decision,color,direction,reason,action,upgrade,expiration,invalidation,
     conviction:conviction.conviction,
     accountFit:fit.fit,
-    policy
+    policy,
+    setupStatus: setupIsGood ? "GOOD SETUP" : "WEAK / REJECTED SETUP",
+    entryStatus: decision === "BUY" ? "ENTRY APPROVED" : decision === "WAIT" ? "ENTRY NOT APPROVED YET" : "NO ENTRY"
   };
 }
 
 function renderSimplePredatorDecision(a){
   const d = getSimplePredatorDecision(a);
   const directionText = d.direction === "WAIT" ? "No directional buy" : d.direction;
+  const permissionText = d.decision === "BUY" ? "YES â ENTRY APPROVED" : d.decision === "WAIT" ? "NO â WAIT" : "NO â PASS";
+
   return `
   <div class="card final-answer-card">
     <div class="section-title">Predator Final Answer</div>
     <div class="final-answer-word ${d.color}">${d.decision}</div>
     <div class="final-answer-sub">${d.reason}</div>
-    <div style="text-align:center;margin-bottom:10px;">
-      <span class="strategy-chip"><b>Trade:</b> ${directionText}</span>
-      <span class="strategy-chip"><b>Expiration:</b> ${d.expiration}</span>
-      <span class="strategy-chip"><b>Account Fit:</b> ${d.accountFit}</span>
+
+    <div class="simple-summary-grid">
+      <div class="simple-summary-tile"><div class="metric"><b>Favored Trade</b><br>${directionText}</div></div>
+      <div class="simple-summary-tile"><div class="metric"><b>Enter Now?</b><br><span class="${d.color}">${permissionText}</span></div></div>
+      <div class="simple-summary-tile"><div class="metric"><b>Expiration</b><br>${d.expiration}</div></div>
+      <div class="simple-summary-tile"><div class="metric"><b>Account Fit</b><br>${d.accountFit}</div></div>
     </div>
+
+    <div class="divider"></div>
     <div class="metric"><b>What to do:</b> ${d.action}</div>
     ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
     <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
-    <div class="metric muted">Predator still calculates the advanced scores underneath, but the user-facing answer is simply BUY, WAIT, or PASS.</div>
   </div>`;
 }
 
@@ -4922,7 +4961,7 @@ function renderFull(ticker, a){
     <div class="metric"><b>Market Regime:</b> <span class="${signalClass(a.regime)}">${a.regime}</span></div>
     <div class="divider"></div>
     <div class="section-title">Live Options Range</div>
-    <div class="metric"><b>Suggested Expiration:</b> ${a.expiration}</div>
+    <div class="metric"><b>Suggested Expiration:</b> ${getStrategyExpirationPolicy(a).buyWindow}</div>
     <div class="metric"><b>Weekly Choice:</b> ${a.weeklyLabel}</div>
     <div class="metric"><b>Bi-Weekly Choice:</b> ${a.biweeklyLabel}</div>
     <div class="grid-2" style="margin-top:10px;">
