@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v46.2.1 Unified Final Decision Hotfix</title>
+  <title>Signal Predator AI v46.2.3 Unified Account Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v46.2.1 // one final decision authority // monthly buy consistency</div>
+  <div class="subtitle">v46.2.3 // one account profile // automatic risk scaling</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -296,7 +296,7 @@ body.advanced-on .scan-support{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v46.2.1 Stability Guard</div>
+    <div class="section-title">v46.2.3 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -387,16 +387,48 @@ body.advanced-on .scan-support{display:block}
     <div id="performanceLog" style="margin-top:10px;"></div>
   </div>
 
-  <div class="card">
-    <div class="section-title">Risk Control Engine</div>
-    <div class="metric muted">Protect your account with max risk rules, streak protection, and exposure tracking.</div>
+  <div class="card account-card">
+    <div class="section-title">Predator Account & Risk Control</div>
+    <div class="metric muted">One account profile now controls affordability, option size, Wheel capital, and portfolio exposure. Change the portfolio value and Predator recalculates the limits automatically.</div>
+
+    <div class="field-label">Portfolio Value ($)</div>
+    <input id="portfolioValue" type="number" min="100" step="100" placeholder="Portfolio Value ($)" oninput="previewUnifiedAccountRisk()">
+
+    <div class="field-label">Trading Style</div>
+    <select id="accountTradingStyle" onchange="previewUnifiedAccountRisk()">
+      <option value="BOTH">Momentum + Wheel</option>
+      <option value="MOMENTUM">Momentum Options Only</option>
+      <option value="WHEEL">Wheel Income Only</option>
+    </select>
+
     <div class="grid-2">
-      <input id="maxRiskPerTrade" placeholder="Max Risk Per Trade ($)">
-      <input id="dailyProfitLock" placeholder="Daily Profit Lock %">
-      <input id="maxPortfolioRisk" placeholder="Max Portfolio Risk %">
-      <input id="maxActiveTrades" placeholder="Max Active Trades">
+      <div>
+        <div class="field-label">Max Long-Option Allocation %</div>
+        <input id="maxOptionAllocationPct" type="number" min="1" max="50" step="1" placeholder="Option Allocation %" oninput="previewUnifiedAccountRisk()">
+      </div>
+      <div>
+        <div class="field-label">Max Wheel Capital %</div>
+        <input id="maxWheelUsagePct" type="number" min="10" max="100" step="5" placeholder="Wheel Capital %" oninput="previewUnifiedAccountRisk()">
+      </div>
     </div>
-    <button onclick="safeAction('Save Risk Settings', saveRiskSettings)">Save Risk Settings</button>
+
+    <div class="grid-2">
+      <div>
+        <div class="field-label">Daily Profit Lock %</div>
+        <input id="dailyProfitLock" type="number" min="1" max="100" step="1" placeholder="Daily Profit Lock %">
+      </div>
+      <div>
+        <div class="field-label">Max Active Trades</div>
+        <input id="maxActiveTrades" type="number" min="1" max="10" step="1" placeholder="Auto by account size">
+      </div>
+    </div>
+
+    <input id="maxRiskPerTrade" type="hidden">
+    <input id="maxPortfolioRisk" type="hidden">
+
+    <button onclick="safeAction('Save Account & Risk Profile', saveUnifiedAccountRiskSettings)">Save Account & Risk Profile</button>
+
+    <div id="accountIntelligenceSummary" style="margin-top:14px;"></div>
     <div id="riskControlSummary" style="margin-top:14px;"></div>
   </div>
 
@@ -442,22 +474,6 @@ body.advanced-on .scan-support{display:block}
     <div class="metric muted">The engine sizes trades according to the saved account profile and never treats conviction as a guaranteed probability of profit.</div>
   </div>
 
-  <div class="card account-card">
-    <div class="section-title">Predator Account Intelligence</div>
-    <div class="metric muted">Signal Predator will grow with the account and filter out trades that require too much capital.</div>
-    <div class="grid-2">
-      <input id="portfolioValue" type="number" min="100" step="100" placeholder="Portfolio Value ($)">
-      <select id="accountTradingStyle">
-        <option value="BOTH">Momentum + Wheel</option>
-        <option value="MOMENTUM">Momentum Options Only</option>
-        <option value="WHEEL">Wheel Income Only</option>
-      </select>
-      <input id="maxOptionAllocationPct" type="number" min="1" max="50" step="1" placeholder="Max Option Allocation %">
-      <input id="maxWheelUsagePct" type="number" min="10" max="100" step="5" placeholder="Max Wheel Capital %">
-    </div>
-    <button onclick="safeAction('Save Account Profile', saveAccountProfile)">Save Account Profile</button>
-    <div id="accountIntelligenceSummary" style="margin-top:12px;"></div>
-  </div>
 
   <div class="card opportunity-card">
     <div class="section-title">Predator Elite Opportunity Desk</div>
@@ -552,7 +568,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v46.2.1",
+    version: "v46.2.3",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -569,7 +585,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v46-2-1.json";
+  a.download = "signal-predator-backup-v46-2-3.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -581,7 +597,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v46.2.1",
+    version: "v46.2.3",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -721,16 +737,115 @@ function normalizeAccountProfile(){
   return accountProfile;
 }
 
+function getAutoRiskProfile(portfolioValue, optionAllocationPct){
+  const portfolio = Math.max(100, safeNum(portfolioValue, 100));
+  const optionPct = Math.max(1, Math.min(50, safeNum(optionAllocationPct, 15)));
+  const tier = getAccountTier(portfolio);
+
+  let maxActiveTrades = 2;
+  if(tier.name === "EMERGING") maxActiveTrades = 3;
+  else if(tier.name === "GROWTH") maxActiveTrades = 4;
+  else if(tier.name === "ADVANCED") maxActiveTrades = 5;
+
+  const maxRiskPerTrade = Math.round(portfolio * optionPct / 100);
+  const maxPortfolioRisk = Math.min(50, Math.round(optionPct * maxActiveTrades));
+
+  return {maxRiskPerTrade,maxPortfolioRisk,maxActiveTrades};
+}
+
+function renderUnifiedAccountPreview(portfolioValue, optionAllocationPct){
+  const el = document.getElementById("accountIntelligenceSummary");
+  if(!el) return;
+
+  const portfolio = Math.max(100, safeNum(portfolioValue, accountProfile.portfolioValue));
+  const optionPct = Math.max(1, Math.min(50, safeNum(optionAllocationPct, accountProfile.maxOptionAllocationPct)));
+  const wheelPct = Math.max(10, Math.min(100, safeNum(document.getElementById("maxWheelUsagePct")?.value, accountProfile.maxWheelUsagePct)));
+  const auto = getAutoRiskProfile(portfolio, optionPct);
+  const tier = getAccountTier(portfolio);
+  const optionBudget = portfolio * optionPct / 100;
+  const wheelBudget = portfolio * wheelPct / 100;
+
+  el.innerHTML = `
+    <div class="fit-grid">
+      <div class="fit-tile"><div class="metric"><b>Portfolio:</b><br>$${Math.round(portfolio).toLocaleString()}</div></div>
+      <div class="fit-tile"><div class="metric"><b>Account Tier:</b><br><span class="green">${tier.name}</span></div></div>
+      <div class="fit-tile"><div class="metric"><b>Max Long Option:</b><br>$${Math.round(optionBudget).toLocaleString()}</div></div>
+      <div class="fit-tile"><div class="metric"><b>Max Wheel Capital:</b><br>$${Math.round(wheelBudget).toLocaleString()}</div></div>
+      <div class="fit-tile"><div class="metric"><b>Auto Risk / Trade:</b><br>$${auto.maxRiskPerTrade.toLocaleString()}</div></div>
+      <div class="fit-tile"><div class="metric"><b>Auto Active Trades:</b><br>${auto.maxActiveTrades}</div></div>
+    </div>
+    <div class="metric muted">These limits recalculate from the portfolio amount above. Save the profile to make the new limits active everywhere in Predator.</div>`;
+}
+
+function previewUnifiedAccountRisk(){
+  const portfolioInput = document.getElementById("portfolioValue");
+  const optionInput = document.getElementById("maxOptionAllocationPct");
+  if(!portfolioInput || !optionInput) return;
+
+  const portfolio = safeNum(portfolioInput.value, accountProfile.portfolioValue);
+  const optionPct = safeNum(optionInput.value, accountProfile.maxOptionAllocationPct);
+  const auto = getAutoRiskProfile(portfolio, optionPct);
+
+  const maxRiskInput = document.getElementById("maxRiskPerTrade");
+  const maxPortfolioInput = document.getElementById("maxPortfolioRisk");
+  const maxTradesInput = document.getElementById("maxActiveTrades");
+
+  if(maxRiskInput) maxRiskInput.value = auto.maxRiskPerTrade;
+  if(maxPortfolioInput) maxPortfolioInput.value = auto.maxPortfolioRisk;
+  if(maxTradesInput && document.activeElement !== maxTradesInput) maxTradesInput.value = auto.maxActiveTrades;
+
+  renderUnifiedAccountPreview(portfolio, optionPct);
+}
+
 function saveAccountProfile(){
+  return saveUnifiedAccountRiskSettings();
+}
+
+function saveUnifiedAccountRiskSettings(){
+  const portfolioValue = Number(document.getElementById("portfolioValue")?.value);
+  if(!Number.isFinite(portfolioValue) || portfolioValue < 100){
+    alert("Enter your current portfolio value first.");
+    return;
+  }
+
+  const maxOptionAllocationPct = Math.max(1, Math.min(50,
+    sanitizeNumber(document.getElementById("maxOptionAllocationPct")?.value, 15)
+  ));
+  const maxWheelUsagePct = Math.max(10, Math.min(100,
+    sanitizeNumber(document.getElementById("maxWheelUsagePct")?.value, 70)
+  ));
+
   accountProfile = {
-    portfolioValue:sanitizeNumber(document.getElementById("portfolioValue").value, 3000),
-    tradingStyle:document.getElementById("accountTradingStyle").value,
-    maxOptionAllocationPct:sanitizeNumber(document.getElementById("maxOptionAllocationPct").value, 15),
-    maxWheelUsagePct:sanitizeNumber(document.getElementById("maxWheelUsagePct").value, 70)
+    portfolioValue,
+    tradingStyle:document.getElementById("accountTradingStyle")?.value || "BOTH",
+    maxOptionAllocationPct,
+    maxWheelUsagePct
   };
   normalizeAccountProfile();
   setStore("signal_predator_account_profile", accountProfile);
+
+  const auto = getAutoRiskProfile(accountProfile.portfolioValue, accountProfile.maxOptionAllocationPct);
+  const userMaxTrades = sanitizeNumber(document.getElementById("maxActiveTrades")?.value, auto.maxActiveTrades);
+
+  riskSettings = {
+    maxRiskPerTrade:auto.maxRiskPerTrade,
+    dailyProfitLock:Math.max(1, Math.min(100,
+      sanitizeNumber(document.getElementById("dailyProfitLock")?.value, riskSettings.dailyProfitLock || 20)
+    )),
+    maxPortfolioRisk:auto.maxPortfolioRisk,
+    maxActiveTrades:Math.max(1, Math.min(10, userMaxTrades))
+  };
+  setStore("signal_predator_risk_settings", riskSettings);
+
   renderAccountIntelligenceSummary();
+  renderRiskControlSummary();
+
+  const box = document.getElementById("accountIntelligenceSummary");
+  if(box){
+    box.insertAdjacentHTML("afterbegin",
+      `<div class="alert-banner alert-green">ACCOUNT UPDATED â Predator is now sizing from $${Math.round(accountProfile.portfolioValue).toLocaleString()}.</div>`
+    );
+  }
 }
 
 function getAccountFit(a, strategy){
@@ -803,20 +918,31 @@ function renderAccountIntelligenceSummary(){
     if(input) input.value = val;
   });
 
+  const auto = getAutoRiskProfile(accountProfile.portfolioValue, accountProfile.maxOptionAllocationPct);
   const optionBudget = accountProfile.portfolioValue * accountProfile.maxOptionAllocationPct / 100;
   const wheelBudget = accountProfile.portfolioValue * accountProfile.maxWheelUsagePct / 100;
 
+  const maxRiskInput = document.getElementById("maxRiskPerTrade");
+  const maxPortfolioInput = document.getElementById("maxPortfolioRisk");
+  const maxTradesInput = document.getElementById("maxActiveTrades");
+  const dailyLockInput = document.getElementById("dailyProfitLock");
+
+  if(maxRiskInput) maxRiskInput.value = auto.maxRiskPerTrade;
+  if(maxPortfolioInput) maxPortfolioInput.value = auto.maxPortfolioRisk;
+  if(maxTradesInput) maxTradesInput.value = riskSettings.maxActiveTrades || auto.maxActiveTrades;
+  if(dailyLockInput) dailyLockInput.value = riskSettings.dailyProfitLock || 20;
+
   el.innerHTML = `
     <div class="fit-grid">
-      <div class="fit-tile"><div class="metric"><b>Account Tier:</b><br><span class="green">${tier.name}</span></div></div>
       <div class="fit-tile"><div class="metric"><b>Portfolio:</b><br>$${Math.round(accountProfile.portfolioValue).toLocaleString()}</div></div>
-      <div class="fit-tile"><div class="metric"><b>Option Budget:</b><br>$${Math.round(optionBudget).toLocaleString()}</div></div>
+      <div class="fit-tile"><div class="metric"><b>Account Tier:</b><br><span class="green">${tier.name}</span></div></div>
+      <div class="fit-tile"><div class="metric"><b>Long-Option Limit:</b><br>$${Math.round(optionBudget).toLocaleString()}</div></div>
       <div class="fit-tile"><div class="metric"><b>Wheel Capital Limit:</b><br>$${Math.round(wheelBudget).toLocaleString()}</div></div>
     </div>
+    <div class="metric"><b>Trading Style:</b> ${accountProfile.tradingStyle === "BOTH" ? "Momentum + Wheel" : accountProfile.tradingStyle}</div>
     <div class="metric muted">${tier.note}</div>
-    <div class="metric yellow"><b>Wheel reminder:</b> A $3,000 account can only cash-secure relatively low strikes, and one assignment may concentrate most of the account in one company.</div>`;
+    <div class="metric yellow"><b>Dynamic sizing:</b> Change Portfolio Value and save. Predator will use the new amount for all account-fit decisions.</div>`;
 }
-
 function getDeskVerdict(a, strategy){
   const brain = typeof getPredatorBrain === "function" ? getPredatorBrain(a) : null;
   if(strategy === "WHEEL"){
@@ -1355,264 +1481,78 @@ function estimatePortfolioRisk(){
   return savedPositions.length * Number(riskSettings.maxRiskPerTrade || 100);
 }
 function saveRiskSettings(){
-  riskSettings = {
-    maxRiskPerTrade: sanitizeNumber(document.getElementById("maxRiskPerTrade").value, 100),
-    dailyProfitLock: sanitizeNumber(document.getElementById("dailyProfitLock").value, 20),
-    maxPortfolioRisk: sanitizeNumber(document.getElementById("maxPortfolioRisk").value, 25),
-    maxActiveTrades: sanitizeNumber(document.getElementById("maxActiveTrades").value, 3)
-  };
-  setStore("signal_predator_risk_settings", riskSettings);
-  renderRiskControlSummary();
+  return saveUnifiedAccountRiskSettings();
 }
+
 function renderRiskControlSummary(){
   const el = document.getElementById("riskControlSummary");
-  document.getElementById("maxRiskPerTrade").value = riskSettings.maxRiskPerTrade;
-  document.getElementById("dailyProfitLock").value = riskSettings.dailyProfitLock;
-  document.getElementById("maxPortfolioRisk").value = riskSettings.maxPortfolioRisk;
-  document.getElementById("maxActiveTrades").value = riskSettings.maxActiveTrades;
+  if(!el) return;
+
+  normalizeAccountProfile();
+  const auto = getAutoRiskProfile(accountProfile.portfolioValue, accountProfile.maxOptionAllocationPct);
+
+  if(!riskSettings || typeof riskSettings !== "object") riskSettings = {};
+  riskSettings.maxRiskPerTrade = auto.maxRiskPerTrade;
+  riskSettings.maxPortfolioRisk = auto.maxPortfolioRisk;
+  if(!Number.isFinite(Number(riskSettings.maxActiveTrades)) || Number(riskSettings.maxActiveTrades) < 1){
+    riskSettings.maxActiveTrades = auto.maxActiveTrades;
+  }
+  if(!Number.isFinite(Number(riskSettings.dailyProfitLock))){
+    riskSettings.dailyProfitLock = 20;
+  }
+  setStore("signal_predator_risk_settings", riskSettings);
 
   const activeTrades = savedPositions.length;
   const estRiskDollars = estimatePortfolioRisk();
-  const estPortfolioRiskPct = Math.round((activeTrades / Math.max(1, riskSettings.maxActiveTrades)) * riskSettings.maxPortfolioRisk);
+  const portfolio = Math.max(100, accountProfile.portfolioValue);
+  const actualRiskPct = Math.round((estRiskDollars / portfolio) * 100);
   const lossStreak = getLossStreak();
-  const todayWinRate = getTodayWinRate();
-  let warnings = [];
+
+  const maxRiskInput = document.getElementById("maxRiskPerTrade");
+  const maxPortfolioInput = document.getElementById("maxPortfolioRisk");
+  const maxTradesInput = document.getElementById("maxActiveTrades");
+  const dailyLockInput = document.getElementById("dailyProfitLock");
+
+  if(maxRiskInput) maxRiskInput.value = riskSettings.maxRiskPerTrade;
+  if(maxPortfolioInput) maxPortfolioInput.value = riskSettings.maxPortfolioRisk;
+  if(maxTradesInput && document.activeElement !== maxTradesInput) maxTradesInput.value = riskSettings.maxActiveTrades;
+  if(dailyLockInput && document.activeElement !== dailyLockInput) dailyLockInput.value = riskSettings.dailyProfitLock;
+
+  const warnings = [];
   if(activeTrades > riskSettings.maxActiveTrades) warnings.push("TOO MANY ACTIVE TRADES");
-  if(estPortfolioRiskPct > riskSettings.maxPortfolioRisk) warnings.push("PORTFOLIO RISK TOO HIGH");
+  if(actualRiskPct > riskSettings.maxPortfolioRisk) warnings.push("PORTFOLIO EXPOSURE ABOVE LIMIT");
   if(lossStreak >= 2) warnings.push("LOSS STREAK PROTECTION");
-  if(todayWinRate !== null && todayWinRate >= riskSettings.dailyProfitLock) warnings.push("DAILY PROFIT LOCK CONSIDER PAUSING");
 
   el.innerHTML = `
-    <div class="metric"><b>Max Risk Per Trade:</b> $${riskSettings.maxRiskPerTrade}</div>
-    <div class="metric"><b>Daily Profit Lock:</b> ${riskSettings.dailyProfitLock}%</div>
-    <div class="metric"><b>Max Portfolio Risk:</b> ${riskSettings.maxPortfolioRisk}%</div>
+    <div class="divider"></div>
+    <div class="section-title">Live Account Limits</div>
+    <div class="metric"><b>Auto Max Risk / Long Option:</b> $${Math.round(riskSettings.maxRiskPerTrade).toLocaleString()}</div>
+    <div class="metric"><b>Max Combined Option Exposure:</b> ${riskSettings.maxPortfolioRisk}%</div>
     <div class="metric"><b>Max Active Trades:</b> ${riskSettings.maxActiveTrades}</div>
-    <div class="divider"></div>
-    <div class="metric"><b>Active Trades:</b> ${activeTrades}</div>
-    <div class="metric"><b>Estimated Portfolio Risk ($):</b> $${Math.round(estRiskDollars)}</div>
-    <div class="metric"><b>Portfolio Risk Meter:</b> ${estPortfolioRiskPct}%</div>
-    <div class="bar"><div class="fill" style="width:${Math.min(100, estPortfolioRiskPct)}%"></div></div>
+    <div class="metric"><b>Active Trades Now:</b> ${activeTrades}</div>
+    <div class="metric"><b>Estimated Open Risk:</b> $${Math.round(estRiskDollars).toLocaleString()} (${actualRiskPct}% of portfolio)</div>
+    <div class="bar"><div class="fill" style="width:${Math.min(100, actualRiskPct)}%"></div></div>
     <div class="metric"><b>Loss Streak:</b> ${lossStreak}</div>
-    <div class="metric"><b>Today Win Rate:</b> ${todayWinRate === null ? "N/A" : todayWinRate + "%"}</div>
-    <div class="divider"></div>
-    <div class="metric"><b>Risk Warnings:</b> ${warnings.length ? warnings.join(" â¢ ") : "NONE"}</div>
-  `;
+    <div class="metric"><b>Risk Warnings:</b> ${warnings.length ? warnings.join(" â¢ ") : "NONE"}</div>`;
 }
 function getRiskControlAdvice(){
+  normalizeAccountProfile();
   const activeTrades = savedPositions.length;
-  const estPortfolioRiskPct = Math.round((activeTrades / Math.max(1, riskSettings.maxActiveTrades)) * riskSettings.maxPortfolioRisk);
+  const portfolio = Math.max(100, accountProfile.portfolioValue);
+  const estPortfolioRiskPct = Math.round((estimatePortfolioRisk() / portfolio) * 100);
   const lossStreak = getLossStreak();
-  const todayWinRate = getTodayWinRate();
   const advice = [];
-  if(activeTrades > riskSettings.maxActiveTrades) advice.push({level:"red", message:"RISK CONTROL // Too many active trades. Focus and reduce exposure."});
-  if(estPortfolioRiskPct > riskSettings.maxPortfolioRisk) advice.push({level:"red", message:"RISK CONTROL // Portfolio risk meter is above your limit."});
-  if(lossStreak >= 2) advice.push({level:"yellow", message:"RISK CONTROL // Loss streak protection suggests slowing down."});
-  if(todayWinRate !== null && todayWinRate >= riskSettings.dailyProfitLock) advice.push({level:"green", message:"RISK CONTROL // Daily profit lock reached. Consider stopping for the day."});
+
+  if(activeTrades > riskSettings.maxActiveTrades){
+    advice.push({level:"red", message:"RISK CONTROL // Too many active trades for the current account profile."});
+  }
+  if(estPortfolioRiskPct > riskSettings.maxPortfolioRisk){
+    advice.push({level:"red", message:"RISK CONTROL // Open option exposure is above the current portfolio limit."});
+  }
+  if(lossStreak >= 2){
+    advice.push({level:"yellow", message:"RISK CONTROL // Loss streak protection suggests slowing down."});
+  }
   return advice;
-}
-
-
-let predatorDataLog = getStore("signal_predator_data_log", {requests:[], providers:{alpha:{success:0,fail:0}, quote:{success:0,fail:0}, intraday:{success:0,fail:0}, daily:{success:0,fail:0}}});
-
-function saveDataLog(){
-  predatorDataLog.requests = (predatorDataLog.requests || []).slice(-250);
-  setStore("signal_predator_data_log", predatorDataLog);
-}
-
-function logDataRequest(provider, ok, message){
-  try{
-    predatorDataLog.requests = predatorDataLog.requests || [];
-    predatorDataLog.providers = predatorDataLog.providers || {};
-    predatorDataLog.providers[provider] = predatorDataLog.providers[provider] || {success:0,fail:0};
-    if(ok) predatorDataLog.providers[provider].success += 1;
-    else predatorDataLog.providers[provider].fail += 1;
-    predatorDataLog.requests.push({provider,ok,message:String(message || ""),time:new Date().toISOString()});
-    saveDataLog();
-  }catch(e){}
-}
-
-function getMarketClock(){
-  const now = new Date();
-  const minutes = now.getHours()*60 + now.getMinutes();
-  const open = 9*60 + 30;
-  const close = 16*60;
-  let status = "CLOSED";
-  let detail = "Using previous close or cached data.";
-  if(minutes >= open && minutes < close){
-    status = "OPEN";
-    const remaining = close - minutes;
-    detail = `${Math.floor(remaining/60)}h ${remaining%60}m until close.`;
-  }else if(minutes < open){
-    status = "PREMARKET";
-    const until = open - minutes;
-    detail = `${Math.floor(until/60)}h ${until%60}m until open.`;
-  }else{
-    status = "AFTER HOURS";
-    detail = "Regular session is closed.";
-  }
-  return {status,detail};
-}
-
-function getApiUsageEstimate(){
-  const today = new Date().toISOString().slice(0,10);
-  const now = Date.now();
-  const reqs = (predatorDataLog.requests || []).filter(r => String(r.time || "").slice(0,10) === today);
-  const minuteReqs = reqs.filter(r => now - new Date(r.time).getTime() < 60000);
-  return {
-    today:reqs.length,
-    minute:minuteReqs.length,
-    dailyLimit:500,
-    minuteLimit:75,
-    safe:reqs.length < 450 && minuteReqs.length < 60
-  };
-}
-
-function providerReliability(provider){
-  const p = predatorDataLog.providers?.[provider] || {success:0,fail:0};
-  const total = p.success + p.fail;
-  if(!total) return 100;
-  return Math.round((p.success / total) * 100);
-}
-
-function getPredatorDataIntelligence(reasonMessage){
-  const usage = getApiUsageEstimate();
-  const clock = getMarketClock();
-  const alphaRel = providerReliability("alpha");
-  const dailyRel = providerReliability("daily");
-  const quoteRel = providerReliability("quote");
-  const intradayRel = providerReliability("intraday");
-  const recent = (predatorDataLog.requests || []).slice(-12);
-  const recentFails = recent.filter(r => !r.ok).length;
-  const recentSuccess = recent.filter(r => r.ok).length;
-
-  let status = "SYSTEM HEALTHY";
-  let color = "green";
-  let ready = 96;
-  let diagnosis = "Market data appears usable.";
-  let recommendation = "Proceed with scan.";
-
-  if(recentFails >= 3 && recentSuccess === 0){
-    status = "DATA FEED UNSTABLE";
-    color = "red";
-    ready = 48;
-    diagnosis = "Recent API calls failed across multiple endpoints. This is likely a provider throttle, temporary API outage, or connection issue.";
-    recommendation = "Wait 2-5 minutes, then retry one ticker.";
-  }else if(recentFails >= 2){
-    status = "CAUTION";
-    color = "yellow";
-    ready = 68;
-    diagnosis = "Some API calls are failing. Analysis may need cached or previous-close data.";
-    recommendation = "Use extra caution and avoid forcing new trades until data stabilizes.";
-  }else if(!usage.safe){
-    status = "REQUEST LIMIT CAUTION";
-    color = "yellow";
-    ready = 70;
-    diagnosis = "The app has made many recent requests. Soft throttling may occur even before the daily limit.";
-    recommendation = "Slow scans down for a few minutes.";
-  }
-
-  if(reasonMessage){
-    diagnosis = reasonMessage;
-    if(status === "SYSTEM HEALTHY"){
-      status = "DATA WARNING";
-      color = "yellow";
-      ready = 72;
-      recommendation = "Retry shortly or scan one major ticker like SPY.";
-    }
-  }
-
-  const feeds = [
-    {name:"Daily Candles", score:dailyRel},
-    {name:"Global Quote", score:quoteRel},
-    {name:"Intraday", score:intradayRel},
-    {name:"Alpha Vantage Overall", score:alphaRel}
-  ];
-
-  return {status,color,ready,diagnosis,recommendation,usage,clock,feeds,recent};
-}
-
-
-function renderApiWarningOnly(reasonMessage){
-  const d = getPredatorDataIntelligence(reasonMessage);
-  const hasWarning = !!reasonMessage || d.status !== "SYSTEM HEALTHY";
-  if(!hasWarning) return "";
-  return `
-    <div class="card api-warning-only">
-      <div class="section-title">API Warning</div>
-      <div class="metric"><b>Status:</b> <span class="${d.color}">${d.status}</span></div>
-      <div class="metric"><b>What happened:</b> ${d.diagnosis}</div>
-      <div class="metric"><b>What to do:</b> ${d.recommendation}</div>
-    </div>`;
-}
-
-function renderSimpleDecisionSnapshot(a){
-  const d = getSimplePredatorDecision(a);
-  const c = getPredatorConvictionEngine(a);
-
-  return `
-    <div class="card simple-summary-card">
-      <div class="section-title">Quick Read</div>
-      <div class="simple-summary-grid">
-        <div class="simple-summary-tile"><div class="metric"><b>Bot Confidence</b><br>${c.conviction}/100</div></div>
-        <div class="simple-summary-tile"><div class="metric"><b>Setup</b><br>${d.setupStatus}</div></div>
-      </div>
-      ${d.decision === "WAIT" ? `<div class="metric"><b>Entry Status:</b> ${d.entryStatus}</div>` : ""}
-    </div>`;
-}
-
-function renderAdvancedScanToggle(){
-  return `
-    <button class="secondary scan-details-button" onclick="toggleAdvancedScanDetails()">
-      Show / Hide Advanced Analysis
-    </button>`;
-}
-
-function toggleAdvancedScanDetails(){
-  document.body.classList.toggle("advanced-on");
-  const sel = document.getElementById("predatorViewMode");
-  if(sel){
-    sel.value = document.body.classList.contains("advanced-on") ? "advanced" : "simple";
-    localStorage.setItem("signal_predator_view_mode", sel.value);
-  }
-}
-
-
-function renderDataIntelligenceCard(reasonMessage){
-  const d = getPredatorDataIntelligence(reasonMessage);
-  return `
-  <div class="card data-card">
-    <div class="section-title">Predator Data Intelligence</div>
-    <div class="data-status ${d.color}">${d.status}</div>
-    <div class="data-grid">
-      <div class="data-tile"><div class="metric"><b>Predator Ready:</b><br>${d.ready}/100</div></div>
-      <div class="data-tile"><div class="metric"><b>Market:</b><br>${d.clock.status}</div></div>
-      <div class="data-tile"><div class="metric"><b>Today's Requests:</b><br>${d.usage.today}/${d.usage.dailyLimit}</div></div>
-      <div class="data-tile"><div class="metric"><b>Minute Requests:</b><br>${d.usage.minute}/${d.usage.minuteLimit}</div></div>
-    </div>
-    <div class="divider"></div>
-    <div class="metric"><b>Diagnosis:</b> ${d.diagnosis}</div>
-    <div class="metric"><b>Recommendation:</b> ${d.recommendation}</div>
-    <div class="metric"><b>Market Clock:</b> ${d.clock.detail}</div>
-    <div class="divider"></div>
-    <div class="section-title">Feed Quality Meter</div>
-    ${d.feeds.map(f=>`<div class="readiness-row"><span>${f.name}</span><div class="readiness-track"><div class="readiness-fill" style="width:${f.score}%"></div></div><span>${f.score}%</span></div>`).join("")}
-    <div class="divider"></div>
-    <div class="section-title">Recent Data Attempts</div>
-    ${d.recent.length ? d.recent.slice(-6).reverse().map(r=>`<div class="feed-step"><span class="${r.ok ? "green" : "red"}">${r.ok ? "â" : "â"}</span> ${r.provider} â ${r.message || (r.ok ? "Success" : "Failed")}</div>`).join("") : "<div class='muted'>No API attempts logged yet.</div>"}
-  </div>`;
-}
-
-function renderApiFailureDiagnostic(ticker, reasonMessage){
-  const reason = reasonMessage || "Alpha Vantage returned no usable data from daily, quote, and intraday endpoints.";
-  return `
-    ${renderApiWarningOnly(reason)}
-    <div class="card sell-alert">
-      <div class="section-title">API Diagnostic</div>
-      <div class="metric"><b>${ticker}</b> could not load enough data right now.</div>
-      <div class="metric">Predator checked the data feed and did not receive enough usable market data to build a trustworthy analysis.</div>
-      <div class="metric"><b>Most likely cause:</b> temporary provider throttle, empty API response, or Alpha Vantage server issue.</div>
-      <div class="metric"><b>What to do:</b> Wait 2-5 minutes, then retry one ticker. If SPY also fails, the issue is almost certainly the data provider, not the ticker.</div>
-    </div>`;
 }
 
 async function fetchJson(url){
@@ -3766,12 +3706,13 @@ function getSimplePredatorDecision(a){
 function renderSimplePredatorDecision(a){
   const d = getSimplePredatorDecision(a);
   const directionText = d.direction === "WAIT" ? "No directional buy" : d.direction;
-  const permissionText = d.decision === "BUY" ? "YES â ENTRY APPROVED" : d.decision === "WAIT" ? "NO â WAIT" : "NO â PASS";
+  const displayDecision = d.decision === "PASS" ? "NO TRADE" : d.decision;
+  const permissionText = d.decision === "BUY" ? "YES â ENTRY APPROVED" : d.decision === "WAIT" ? "NO â WAIT" : "NO â NO TRADE";
 
   return `
   <div class="card final-answer-card">
     <div class="section-title">Predator Final Answer</div>
-    <div class="final-answer-word ${d.color}">${d.decision}</div>
+    <div class="final-answer-word ${d.color}">${displayDecision}</div>
     <div class="final-answer-sub">${d.reason}</div>
 
     <div class="simple-summary-grid">
@@ -5106,22 +5047,123 @@ async function runAI(){
 }
 
 async function scanList(list, title){
-  renderThinkingCard(["TRACKING MARKET MOVEMENT...","LOCKING ONTO TARGETS...","RANKING CLEANEST SETUPS..."]);
-  let results = [];
+  renderThinkingCard([
+    "SCANNING WITH THE FINAL DECISION ENGINE...",
+    "CHECKING MONTHLY BUY SETUPS...",
+    "FILTERING OUT WAIT AND NO-TRADE NAMES..."
+  ]);
+
+  const buys = [];
+  const waits = [];
+  const noTrades = [];
+
   for(let i=0; i<list.length; i++){
     const ticker = normalizeTicker(list[i]);
     const closes = await getHistory(ticker);
     if(!closes) continue;
+
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null) continue;
+
     const a = analyze(closes, pricePack.price);
-    if(a.tradeFilter === "PASS" && passesGradeFilter(a) && a.qualityDecision.decision !== "REJECT") results.push({ticker, score:a.score, direction:a.direction, expiration:a.expiration, timeTarget:a.timeTarget.probability, grade:a.grade, tomorrowRead:a.nextDay.tomorrowRead, chaseRisk:a.nextDay.chaseRisk, quality:a.qualityDecision.decision, alignment:a.alignmentScore.score});
+    const finalDecision = getSimplePredatorDecision(a);
+
+    const row = {
+      ticker,
+      a,
+      finalDecision,
+      conviction: safeNum(finalDecision.conviction, 0),
+      alignment: safeNum(a.alignmentScore?.score, 0),
+      ttt: safeNum(a.timeTarget?.probability, 0)
+    };
+
+    if(finalDecision.decision === "BUY"){
+      buys.push(row);
+    }else if(finalDecision.decision === "WAIT"){
+      waits.push(row);
+    }else{
+      noTrades.push(row);
+    }
+
     await new Promise(r => setTimeout(r, 15000));
   }
-  results.sort((a,b)=>b.score-a.score || b.timeTarget-a.timeTarget);
-  results = results.slice(0,2);
-  if(results.length === 0){ document.getElementById("output").innerHTML = `<div class='card'>No A/B setups found in ${title}.</div>`; return; }
-  document.getElementById("output").innerHTML = `<div class='card'><div class='section-title'>${title}</div>${results.map(r=>`<div class="metric">${r.ticker} â <span class="${signalClass(r.direction)}">${r.direction}</span> â Grade ${r.grade} â Score ${r.score} â Align ${r.alignment}% â ${r.quality} â TTT ${r.timeTarget}% â ${r.tomorrowRead} â Chase ${r.chaseRisk} â ${r.expiration}</div>`).join("")}</div>`;
+
+  buys.sort((x,y)=>
+    y.conviction - x.conviction ||
+    y.alignment - x.alignment ||
+    y.ttt - x.ttt
+  );
+
+  waits.sort((x,y)=>
+    y.conviction - x.conviction ||
+    y.alignment - x.alignment ||
+    y.ttt - x.ttt
+  );
+
+  const output = document.getElementById("output");
+
+  if(!buys.length){
+    const closest = waits.slice(0,3);
+
+    output.innerHTML = `
+      <div class="card sell-alert">
+        <div class="section-title">${title}</div>
+        <div class="final-answer-word red">NO TRADES</div>
+        <div class="final-answer-sub">
+          Predator scanned the full list with the same final decision engine used by individual stock scans.
+          None of these stocks has a BUY-approved monthly option entry right now.
+        </div>
+        <div class="metric"><b>BUY-ready:</b> 0</div>
+        <div class="metric"><b>WAIT / watch only:</b> ${waits.length}</div>
+        <div class="metric"><b>NO TRADE:</b> ${noTrades.length}</div>
+        <div class="metric green"><b>You do not need to individually rescan these names.</b></div>
+
+        ${closest.length ? `
+          <div class="divider"></div>
+          <div class="section-title">Closest Watchlist Setups</div>
+          ${closest.map(r=>`
+            <div class="card" style="padding:12px;margin-top:9px;">
+              <div class="metric"><b>${r.ticker}</b> â <span class="yellow">WAIT</span></div>
+              <div class="metric"><b>Favored Trade:</b> ${r.finalDecision.direction}</div>
+              <div class="metric"><b>Why not yet:</b> ${r.finalDecision.reason}</div>
+              <div class="metric"><b>What changes it to BUY:</b> ${r.finalDecision.upgrade}</div>
+              <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
+            </div>
+          `).join("")}
+        ` : ""}
+      </div>`;
+    return;
+  }
+
+  const topBuys = buys.slice(0,3);
+
+  output.innerHTML = `
+    <div class="card hold-alert">
+      <div class="section-title">${title}</div>
+      <div class="final-answer-word green">${topBuys.length === 1 ? "1 TRADE READY" : topBuys.length + " TRADES READY"}</div>
+      <div class="final-answer-sub">
+        These are the only names from this scan that passed the same final BUY gate used by an individual Predator Analysis.
+      </div>
+
+      ${topBuys.map((r,index)=>`
+        <div class="card" style="padding:14px;margin-top:12px;">
+          <div class="section-title">#${index+1} BUY-READY</div>
+          <div class="metric"><b>${r.ticker}</b> â <span class="green">${r.finalDecision.direction}</span></div>
+          <div class="metric"><b>Final Decision:</b> <span class="green">BUY</span></div>
+          <div class="metric"><b>Bot Confidence:</b> ${r.conviction}/100</div>
+          <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
+          <div class="metric"><b>Account Fit:</b> ${r.finalDecision.accountFit}</div>
+          <div class="metric"><b>Why:</b> ${r.finalDecision.reason}</div>
+          <div class="metric"><b>What to do:</b> ${r.finalDecision.action}</div>
+          <div class="metric"><b>Invalidation:</b> ${r.finalDecision.invalidation}</div>
+        </div>
+      `).join("")}
+
+      <div class="divider"></div>
+      <div class="metric"><b>Other WAIT names:</b> ${waits.length}</div>
+      <div class="metric"><b>Other NO TRADE names:</b> ${noTrades.length}</div>
+      <div class="metric muted">No individual rescan is required just to discover whether these were actually BUY, WAIT, or NO TRADE.</div>
+    </div>`;
 }
 async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
 async function scanMyWatchlist(){
@@ -5130,54 +5172,75 @@ async function scanMyWatchlist(){
 }
 
 async function findBestTrade(){
-  if(!customWatchlist.length){ document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>"; return; }
-  renderThinkingCard(["SCANNING WATCHLIST...","RANKING TOP TARGET...","LOCKING BEST TRADE..."]);
+  if(!customWatchlist.length){
+    document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>";
+    return;
+  }
+
+  renderThinkingCard([
+    "SCANNING WATCHLIST...",
+    "USING FINAL BUY GATE...",
+    "LOOKING FOR A TRUE BUY-READY SETUP..."
+  ]);
+
   let best = null;
+  let waitCount = 0;
+  let noTradeCount = 0;
+
   for(let i=0; i<customWatchlist.length; i++){
     const ticker = normalizeTicker(customWatchlist[i]);
     const closes = await getHistory(ticker);
     if(!closes) continue;
+
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null) continue;
+
     const a = analyze(closes, pricePack.price);
-    if(a.tradeFilter !== "PASS" || !passesGradeFilter(a) || a.qualityDecision.decision === "REJECT") continue;
-    const rankScore = a.score + (a.timeTarget?.probability || 0) + (a.alignmentScore?.score || 0);
-    if(!best || rankScore > best.rankScore) best = {ticker, a, rankScore};
+    const d = getSimplePredatorDecision(a);
+
+    if(d.decision === "WAIT"){
+      waitCount++;
+    }else if(d.decision === "PASS"){
+      noTradeCount++;
+    }else if(d.decision === "BUY"){
+      const rankScore =
+        safeNum(d.conviction,0) +
+        safeNum(a.alignmentScore?.score,0) +
+        safeNum(a.timeTarget?.probability,0);
+
+      if(!best || rankScore > best.rankScore){
+        best = {ticker, a, d, rankScore};
+      }
+    }
+
     await new Promise(r => setTimeout(r, 15000));
   }
-  if(!best){ document.getElementById("output").innerHTML = "<div class='card'>No strong trade found in your watchlist right now.</div>"; return; }
-  document.getElementById("output").innerHTML =
-    `<div class="card hold-alert">
-      <div class="section-title">Best Trade of the Day</div>
-      <div class="metric"><b>${best.ticker}</b> â <span class="${signalClass(best.a.direction)}">${best.a.direction}</span></div>
-      <div class="metric"><b>Price:</b> $${best.a.price}</div>
-      <div class="metric"><b>Trade Score:</b> ${best.a.score}/100</div>
-      <div class="metric"><b>Quality Decision:</b> <span class="${signalClass(best.a.qualityDecision.decision)}">${best.a.qualityDecision.decision}</span></div>
-      <div class="metric"><b>Alignment Score:</b> ${best.a.alignmentScore.score}/100</div>
-      <div class="metric"><b>Market State:</b> ${best.a.marketRegimeFilter.state}</div>
-      <div class="metric"><b>No-Trade Zone:</b> ${best.a.noTradeZone.zone}</div>
-      <div class="metric"><b>Confidence Meter:</b> <span class="${best.a.confidenceMeter.color}">${best.a.confidenceMeter.label}</span></div>
-      <div class="metric"><b>Entry Timing:</b> <span class="${signalClass(best.a.entryTiming.label)}">${best.a.entryTiming.label}</span></div>
-      <div class="metric"><b>Entry Read:</b> ${best.a.entryTiming.reason}</div>
-      <div class="metric"><b>Tomorrow Read:</b> <span class="${signalClass(best.a.nextDay.tomorrowRead)}">${best.a.nextDay.tomorrowRead}</span></div>
-      <div class="metric"><b>Buy Trigger:</b> ${best.a.nextDay.buyTrigger === "N/A" ? "N/A" : "$" + best.a.nextDay.buyTrigger}</div>
-      <div class="metric"><b>Invalidation:</b> ${best.a.nextDay.invalidation === "N/A" ? "N/A" : "$" + best.a.nextDay.invalidation}</div>
-      <div class="metric"><b>Chase Risk:</b> ${best.a.nextDay.chaseRisk}</div>
-      <div class="metric"><b>Likely Move:</b> ${best.a.predictiveEngine.likelyMove}</div>
-      <div class="metric"><b>Move Strength:</b> ${best.a.predictiveEngine.moveStrength}</div>
-      <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(best.a.trapWarning)}">${best.a.trapWarning}</span></div>
-      <div class="metric"><b>Mode:</b> ${best.a.incomeMode.strategy}</div>
-      <div class="metric"><b>Income Setup:</b> ${best.a.incomeMode.spreadType}</div>
-      <div class="metric"><b>Wheel Best Action:</b> ${best.a.wheelMode.bestAction}</div>
-      <div class="metric"><b>Wheel Duration:</b> ${best.a.wheelExpiration.bestDuration} (${best.a.wheelExpiration.bestScore}/100)</div>
-      <div class="metric"><b>Best Duration:</b> ${best.a.longTermOptions.bestLabel} (${best.a.longTermOptions.bestScore}/100)</div>
-      <div class="metric"><b>Expiration Confidence:</b> ${best.a.expirationConfidence.recommendedDuration} (${best.a.expirationConfidence.recommendedConfidence}/100)</div>
-      <div class="metric"><b>Entry Style:</b> ${best.a.multiTimeframeEntry.bestEntryStyle}</div>
-      <div class="metric"><b>Time-to-Target:</b> ${best.a.timeTarget.probability}%</div>
-      <div class="metric"><b>Suggested Expiration:</b> ${best.a.expiration}</div>
-      <div class="metric"><b>Best Contract:</b> ${best.a.bestContract.label} ${best.a.bestContract.strike}</div>
-      <div class="metric"><b>OTM Grade:</b> <span class="${signalClass(best.a.otmPreferred.grade)}">${best.a.otmPreferred.grade}</span></div>
-    </div>` + (document.getElementById("uiMode").value === "compact" ? renderCompact(best.ticker, best.a) : renderFull(best.ticker, best.a));
+
+  if(!best){
+    document.getElementById("output").innerHTML = `
+      <div class="card sell-alert">
+        <div class="section-title">Best Trade Search</div>
+        <div class="final-answer-word red">NO TRADES</div>
+        <div class="final-answer-sub">No stock in your watchlist currently passes Predator's final BUY gate.</div>
+        <div class="metric"><b>WAIT / watch only:</b> ${waitCount}</div>
+        <div class="metric"><b>NO TRADE:</b> ${noTradeCount}</div>
+        <div class="metric green"><b>No additional individual scans are needed.</b></div>
+      </div>`;
+    return;
+  }
+
+  document.getElementById("output").innerHTML = `
+    <div class="card hold-alert">
+      <div class="section-title">Best Trade Right Now</div>
+      <div class="final-answer-word green">BUY</div>
+      <div class="metric"><b>${best.ticker}</b> â ${best.d.direction}</div>
+      <div class="metric"><b>Bot Confidence:</b> ${best.d.conviction}/100</div>
+      <div class="metric"><b>Expiration:</b> ${best.d.expiration}</div>
+      <div class="metric"><b>Account Fit:</b> ${best.d.accountFit}</div>
+      <div class="metric"><b>Why:</b> ${best.d.reason}</div>
+      <div class="metric"><b>What to do:</b> ${best.d.action}</div>
+      <div class="metric"><b>Invalidation:</b> ${best.d.invalidation}</div>
+    </div>`;
 }
 
 async function scanMyPositions(){
@@ -5247,6 +5310,7 @@ function quickRecheckPositions(){
 renderWatchlist();
 renderPositions();
 renderPerformanceTracker();
+renderAccountIntelligenceSummary();
 renderRiskControlSummary();
 renderClosedTradeJournal();
 renderJournalSummary();
