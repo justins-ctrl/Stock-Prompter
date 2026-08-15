@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v46.2.3 Unified Account Engine</title>
+  <title>Signal Predator AI v46.2.4 Scan Reliability Hotfix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v46.2.3 // one account profile // automatic risk scaling</div>
+  <div class="subtitle">v46.2.4 // scan reliability // no false NO TRADES</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -296,7 +296,7 @@ body.advanced-on .scan-support{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v46.2.3 Stability Guard</div>
+    <div class="section-title">v46.2.4 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -568,7 +568,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v46.2.3",
+    version: "v46.2.4",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -585,7 +585,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v46-2-3.json";
+  a.download = "signal-predator-backup-v46-2-4.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -597,7 +597,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v46.2.3",
+    version: "v46.2.4",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -1555,35 +1555,47 @@ function getRiskControlAdvice(){
   return advice;
 }
 
+let lastApiIssue = null;
+
 async function fetchJson(url){
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), APP_CONFIG.apiTimeoutMs);
   try{
     const r = await fetch(url, {signal: controller.signal});
     const data = await r.json();
-    logDataRequest("alpha", true, "Response received");
 
     if(data.Note || data.Information || data["Error Message"]){
       const msg = data.Note || data.Information || data["Error Message"];
+      const kind = data["Error Message"] ? "API_ERROR" : "API_MESSAGE";
+      lastApiIssue = {kind, message:String(msg), at:new Date().toISOString()};
+      logDataRequest("alpha", false, String(msg).slice(0,160));
+
       const box = document.getElementById("apiStatusBox");
       if(box){
         box.innerHTML = `<div class="metric"><b>API Message:</b> ${String(msg).slice(0,220)}</div>`;
       }
+    }else{
+      lastApiIssue = null;
+      logDataRequest("alpha", true, "Response received");
     }
 
     return data;
   }catch(err){
+    lastApiIssue = {
+      kind: err.name === "AbortError" ? "TIMEOUT" : "NETWORK_ERROR",
+      message: err.name === "AbortError" ? "Request timed out." : err.message,
+      at:new Date().toISOString()
+    };
     const box = document.getElementById("apiStatusBox");
     if(box){
-      box.innerHTML = `<div class="metric"><b>API Request Failed:</b> ${err.name === "AbortError" ? "Request timed out." : err.message}</div>`;
+      box.innerHTML = `<div class="metric"><b>API Request Failed:</b> ${lastApiIssue.message}</div>`;
     }
-    logDataRequest("alpha", false, err.name === "AbortError" ? "Request timed out" : err.message);
+    logDataRequest("alpha", false, lastApiIssue.message);
     throw err;
   }finally{
     clearTimeout(timeout);
   }
 }
-
 function updateApiStatus(message, level="blue"){
   const box = document.getElementById("apiStatusBox");
   if(!box) return;
@@ -4974,6 +4986,35 @@ function applyPortfolioAlertSummary(results, sourceLabel){
   renderActiveAlertsPanel(allAlerts);
 }
 
+
+function renderApiFailureDiagnostic(ticker, extraMessage=""){
+  const issue = lastApiIssue;
+  const issueText = extraMessage || issue?.message || "Historical market data did not load.";
+  const likelyLimit = /limit|frequency|premium|call volume|rate/i.test(issueText);
+  const likelyTicker = /invalid|symbol/i.test(issueText);
+
+  let diagnosis = "Predator could not get enough market data to make a reliable decision.";
+  let action = "Wait a moment and try again. Do not treat this as NO TRADE.";
+  if(likelyLimit){
+    diagnosis = "Alpha Vantage returned a usage or rate-limit message.";
+    action = "Pause scanning and try again after the API window resets.";
+  }else if(likelyTicker){
+    diagnosis = "The ticker or API response appears invalid.";
+    action = "Check the ticker symbol and try once more.";
+  }
+
+  return `
+    <div class="card sell-alert">
+      <div class="section-title">Data / API Warning</div>
+      <div class="final-answer-word yellow">SCAN INCOMPLETE</div>
+      <div class="metric"><b>Ticker:</b> ${ticker}</div>
+      <div class="metric"><b>Diagnosis:</b> ${diagnosis}</div>
+      <div class="metric"><b>API Detail:</b> ${String(issueText).slice(0,300)}</div>
+      <div class="metric"><b>What to do:</b> ${action}</div>
+      <div class="metric red"><b>Important:</b> Predator did not evaluate this ticker, so this result is not BUY, WAIT, or NO TRADE.</div>
+    </div>`;
+}
+
 async function runFallbackAnalysis(ticker){
   const output = document.getElementById("output");
   updateApiStatus("Trying quote-only fallback mode...", "yellow");
@@ -5050,23 +5091,42 @@ async function scanList(list, title){
   renderThinkingCard([
     "SCANNING WITH THE FINAL DECISION ENGINE...",
     "CHECKING MONTHLY BUY SETUPS...",
-    "FILTERING OUT WAIT AND NO-TRADE NAMES..."
+    "VERIFYING EACH TICKER BEFORE CALLING NO TRADES..."
   ]);
 
   const buys = [];
   const waits = [];
   const noTrades = [];
+  const failures = [];
+  let processed = 0;
 
   for(let i=0; i<list.length; i++){
     const ticker = normalizeTicker(list[i]);
+    updateApiStatus(`Scanning ${ticker} (${i+1}/${list.length})...`, "blue");
+
     const closes = await getHistory(ticker);
-    if(!closes) continue;
+    if(!closes || !closes.length){
+      failures.push({
+        ticker,
+        stage:"Daily history",
+        message:lastApiIssue?.message || "Daily history unavailable."
+      });
+      continue;
+    }
 
     const pricePack = await getBestAvailablePrice(ticker, closes);
-    if(pricePack.price === null) continue;
+    if(pricePack.price === null){
+      failures.push({
+        ticker,
+        stage:"Price",
+        message:lastApiIssue?.message || "Live/fallback price unavailable."
+      });
+      continue;
+    }
 
     const a = analyze(closes, pricePack.price);
     const finalDecision = getSimplePredatorDecision(a);
+    processed++;
 
     const row = {
       ticker,
@@ -5085,7 +5145,10 @@ async function scanList(list, title){
       noTrades.push(row);
     }
 
-    await new Promise(r => setTimeout(r, 15000));
+    // Preserve the API-saving throttle only after a ticker was actually processed.
+    if(i < list.length - 1){
+      await new Promise(r => setTimeout(r, 15000));
+    }
   }
 
   buys.sort((x,y)=>
@@ -5101,22 +5164,48 @@ async function scanList(list, title){
   );
 
   const output = document.getElementById("output");
+  const attempted = list.length;
+  const completeScan = processed === attempted;
+  const partialScan = processed > 0 && processed < attempted;
+
+  // CRITICAL: zero successfully processed tickers is DATA FAILURE, never "NO TRADES".
+  if(processed === 0){
+    const lastFailure = failures[failures.length - 1];
+    output.innerHTML = `
+      <div class="card sell-alert">
+        <div class="section-title">${title}</div>
+        <div class="final-answer-word yellow">SCAN INCOMPLETE</div>
+        <div class="final-answer-sub">
+          Predator did not successfully evaluate any of the ${attempted} ticker${attempted===1?"":"s"}.
+          The earlier instant "NO TRADES" behavior was not a valid market decision.
+        </div>
+        <div class="metric"><b>Successfully analyzed:</b> 0/${attempted}</div>
+        <div class="metric"><b>Data failures:</b> ${failures.length}</div>
+        <div class="metric"><b>Latest issue:</b> ${lastFailure ? `${lastFailure.ticker} â ${lastFailure.stage}: ${String(lastFailure.message).slice(0,220)}` : "Unknown data failure"}</div>
+        <div class="metric red"><b>Do not interpret this as NO TRADES.</b></div>
+        <div class="metric"><b>What to do:</b> Check the API warning/status and retry later. One individual scan can be used as a diagnostic, but it should not be counted as a trading signal if data does not load.</div>
+      </div>`;
+    return;
+  }
 
   if(!buys.length){
     const closest = waits.slice(0,3);
 
     output.innerHTML = `
-      <div class="card sell-alert">
+      <div class="card ${partialScan ? "weak-alert" : "sell-alert"}">
         <div class="section-title">${title}</div>
-        <div class="final-answer-word red">NO TRADES</div>
+        <div class="final-answer-word ${partialScan ? "yellow" : "red"}">${partialScan ? "PARTIAL SCAN" : "NO TRADES"}</div>
         <div class="final-answer-sub">
-          Predator scanned the full list with the same final decision engine used by individual stock scans.
-          None of these stocks has a BUY-approved monthly option entry right now.
+          ${partialScan
+            ? `Predator analyzed ${processed} of ${attempted} tickers. None of the successfully analyzed names is BUY-ready, but ${failures.length} ticker(s) could not be evaluated.`
+            : `Predator successfully analyzed the full list. None has a BUY-approved monthly option entry right now.`}
         </div>
+        <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
         <div class="metric"><b>BUY-ready:</b> 0</div>
         <div class="metric"><b>WAIT / watch only:</b> ${waits.length}</div>
         <div class="metric"><b>NO TRADE:</b> ${noTrades.length}</div>
-        <div class="metric green"><b>You do not need to individually rescan these names.</b></div>
+        ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length}</div>` : ""}
+        <div class="metric ${completeScan ? "green" : "yellow"}"><b>${completeScan ? "No individual rescans are needed." : "Do not assume the failed tickers are NO TRADE."}</b></div>
 
         ${closest.length ? `
           <div class="divider"></div>
@@ -5142,8 +5231,11 @@ async function scanList(list, title){
       <div class="section-title">${title}</div>
       <div class="final-answer-word green">${topBuys.length === 1 ? "1 TRADE READY" : topBuys.length + " TRADES READY"}</div>
       <div class="final-answer-sub">
-        These are the only names from this scan that passed the same final BUY gate used by an individual Predator Analysis.
+        These names passed the same final BUY gate used by an individual Predator Analysis.
       </div>
+
+      <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
+      ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length} â failed names were not classified.</div>` : ""}
 
       ${topBuys.map((r,index)=>`
         <div class="card" style="padding:14px;margin-top:12px;">
@@ -5162,7 +5254,7 @@ async function scanList(list, title){
       <div class="divider"></div>
       <div class="metric"><b>Other WAIT names:</b> ${waits.length}</div>
       <div class="metric"><b>Other NO TRADE names:</b> ${noTrades.length}</div>
-      <div class="metric muted">No individual rescan is required just to discover whether these were actually BUY, WAIT, or NO TRADE.</div>
+      <div class="metric muted">${completeScan ? "Full list completed." : "Some tickers failed data checks and were not classified."}</div>
     </div>`;
 }
 async function scanMarket(){ await scanList(DEFAULT_WATCHLIST, "Top Default Opportunities"); }
