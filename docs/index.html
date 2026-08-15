@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v46.2.4 Scan Reliability Hotfix</title>
+  <title>Signal Predator AI v46.2.5 API Logging Hotfix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v46.2.4 // scan reliability // no false NO TRADES</div>
+  <div class="subtitle">v46.2.5 // API logging fix // reliable scan diagnostics</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -296,7 +296,7 @@ body.advanced-on .scan-support{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v46.2.4 Stability Guard</div>
+    <div class="section-title">v46.2.5 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -568,7 +568,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v46.2.4",
+    version: "v46.2.5",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -585,7 +585,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v46-2-4.json";
+  a.download = "signal-predator-backup-v46-2-5.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -597,7 +597,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v46.2.4",
+    version: "v46.2.5",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -1557,6 +1557,29 @@ function getRiskControlAdvice(){
 
 let lastApiIssue = null;
 
+function logDataRequest(source, success, detail=""){
+  try{
+    const key = "signal_predator_data_log";
+    const existing = getStore ? (getStore(key, []) || []) : [];
+    existing.unshift({
+      source:String(source || "unknown"),
+      success:!!success,
+      detail:String(detail || "").slice(0,220),
+      at:new Date().toISOString()
+    });
+    const trimmed = existing.slice(0,30);
+    if(typeof setStore === "function"){
+      setStore(key, trimmed);
+    }else{
+      localStorage.setItem(key, JSON.stringify(trimmed));
+    }
+  }catch(e){
+    // Logging must never break scanning.
+    console.warn("Signal Predator data log skipped:", e);
+  }
+}
+
+
 async function fetchJson(url){
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), APP_CONFIG.apiTimeoutMs);
@@ -1568,7 +1591,7 @@ async function fetchJson(url){
       const msg = data.Note || data.Information || data["Error Message"];
       const kind = data["Error Message"] ? "API_ERROR" : "API_MESSAGE";
       lastApiIssue = {kind, message:String(msg), at:new Date().toISOString()};
-      logDataRequest("alpha", false, String(msg).slice(0,160));
+      try{ logDataRequest("alpha", false, String(msg).slice(0,160)); }catch(e){}
 
       const box = document.getElementById("apiStatusBox");
       if(box){
@@ -1576,7 +1599,7 @@ async function fetchJson(url){
       }
     }else{
       lastApiIssue = null;
-      logDataRequest("alpha", true, "Response received");
+      try{ logDataRequest("alpha", true, "Response received"); }catch(e){}
     }
 
     return data;
@@ -1590,7 +1613,7 @@ async function fetchJson(url){
     if(box){
       box.innerHTML = `<div class="metric"><b>API Request Failed:</b> ${lastApiIssue.message}</div>`;
     }
-    logDataRequest("alpha", false, lastApiIssue.message);
+    try{ logDataRequest("alpha", false, lastApiIssue.message); }catch(e){}
     throw err;
   }finally{
     clearTimeout(timeout);
@@ -4990,23 +5013,34 @@ function applyPortfolioAlertSummary(results, sourceLabel){
 function renderApiFailureDiagnostic(ticker, extraMessage=""){
   const issue = lastApiIssue;
   const issueText = extraMessage || issue?.message || "Historical market data did not load.";
-  const likelyLimit = /limit|frequency|premium|call volume|rate/i.test(issueText);
-  const likelyTicker = /invalid|symbol/i.test(issueText);
+  const lower = String(issueText).toLowerCase();
 
+  const likelyLimit =
+    /limit|frequency|call volume|rate|too many requests|thank you for using alpha vantage/i.test(issueText);
+  const likelyPremium =
+    /premium|subscribe|higher api call frequency/i.test(issueText);
+  const likelyTicker =
+    /invalid api call|invalid symbol|symbol/i.test(issueText);
+
+  let title = "SCAN INCOMPLETE";
   let diagnosis = "Predator could not get enough market data to make a reliable decision.";
   let action = "Wait a moment and try again. Do not treat this as NO TRADE.";
+
   if(likelyLimit){
-    diagnosis = "Alpha Vantage returned a usage or rate-limit message.";
-    action = "Pause scanning and try again after the API window resets.";
+    diagnosis = "Alpha Vantage returned a rate or usage-limit message.";
+    action = "Pause scanning and retry after the API window resets.";
+  }else if(likelyPremium){
+    diagnosis = "Alpha Vantage returned a premium-access message for this request.";
+    action = "Predator should fall back to supported free endpoints. If this repeats, the endpoint needs adjusting.";
   }else if(likelyTicker){
     diagnosis = "The ticker or API response appears invalid.";
-    action = "Check the ticker symbol and try once more.";
+    action = "Check the ticker symbol and try again.";
   }
 
   return `
     <div class="card sell-alert">
       <div class="section-title">Data / API Warning</div>
-      <div class="final-answer-word yellow">SCAN INCOMPLETE</div>
+      <div class="final-answer-word yellow">${title}</div>
       <div class="metric"><b>Ticker:</b> ${ticker}</div>
       <div class="metric"><b>Diagnosis:</b> ${diagnosis}</div>
       <div class="metric"><b>API Detail:</b> ${String(issueText).slice(0,300)}</div>
