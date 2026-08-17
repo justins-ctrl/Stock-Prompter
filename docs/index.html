@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v46.2.5 API Logging Hotfix</title>
+  <title>Signal Predator AI v46.2.6 Render Snapshot Hotfix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v46.2.5 // API logging fix // reliable scan diagnostics</div>
+  <div class="subtitle">v46.2.6 // restore simple snapshot // unified decision display</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -296,7 +296,7 @@ body.advanced-on .scan-support{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v46.2.5 Stability Guard</div>
+    <div class="section-title">v46.2.6 Stability Guard</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
@@ -568,7 +568,7 @@ function safeJsonParse(raw, fallback){
 
 function exportAppBackup(){
   const backup = {
-    version: "v46.2.5",
+    version: "v46.2.6",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -585,7 +585,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v46-2-5.json";
+  a.download = "signal-predator-backup-v46-2-6.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -597,7 +597,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v46.2.5",
+    version: "v46.2.6",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -3764,6 +3764,57 @@ function renderSimplePredatorDecision(a){
   </div>`;
 }
 
+function renderSimpleDecisionSnapshot(a){
+  a = ensureEngineDefaults(a);
+
+  const d = getSimplePredatorDecision(a);
+  const convictionEngine = typeof getPredatorConvictionEngine === "function"
+    ? getPredatorConvictionEngine(a)
+    : {conviction:safeNum(d.conviction,50)};
+
+  const confidence = safeNum(convictionEngine.conviction, safeNum(d.conviction,50));
+  const displayDecision = d.decision === "PASS" ? "NO TRADE" : d.decision;
+
+  let decisionColor = "red";
+  if(d.decision === "BUY") decisionColor = "green";
+  else if(d.decision === "WAIT") decisionColor = "yellow";
+
+  let setupLabel = d.setupStatus || "N/A";
+  let entryLabel = d.entryStatus || "N/A";
+
+  let plainMeaning = "Predator does not approve a new entry.";
+  if(d.decision === "BUY"){
+    plainMeaning = "The setup and entry gate are both approved.";
+  }else if(d.decision === "WAIT"){
+    plainMeaning = "The setup is worth watching, but entry permission is not complete yet.";
+  }
+
+  return `
+    <div class="card simple-summary-card">
+      <div class="section-title">Quick Read</div>
+
+      <div class="simple-summary-grid">
+        <div class="simple-summary-tile">
+          <div class="metric"><b>Final Decision</b><br><span class="${decisionColor}">${displayDecision}</span></div>
+        </div>
+
+        <div class="simple-summary-tile">
+          <div class="metric"><b>Bot Confidence</b><br>${confidence}/100</div>
+        </div>
+
+        <div class="simple-summary-tile">
+          <div class="metric"><b>Setup</b><br>${setupLabel}</div>
+        </div>
+
+        <div class="simple-summary-tile">
+          <div class="metric"><b>Entry Status</b><br>${entryLabel}</div>
+        </div>
+      </div>
+
+      <div class="metric"><b>Simple Meaning:</b> ${plainMeaning}</div>
+    </div>`;
+}
+
 function renderExpirationPolicyCard(a){
   const p = getStrategyExpirationPolicy(a);
   return `
@@ -4757,7 +4808,7 @@ function renderFull(ticker, a){
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderSimplePredatorDecision(a)}
-  ${renderSimpleDecisionSnapshot(a)}
+  ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
   ${renderApiWarningOnly()}
   ${renderAdvancedScanToggle()}
   <div class="scan-support">
@@ -4978,7 +5029,7 @@ function renderFull(ticker, a){
 function renderCompact(ticker, a){
   a = ensureEngineDefaults(a);
   return `${renderSimplePredatorDecision(a)}
-  ${renderSimpleDecisionSnapshot(a)}
+  ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
   ${renderApiWarningOnly()}
   ${renderAdvancedScanToggle()}
   <div class="scan-support">
