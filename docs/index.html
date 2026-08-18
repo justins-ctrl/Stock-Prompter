@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v46.2.7 Display Artifact Cleanup</title>
+  <title>Signal Predator AI v47.0.1 Personal API Setup</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v46.2.7 // clean mobile text // remove encoding artifacts</div>
+  <div class="subtitle">v47.0.1 // personal API setup // clean core // stability hardening</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -296,20 +296,26 @@ body.advanced-on .scan-support{display:block}
   </div>
 
   <div class="card">
-    <div class="section-title">v46.2.7 Stability Guard</div>
+    <div class="section-title">v47.0 Security & Stability Core</div>
     <div class="metric">Engine Default Protection <span class="green">ACTIVE</span></div>
     <div class="metric">Safe Render Guards <span class="green">ACTIVE</span></div>
     <div class="metric">Live Position Scan Hotfix <span class="green">ACTIVE</span></div>
     <div class="metric">Thesis Integrity Engine <span class="green">ACTIVE</span></div>
     <div class="metric">Position Hold Duration Guide <span class="green">ACTIVE</span></div>
     <div class="metric">Predator Command Center <span class="green">ACTIVE</span></div>
-    <div class="metric">v41.5 Bot Decision Layer <span class="green">ACTIVE</span></div>
-    <div class="metric muted">Protects the app when one advanced engine returns missing or unexpected data.</div>
+    <div class="metric">Unified Final Decision Layer <span class="green">ACTIVE</span></div>
+    <div class="metric muted">Security audit passed, public API secret removed, scan guards active, and the final BUY / WAIT / NO TRADE authority remains unified.</div>
   </div>
 
   <div class="card">
-    <div class="section-title">API Status / Diagnostic</div>
-    <div class="metric muted">If Alpha Vantage blocks or limits a request, the app will now show the reason instead of only saying Data unavailable.</div>
+    <div class="section-title">API Status / Security</div>
+    <div class="metric muted">Your Alpha Vantage key is no longer stored in the public GitHub source. It is saved only in this browser on this device.</div>
+    <div id="apiKeyStatus" class="metric">API Key: checking...</div>
+    <input id="alphaVantageKeyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter Alpha Vantage API Key">
+    <div class="grid-2">
+      <button onclick="safeAction('Save API Key', saveAlphaVantageKey)">Save API Key</button>
+      <button class="secondary" onclick="safeAction('Clear API Key', clearAlphaVantageKey)">Clear API Key</button>
+    </div>
     <div id="apiStatusBox"><div class="muted">No API check yet.</div></div>
   </div>
 
@@ -490,7 +496,7 @@ body.advanced-on .scan-support{display:block}
   <div class="card">
     <div class="section-title">Target Watchlist</div>
     <div class="row" style="margin-top:12px;">
-      <input id="watchlistInput" placeholder="Add ticker (AAPL, NVDA, SOFI)">
+      <input id="watchlistInput" placeholder="Add ticker (AAPL, NVDA, SOFI)" onkeydown="if(event.key==='Enter'){event.preventDefault();safeAction('Add Ticker', addTicker);}">
       <button class="small-btn" onclick="safeAction('Add Ticker', addTicker)">Add</button>
     </div>
     <div id="watchlistContainer" style="margin-top:14px;"></div>
@@ -532,15 +538,80 @@ body.advanced-on .scan-support{display:block}
 
 <script>
 const APP_CONFIG = Object.freeze({
-  alphaVantageKey: "OHCJWFQEFSXI8IJ3",
   apiTimeoutMs: 18000,
-  maxBackupItems: 250
+  maxBackupItems: 250,
+  alphaVantageKeyStorageKey: "signal_predator_alpha_vantage_key"
 });
-const API_KEY = APP_CONFIG.alphaVantageKey;
+
+function getAlphaVantageKey(){
+  try{
+    const storageKey = APP_CONFIG.alphaVantageKeyStorageKey;
+    let savedKey = String(localStorage.getItem(storageKey) || "").trim();
+
+    // One-time convenience seed for this personal build.
+    // After first load, Signal Predator reads the key from localStorage normally.
+    if(!savedKey){
+      const initialKey = "OHCJWFQEFSXI8IJ3";
+      localStorage.setItem(storageKey, initialKey);
+      savedKey = initialKey;
+    }
+
+    return savedKey;
+  }catch(e){
+    return "";
+  }
+}
+
+function hasAlphaVantageKey(){
+  return getAlphaVantageKey().length >= 8;
+}
+
+function maskApiKey(key){
+  const k = String(key || "");
+  if(k.length < 8) return "NOT SAVED";
+  return `${k.slice(0,4)}â¢â¢â¢â¢${k.slice(-3)}`;
+}
+
+function saveAlphaVantageKey(){
+  const input = document.getElementById("alphaVantageKeyInput");
+  if(!input) return;
+  const key = String(input.value || "").trim();
+
+  if(key.length < 8 || !/^[A-Za-z0-9_-]+$/.test(key)){
+    alert("Enter a valid Alpha Vantage API key.");
+    return;
+  }
+
+  try{
+    localStorage.setItem(APP_CONFIG.alphaVantageKeyStorageKey, key);
+    input.value = "";
+    renderApiKeyStatus();
+    updateApiStatus("API key saved locally on this device.", "green");
+  }catch(e){
+    alert("Safari blocked local storage. The API key could not be saved.");
+  }
+}
+
+function clearAlphaVantageKey(){
+  try{
+    localStorage.removeItem(APP_CONFIG.alphaVantageKeyStorageKey);
+  }catch(e){}
+  renderApiKeyStatus();
+  updateApiStatus("API key removed from this device.", "yellow");
+}
+
+function renderApiKeyStatus(){
+  const box = document.getElementById("apiKeyStatus");
+  if(!box) return;
+  const key = getAlphaVantageKey();
+  box.textContent = key
+    ? `API Key: ${maskApiKey(key)} (stored only in this browser)`
+    : "API Key: NOT SAVED - enter your Alpha Vantage key below.";
+}
 const DEFAULT_WATCHLIST = ["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"];
 
 function normalizeTicker(ticker){
-  return String(ticker | "").toUpperCase().trim().replace(/[^A-Z.]/g,"");
+  return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,"");
 }
 
 function getStore(key, fallback){
@@ -566,9 +637,18 @@ function safeJsonParse(raw, fallback){
   try{ return JSON.parse(raw); }catch(e){ return fallback; }
 }
 
+function escapeHtml(value){
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function exportAppBackup(){
   const backup = {
-    version: "v46.2.7",
+    version: "v47.0",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -585,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v46-2-7.json";
+  a.download = "signal-predator-backup-v47-0.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -597,7 +677,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v46.2.7",
+    version: "v47.0",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -608,13 +688,31 @@ function showBackupText(){
     opportunityHistory,
     gradeFilterSetting: typeof gradeFilterSetting !== "undefined" ? gradeFilterSetting : "A_AND_APLUS"
   };
+
   const box = document.getElementById("backupBox");
-  if(box){
-    box.innerHTML = `
-      <div class="metric"><b>Backup Text:</b></div>
-      <textarea style="width:100%;min-height:180px;border-radius:12px;background:#0b1830;color:white;padding:10px;">${JSON.stringify(backup, null, 2)}</textarea>
-      <div class="metric muted">Copy this text somewhere safe if downloads are difficult on iPhone.</div>`;
-  }
+  if(!box) return;
+
+  box.innerHTML = "";
+  const label = document.createElement("div");
+  label.className = "metric";
+  label.innerHTML = "<b>Backup Text:</b>";
+
+  const textarea = document.createElement("textarea");
+  textarea.style.width = "100%";
+  textarea.style.minHeight = "180px";
+  textarea.style.borderRadius = "12px";
+  textarea.style.background = "#0b1830";
+  textarea.style.color = "white";
+  textarea.style.padding = "10px";
+  textarea.value = JSON.stringify(backup, null, 2);
+
+  const note = document.createElement("div");
+  note.className = "metric muted";
+  note.textContent = "Copy this text somewhere safe if downloads are difficult on iPhone.";
+
+  box.appendChild(label);
+  box.appendChild(textarea);
+  box.appendChild(note);
 }
 
 function clearCachedAnalysis(){
@@ -695,7 +793,7 @@ function ensureEngineDefaults(a){
 
 function safeRender(fn, fallbackHtml){
   try{ return fn(); }
-  catch(err){ return fallbackHtml | `<div class="card sell-alert"><div class="section-title">Render Guard</div><div class="metric">A display section failed safely: ${err.message}</div></div>`; }
+  catch(err){ return fallbackHtml || `<div class="card sell-alert"><div class="section-title">Render Guard</div><div class="metric">A display section failed safely: ${escapeHtml(err.message)}</div></div>`; }
 }
 
 
@@ -720,7 +818,7 @@ let accountProfile = getStore("signal_predator_account_profile", {
 let opportunityHistory = getStore("signal_predator_opportunity_history", {});
 
 function getAccountTier(value){
-  const v = Math.max(0, Number(value | 0));
+  const v = Math.max(0, Number(value || 0));
   if(v < 5000) return {name:"STARTER", maxDeskTickers:6, note:"Focus on one contract, low concentration, and only the cleanest setups."};
   if(v < 10000) return {name:"EMERGING", maxDeskTickers:8, note:"A slightly wider universe is available, but position size still matters more than frequency."};
   if(v < 25000) return {name:"GROWTH", maxDeskTickers:10, note:"More wheel candidates and diversified positions become practical."};
@@ -780,7 +878,7 @@ function renderUnifiedAccountPreview(portfolioValue, optionAllocationPct){
 function previewUnifiedAccountRisk(){
   const portfolioInput = document.getElementById("portfolioValue");
   const optionInput = document.getElementById("maxOptionAllocationPct");
-  if(!portfolioInput | !optionInput) return;
+  if(!portfolioInput || !optionInput) return;
 
   const portfolio = safeNum(portfolioInput.value, accountProfile.portfolioValue);
   const optionPct = safeNum(optionInput.value, accountProfile.maxOptionAllocationPct);
@@ -803,7 +901,7 @@ function saveAccountProfile(){
 
 function saveUnifiedAccountRiskSettings(){
   const portfolioValue = Number(document.getElementById("portfolioValue")?.value);
-  if(!Number.isFinite(portfolioValue) | portfolioValue < 100){
+  if(!Number.isFinite(portfolioValue) || portfolioValue < 100){
     alert("Enter your current portfolio value first.");
     return;
   }
@@ -817,7 +915,7 @@ function saveUnifiedAccountRiskSettings(){
 
   accountProfile = {
     portfolioValue,
-    tradingStyle:document.getElementById("accountTradingStyle")?.value | "BOTH",
+    tradingStyle:document.getElementById("accountTradingStyle")?.value || "BOTH",
     maxOptionAllocationPct,
     maxWheelUsagePct
   };
@@ -830,7 +928,7 @@ function saveUnifiedAccountRiskSettings(){
   riskSettings = {
     maxRiskPerTrade:auto.maxRiskPerTrade,
     dailyProfitLock:Math.max(1, Math.min(100,
-      sanitizeNumber(document.getElementById("dailyProfitLock")?.value, riskSettings.dailyProfitLock | 20)
+      sanitizeNumber(document.getElementById("dailyProfitLock")?.value, riskSettings.dailyProfitLock || 20)
     )),
     maxPortfolioRisk:auto.maxPortfolioRisk,
     maxActiveTrades:Math.max(1, Math.min(10, userMaxTrades))
@@ -888,7 +986,7 @@ function getAccountFit(a, strategy){
   else if(affordable && usagePct <= 15){ fit = "GOOD FIT"; score = 84; }
   else if(affordable){ fit = "ACCEPTABLE"; score = 70; }
   return {
-    strategy:a.direction | "BUY OPTION",
+    strategy:a.direction || "BUY OPTION",
     capitalRequired,
     usagePct:Math.round(usagePct),
     budget:optionBudget,
@@ -929,8 +1027,8 @@ function renderAccountIntelligenceSummary(){
 
   if(maxRiskInput) maxRiskInput.value = auto.maxRiskPerTrade;
   if(maxPortfolioInput) maxPortfolioInput.value = auto.maxPortfolioRisk;
-  if(maxTradesInput) maxTradesInput.value = riskSettings.maxActiveTrades | auto.maxActiveTrades;
-  if(dailyLockInput) dailyLockInput.value = riskSettings.dailyProfitLock | 20;
+  if(maxTradesInput) maxTradesInput.value = riskSettings.maxActiveTrades || auto.maxActiveTrades;
+  if(dailyLockInput) dailyLockInput.value = riskSettings.dailyProfitLock || 20;
 
   el.innerHTML = `
     <div class="fit-grid">
@@ -947,7 +1045,7 @@ function getDeskVerdict(a, strategy){
   const brain = typeof getPredatorBrain === "function" ? getPredatorBrain(a) : null;
   if(strategy === "WHEEL"){
     const score = safeNum(a.wheelMode?.sellPutScore, 0);
-    if(a.qualityDecision?.decision === "REJECT" | a.noTradeZone?.zone !== "CLEAR") return "PASS";
+    if(a.qualityDecision?.decision === "REJECT" || a.noTradeZone?.zone !== "CLEAR") return "PASS";
     if(score >= 80 && a.wheelMode?.sellPutRead === "GOOD") return "SELL PUT CANDIDATE";
     if(score >= 68) return "WATCH FOR SELL PUT";
     return "PASS";
@@ -960,7 +1058,7 @@ function getDeskVerdict(a, strategy){
 
 function saveOpportunitySnapshot(rows, desk){
   const day = new Date().toISOString().slice(0,10);
-  opportunityHistory[day] = opportunityHistory[day] | {};
+  opportunityHistory[day] = opportunityHistory[day] || {};
   opportunityHistory[day][desk] = rows.slice(0,10).map(r=>({
     ticker:r.ticker, verdict:r.verdict, focusScore:r.focusScore, strategy:r.strategy
   }));
@@ -976,7 +1074,7 @@ function getPreviousOpportunity(ticker, desk){
   const today = new Date().toISOString().slice(0,10);
   for(const day of days){
     if(day === today) continue;
-    const row = (opportunityHistory[day]?.[desk] | []).find(x=>x.ticker===ticker);
+    const row = (opportunityHistory[day]?.[desk] || []).find(x=>x.ticker===ticker);
     if(row) return row;
   }
   return null;
@@ -1004,7 +1102,7 @@ function renderOpportunityBoard(rows, title, desk){
           <div class="metric"><b>Focus Score:</b> ${r.focusScore}/100</div>
           <div class="metric"><b>Account Fit:</b> <span class="${signalClass(r.accountFit.fit)}">${r.accountFit.fit}</span></div>
           <div class="metric"><b>Estimated Capital:</b> $${Math.round(r.accountFit.capitalRequired).toLocaleString()} (${r.accountFit.usagePct}% of account)</div>
-          <div class="metric"><b>Setup:</b> ${r.a.grade} / ${r.a.score} â Alignment ${r.a.alignmentScore?.score | 0}</div>
+          <div class="metric"><b>Setup:</b> ${r.a.grade} / ${r.a.score} â Alignment ${r.a.alignmentScore?.score || 0}</div>
           <div class="metric"><b>Evolution:</b> ${evolution}</div>
           <button class="small-btn" onclick="loadDeskTicker('${r.ticker}')">Load ${r.ticker}</button>
         </div>`;
@@ -1126,31 +1224,16 @@ let closedTradeJournal = getStore("signal_predator_closed_trade_journal", []);
 let lastScanCache = getStore("ai_options_last_scan_cache", null);
 let riskSettings = getStore("signal_predator_risk_settings", {maxRiskPerTrade:100,dailyProfitLock:20,maxPortfolioRisk:25,maxActiveTrades:3});
 
-function cleanUiText(value){
-  if(value === null || value === undefined) return "";
-  return String(value)
-    .replace(/Ã¢ÂÂ¢|Ã¢â¬Â¢|Ã¢â¡â¡|Ã¢â¡|ï¿½/g, " | ")
-    .replace(/Ã¢ÂÂ/g, " - ")
-    .replace(/Ã¢â¬â/g, "-")
-    .replace(/Ã¢â¬â¢|Ã¢â¬Ë/g, "'")
-    .replace(/Ã¢â¬Å|Ã¢â¬Â/g, '"')
-    .replace(/Ã¢ÂÂ/g, " -> ")
-    .replace(/Ã/g, "")
-    .replace(/\s*\|\s*\|\s*/g, " | ")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
-
 function signalClass(value){
-  value = String(value | "").toUpperCase();
-  if(value.includes("BUY CALL") | value.includes("BUY PUT") | value.includes("SELL CASH-SECURED PUT") | value.includes("SELL COVERED CALL") | value === "GOOD") return "green";
-  if(value.includes("BOT APPROVED") | value.includes("APPROVED") | value.includes("ENTER") | value.includes("HOLD") | value.includes("LET THETA WORK")) return "green";
-  if(value.includes("BOT REJECTED") | value.includes("EXIT") | value.includes("CUT") | value.includes("DO NOT") | value === "AVOID" | value === "REJECT") return "red";
-  if(value.includes("WAIT") | value.includes("WATCH") | value.includes("REDUCED") | value.includes("CAUTION")) return "yellow";
+  value = String(value || "").toUpperCase();
+  if(value.includes("BUY CALL") || value.includes("BUY PUT") || value.includes("SELL CASH-SECURED PUT") || value.includes("SELL COVERED CALL") || value === "GOOD") return "green";
+  if(value.includes("BOT APPROVED") || value.includes("APPROVED") || value.includes("ENTER") || value.includes("HOLD") || value.includes("LET THETA WORK")) return "green";
+  if(value.includes("BOT REJECTED") || value.includes("EXIT") || value.includes("CUT") || value.includes("DO NOT") || value === "AVOID" || value === "REJECT") return "red";
+  if(value.includes("WAIT") || value.includes("WATCH") || value.includes("REDUCED") || value.includes("CAUTION")) return "yellow";
 
-  if(value.includes("LOCK") | value.includes("TAKE") | value.includes("SCALE") | value.includes("HOLD FOR TARGET") | value.includes("CONTROLLED") | value.includes("CAN ENTER")) return "green";
-  if(value.includes("EXIT") | value.includes("CUT") | value.includes("DO NOT HOLD") | value.includes("NOT RECOMMENDED") | value.includes("LOSS CONTROL") | value.includes("ASSIGNMENT") | value.includes("ROLL RISK") | value.includes("DEFENSIVE") | value.includes("DO NOT ENTER")) return "red";
-  if(value.includes("MONITOR") | value.includes("TIGHT STOP") | value.includes("ONLY IF") | value.includes("HIGH RISK") | value.includes("ACCEPTABLE ONLY") | value.includes("WATCH") | value.includes("CONSIDER CLOSING") | value.includes("WAIT") | value.includes("WEAK UNTIL")) return "yellow";
+  if(value.includes("LOCK") || value.includes("TAKE") || value.includes("SCALE") || value.includes("HOLD FOR TARGET") || value.includes("CONTROLLED") || value.includes("CAN ENTER")) return "green";
+  if(value.includes("EXIT") || value.includes("CUT") || value.includes("DO NOT HOLD") || value.includes("NOT RECOMMENDED") || value.includes("LOSS CONTROL") || value.includes("ASSIGNMENT") || value.includes("ROLL RISK") || value.includes("DEFENSIVE") || value.includes("DO NOT ENTER")) return "red";
+  if(value.includes("MONITOR") || value.includes("TIGHT STOP") || value.includes("ONLY IF") || value.includes("HIGH RISK") || value.includes("ACCEPTABLE ONLY") || value.includes("WATCH") || value.includes("CONSIDER CLOSING") || value.includes("WAIT") || value.includes("WEAK UNTIL")) return "yellow";
   if(["TARGET LOCKED","TAKE PROFIT","BUY CALL","BULLISH","STRONG BULLISH","ACCUMULATION","PASS","A+","A","FAVORABLE","LOW","LIKELY TO HIT BEFORE EXPIRATION","CLEAR","ENTER NOW","VALID IF PRICE HOLDS","APPROVED","TRENDING","GOOD FOR TRADING","STRONG","GOOD"].includes(value)) return "green";
   if(["STRIKE NOW","CUT LOSS","LOCK PROFITS","BUY PUT","BEARISH","STRONG BEARISH","SELLING","FAIL","C","RISKY","EXTREME","HIGH","UNLIKELY BEFORE EXPIRATION","BULL TRAP RISK","BEAR TRAP RISK","DO NOT CHASE","DOWN","INVALID UNTIL RECLAIM","REJECT","DANGEROUS","AVOID NEW TRADES","DANGEROUS CONDITIONS","NO TRADE","TRAP ZONE"].includes(value)) return "red";
   if(["STALKING","WAIT","B","MEDIUM","BALANCED","RANGE","NORMAL","MODERATE","TIGHT","POSSIBLE BEFORE EXPIRATION","CHOP ZONE","LOW EDGE SETUP","CHOP","UP","WAIT FOR RETEST","NEEDS CONFIRMATION","A+ BUT CONFIRM FIRST","WAIT FOR PULLBACK","NO NEXT-DAY ENTRY","REDUCED SIZE","CHOPPY","CHOP FILTER","MID-RANGE CHOP","MIXED","WEAK"].includes(value)) return "yellow";
@@ -1164,7 +1247,7 @@ function renderThinkingCard(lines){
 
 function renderActiveAlertsPanel(alerts){
   const panel = document.getElementById("activeAlertsPanel");
-  if(!alerts | !alerts.length){
+  if(!alerts || !alerts.length){
     panel.innerHTML = "<div class='muted'>No active triggers right now.</div>";
     return;
   }
@@ -1177,7 +1260,7 @@ function clearActiveAlertsPanel(){ renderActiveAlertsPanel([]); }
 
 function showSafeError(area, err){
   const output = document.getElementById("output");
-  const msg = err && err.message ? err.message : String(err | "Unknown error");
+  const msg = err && err.message ? err.message : String(err || "Unknown error");
   if(output){
     output.innerHTML = `
       <div class="card sell-alert">
@@ -1207,10 +1290,10 @@ function saveGradeFilter(){
 }
 
 function passesGradeFilter(a){
-  const grade = String(a.grade | "");
+  const grade = String(a.grade || "");
   if(gradeFilterSetting === "APLUS_ONLY") return grade === "A+";
-  if(gradeFilterSetting === "A_B_AND_APLUS") return grade === "A+" | grade === "A" | grade === "B";
-  return grade === "A+" | grade === "A";
+  if(gradeFilterSetting === "A_B_AND_APLUS") return grade === "A+" || grade === "A" || grade === "B";
+  return grade === "A+" || grade === "A";
 }
 
 function renderGradeFilterSummary(){
@@ -1260,16 +1343,35 @@ function renderWatchlist(){
 }
 function addTicker(){
   const input = document.getElementById("watchlistInput");
+  if(!input) return;
+
   const ticker = normalizeTicker(input.value);
-  if(!ticker) return;
-  if(customWatchlist.includes(ticker)){ input.value = ""; return; }
-  if(customWatchlist.length >= 15){ alert("Keep your watchlist at 15 or fewer tickers for faster scans."); return; }
+  if(!ticker){
+    alert("Enter a ticker symbol first.");
+    return;
+  }
+
+  if(customWatchlist.includes(ticker)){
+    input.value = "";
+    alert(`${ticker} is already in your watchlist.`);
+    return;
+  }
+
+  if(customWatchlist.length >= 15){
+    alert("Keep your watchlist at 15 or fewer tickers for faster scans.");
+    return;
+  }
+
   customWatchlist.push(ticker);
   setStore("ai_options_watchlist", customWatchlist);
-  runSecureCoreCheck();
-  initPredatorViewMode();
   renderWatchlist();
   input.value = "";
+
+  try{
+    if(typeof initPredatorViewMode === "function") initPredatorViewMode();
+  }catch(e){
+    console.warn("View mode refresh skipped:", e);
+  }
 }
 function removeTicker(index){
   customWatchlist.splice(index,1);
@@ -1286,11 +1388,11 @@ function syncClosedJournalToPerformance(){
       performanceTrades.unshift({
         ticker:t.ticker,
         outcome:t.result,
-        entrySignal:t.entrySignal | "SAVED POSITION",
-        ttt:t.entryTTT | null,
-        dte:t.entryDTE | null,
-        notes:t.notes | "",
-        loggedAt:t.closedAt | new Date().toISOString()
+        entrySignal:t.entrySignal || "SAVED POSITION",
+        ttt:t.entryTTT || null,
+        dte:t.entryDTE || null,
+        notes:t.notes || "",
+        loggedAt:t.closedAt || new Date().toISOString()
       });
     }
   });
@@ -1335,10 +1437,10 @@ function closeSavedPosition(index, result){
   performanceTrades.unshift({
     ticker:p.ticker,
     outcome:result,
-    entrySignal:p.entrySignal | "SAVED POSITION",
-    ttt:p.entryTTT | null,
-    dte:p.entryDTE | null,
-    notes:p.notes | "",
+    entrySignal:p.entrySignal || "SAVED POSITION",
+    ttt:p.entryTTT || null,
+    dte:p.entryDTE || null,
+    notes:p.notes || "",
     loggedAt:new Date().toISOString()
   });
   performanceTrades = performanceTrades.slice(0,100);
@@ -1363,7 +1465,7 @@ function renderClosedTradeJournal(){
   }
   el.innerHTML = closedTradeJournal.slice(0,20).map(t=>`
     <div class="watch-item">
-      <span>${t.ticker} ${t.strike} ${t.type} â¢ ${t.result} â¢ Exp ${t.expiration | "N/A"}</span>
+      <span>${t.ticker} ${t.strike} ${t.type} â¢ ${t.result} â¢ Exp ${t.expiration || "N/A"}</span>
     </div>
   `).join("");
 }
@@ -1395,9 +1497,9 @@ function addPosition(){
   const type = document.getElementById("posType").value;
   const strike = parseFloat(document.getElementById("posStrike").value);
   const breakeven = parseFloat(document.getElementById("posBreakeven").value);
-  const entryPremium = parseFloat(document.getElementById("posEntryPremium").value | "0");
+  const entryPremium = parseFloat(document.getElementById("posEntryPremium").value || "0");
   const expiration = document.getElementById("posExpiration").value;
-  if(!ticker | Number.isNaN(strike) | Number.isNaN(breakeven)){ alert("Enter ticker, strike, and breakeven."); return; }
+  if(!ticker || Number.isNaN(strike) || Number.isNaN(breakeven)){ alert("Enter ticker, strike, and breakeven."); return; }
   savedPositions.push({ticker,type,strike,breakeven,entryPremium,expiration,entryDate:new Date().toISOString(),entrySignal:'MANUAL SAVE',entryTTT:null,entryDTE:getDTE(expiration),notes:''});
   setStore("ai_options_positions", savedPositions);
   renderPositions();
@@ -1415,11 +1517,11 @@ function removePosition(index){
 function addPerformanceTrade(){
   const ticker = normalizeTicker(document.getElementById("perfTicker").value);
   const outcome = document.getElementById("perfOutcome").value;
-  const entrySignal = String(document.getElementById("perfEntrySignal").value | "").trim().toUpperCase();
-  const ttt = parseFloat(document.getElementById("perfTTT").value | "");
-  const dte = parseFloat(document.getElementById("perfDTE").value | "");
-  const notes = String(document.getElementById("perfNotes").value | "").trim();
-  if(!ticker | !entrySignal){ alert("Enter ticker and entry signal."); return; }
+  const entrySignal = String(document.getElementById("perfEntrySignal").value || "").trim().toUpperCase();
+  const ttt = parseFloat(document.getElementById("perfTTT").value || "");
+  const dte = parseFloat(document.getElementById("perfDTE").value || "");
+  const notes = String(document.getElementById("perfNotes").value || "").trim();
+  if(!ticker || !entrySignal){ alert("Enter ticker and entry signal."); return; }
 
   performanceTrades.unshift({
     ticker, outcome, entrySignal,
@@ -1487,13 +1589,13 @@ function getLossStreak(){
 }
 function getTodayWinRate(){
   const today = new Date().toISOString().slice(0,10);
-  const todays = performanceTrades.filter(t => String(t.loggedAt | "").slice(0,10) === today);
+  const todays = performanceTrades.filter(t => String(t.loggedAt || "").slice(0,10) === today);
   if(!todays.length) return null;
   const wins = todays.filter(t => t.outcome === "WIN").length;
   return Math.round((wins / todays.length) * 100);
 }
 function estimatePortfolioRisk(){
-  return savedPositions.length * Number(riskSettings.maxRiskPerTrade | 100);
+  return savedPositions.length * Number(riskSettings.maxRiskPerTrade || 100);
 }
 function saveRiskSettings(){
   return saveUnifiedAccountRiskSettings();
@@ -1506,10 +1608,10 @@ function renderRiskControlSummary(){
   normalizeAccountProfile();
   const auto = getAutoRiskProfile(accountProfile.portfolioValue, accountProfile.maxOptionAllocationPct);
 
-  if(!riskSettings | typeof riskSettings !== "object") riskSettings = {};
+  if(!riskSettings || typeof riskSettings !== "object") riskSettings = {};
   riskSettings.maxRiskPerTrade = auto.maxRiskPerTrade;
   riskSettings.maxPortfolioRisk = auto.maxPortfolioRisk;
-  if(!Number.isFinite(Number(riskSettings.maxActiveTrades)) | Number(riskSettings.maxActiveTrades) < 1){
+  if(!Number.isFinite(Number(riskSettings.maxActiveTrades)) || Number(riskSettings.maxActiveTrades) < 1){
     riskSettings.maxActiveTrades = auto.maxActiveTrades;
   }
   if(!Number.isFinite(Number(riskSettings.dailyProfitLock))){
@@ -1575,11 +1677,11 @@ let lastApiIssue = null;
 function logDataRequest(source, success, detail=""){
   try{
     const key = "signal_predator_data_log";
-    const existing = getStore ? (getStore(key, []) | []) : [];
+    const existing = getStore ? (getStore(key, []) || []) : [];
     existing.unshift({
-      source:String(source | "unknown"),
+      source:String(source || "unknown"),
       success:!!success,
-      detail:String(detail | "").slice(0,220),
+      detail:String(detail || "").slice(0,220),
       at:new Date().toISOString()
     });
     const trimmed = existing.slice(0,30);
@@ -1602,15 +1704,15 @@ async function fetchJson(url){
     const r = await fetch(url, {signal: controller.signal});
     const data = await r.json();
 
-    if(data.Note | data.Information | data["Error Message"]){
-      const msg = data.Note | data.Information | data["Error Message"];
+    if(data.Note || data.Information || data["Error Message"]){
+      const msg = data.Note || data.Information || data["Error Message"];
       const kind = data["Error Message"] ? "API_ERROR" : "API_MESSAGE";
       lastApiIssue = {kind, message:String(msg), at:new Date().toISOString()};
       try{ logDataRequest("alpha", false, String(msg).slice(0,160)); }catch(e){}
 
       const box = document.getElementById("apiStatusBox");
       if(box){
-        box.innerHTML = `<div class="metric"><b>API Message:</b> ${String(msg).slice(0,220)}</div>`;
+        box.innerHTML = `<div class="metric"><b>API Message:</b> ${escapeHtml(String(msg).slice(0,220))}</div>`;
       }
     }else{
       lastApiIssue = null;
@@ -1626,7 +1728,7 @@ async function fetchJson(url){
     };
     const box = document.getElementById("apiStatusBox");
     if(box){
-      box.innerHTML = `<div class="metric"><b>API Request Failed:</b> ${lastApiIssue.message}</div>`;
+      box.innerHTML = `<div class="metric"><b>API Request Failed:</b> ${escapeHtml(lastApiIssue.message)}</div>`;
     }
     try{ logDataRequest("alpha", false, lastApiIssue.message); }catch(e){}
     throw err;
@@ -1637,15 +1739,21 @@ async function fetchJson(url){
 function updateApiStatus(message, level="blue"){
   const box = document.getElementById("apiStatusBox");
   if(!box) return;
-  box.innerHTML = `<div class="metric"><b>Status:</b> <span class="${level}">${message}</span></div>`;
+  box.innerHTML = `<div class="metric"><b>Status:</b> <span class="${level}">${escapeHtml(message)}</span></div>`;
 }
 async function getHistory(symbol){
   try{
-    const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`);
+    const apiKey = getAlphaVantageKey();
+    if(!apiKey){
+      lastApiIssue = {kind:"NO_API_KEY", message:"No Alpha Vantage API key is saved.", at:new Date().toISOString()};
+      updateApiStatus("No Alpha Vantage API key saved. Add it in API Status / Security.", "yellow");
+      return null;
+    }
+    const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(apiKey)}`);
     const s = d["Time Series (Daily)"];
 
     if(!s){
-      if(d.Note | d.Information){
+      if(d.Note || d.Information){
         updateApiStatus("Alpha Vantage limit/message returned. Try again later or use fewer scans.", "yellow");
       }else if(d["Error Message"]){
         updateApiStatus("Invalid ticker or API error.", "red");
@@ -1665,7 +1773,9 @@ async function getHistory(symbol){
 }
 async function getGlobalQuotePrice(symbol){
   try{
-    const qd = await fetchJson(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${API_KEY}`);
+    const apiKey = getAlphaVantageKey();
+    if(!apiKey) return null;
+    const qd = await fetchJson(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(apiKey)}`);
     const qp = parseFloat(qd?.["Global Quote"]?.["05. price"]);
     if(!Number.isNaN(qp) && qp > 0){ logDataRequest("quote", true, "Global quote loaded"); return qp; }
   }catch(e){}
@@ -1673,7 +1783,9 @@ async function getGlobalQuotePrice(symbol){
 }
 async function getIntradayPrice(symbol){
   try{
-    const id = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=compact&apikey=${API_KEY}`);
+    const apiKey = getAlphaVantageKey();
+    if(!apiKey) return null;
+    const id = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${encodeURIComponent(symbol)}&interval=5min&outputsize=compact&apikey=${encodeURIComponent(apiKey)}`);
     const series = id["Time Series (5min)"];
     if(!series) return null;
     const latestKey = Object.keys(series)[0];
@@ -1813,16 +1925,16 @@ function getIncomeMode(a){
   let rationale = "Momentum setup favors buying options.", maxRisk = "Use existing buy-side sizing.", maxProfit = "Open-ended";
   let pop = a.pop + "%", shortStrike = "N/A", longStrike = "N/A";
   const strike = a.strike;
-  const isChop = a.trapWarning === "CHOP ZONE" | a.predictiveEngine?.likelyMove === "CHOP" | a.regime === "RANGE";
+  const isChop = a.trapWarning === "CHOP ZONE" || a.predictiveEngine?.likelyMove === "CHOP" || a.regime === "RANGE";
   const lowEdge = a.trapWarning === "LOW EDGE SETUP";
-  const mediumConf = a.confidenceMeter?.label === "MEDIUM" | a.confidenceMeter?.label === "LOW";
-  if((isChop | lowEdge) && mediumConf){
+  const mediumConf = a.confidenceMeter?.label === "MEDIUM" || a.confidenceMeter?.label === "LOW";
+  if((isChop || lowEdge) && mediumConf){
     strategy = "SELL PREMIUM"; incomeSignal = "ON";
-    pop = Math.max(55, Math.min(88, a.timeTarget?.probability | 60)) + "%";
-    if(a.bias === "Bullish" | a.direction === "BUY CALL"){
+    pop = Math.max(55, Math.min(88, a.timeTarget?.probability || 60)) + "%";
+    if(a.bias === "Bullish" || a.direction === "BUY CALL"){
       spreadType = "BULL PUT SPREAD"; shortStrike = Math.max(1, strike - 1); longStrike = Math.max(1, strike - 3);
       rationale = "Bullish-to-neutral setup with chop/range conditions favors premium selling.";
-    }else if(a.bias === "Bearish" | a.direction === "BUY PUT"){
+    }else if(a.bias === "Bearish" || a.direction === "BUY PUT"){
       spreadType = "BEAR CALL SPREAD"; shortStrike = strike + 1; longStrike = strike + 3;
       rationale = "Bearish-to-neutral setup with chop/range conditions favors premium selling.";
     }else{
@@ -1855,7 +1967,7 @@ function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
 
 function getNextDayConfirmation(price, closes, direction, momentumEngine, expectedMove, score, grade, volatility){
   const todayClose = closes[0];
-  const prevClose = closes[1] | closes[0];
+  const prevClose = closes[1] || closes[0];
   const fiveDayHigh = Math.max(...closes.slice(0,5));
   const fiveDayLow = Math.min(...closes.slice(0,5));
   const oneDayMovePct = Math.abs((todayClose - prevClose) / prevClose) * 100;
@@ -1871,10 +1983,10 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
   let invalidation = "N/A";
   let morningChecklist = "Confirm price, direction, and no gap against the setup.";
 
-  if(oneDayMovePct >= 4 | Math.abs(fiveDayMovePct) >= 8) chaseRisk = "HIGH";
+  if(oneDayMovePct >= 4 || Math.abs(fiveDayMovePct) >= 8) chaseRisk = "HIGH";
   else if(oneDayMovePct <= 1.5 && Math.abs(fiveDayMovePct) <= 4) chaseRisk = "LOW";
 
-  if(volatility === "EXPANSION LIKELY" | oneDayMovePct >= 5) overnightRisk = "HIGH";
+  if(volatility === "EXPANSION LIKELY" || oneDayMovePct >= 5) overnightRisk = "HIGH";
   else if(volatility === "COMPRESSION" && oneDayMovePct <= 2) overnightRisk = "LOW";
 
   if(direction === "BUY CALL"){
@@ -1884,7 +1996,7 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
     else if(closeLocation > 0.70) reversalTrap = "MEDIUM";
 
     if(score >= 85 && chaseRisk !== "HIGH" && overnightRisk !== "HIGH") tomorrowRead = "VALID IF PRICE HOLDS";
-    if(chaseRisk === "HIGH" | reversalTrap === "HIGH") tomorrowRead = "WAIT FOR PULLBACK";
+    if(chaseRisk === "HIGH" || reversalTrap === "HIGH") tomorrowRead = "WAIT FOR PULLBACK";
     if(momentumEngine.includes("BEARISH")) tomorrowRead = "INVALID UNTIL RECLAIM";
     morningChecklist = `Enter only if price holds above $${buyTrigger}. Avoid if it breaks below $${invalidation}.`;
   }else if(direction === "BUY PUT"){
@@ -1894,7 +2006,7 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
     else if(closeLocation < 0.30) reversalTrap = "MEDIUM";
 
     if(score >= 85 && chaseRisk !== "HIGH" && overnightRisk !== "HIGH") tomorrowRead = "VALID IF PRICE HOLDS";
-    if(chaseRisk === "HIGH" | reversalTrap === "HIGH") tomorrowRead = "WAIT FOR PULLBACK";
+    if(chaseRisk === "HIGH" || reversalTrap === "HIGH") tomorrowRead = "WAIT FOR PULLBACK";
     if(momentumEngine.includes("BULLISH")) tomorrowRead = "INVALID UNTIL RECLAIM";
     morningChecklist = `Enter only if price stays below $${buyTrigger}. Avoid if it reclaims above $${invalidation}.`;
   }else{
@@ -1912,12 +2024,12 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
 
 
 function getConfirmationHoldEngine(a){
-  const oneDayMove = parseFloat(a.nextDay?.oneDayMovePct | "0");
-  const fiveDayMove = parseFloat(a.nextDay?.fiveDayMovePct | "0");
-  const chaseRisk = a.nextDay?.chaseRisk | "N/A";
-  const overnightRisk = a.nextDay?.overnightRisk | "N/A";
-  const reversalTrap = a.nextDay?.reversalTrap | "N/A";
-  const tomorrowRead = a.nextDay?.tomorrowRead | "N/A";
+  const oneDayMove = parseFloat(a.nextDay?.oneDayMovePct || "0");
+  const fiveDayMove = parseFloat(a.nextDay?.fiveDayMovePct || "0");
+  const chaseRisk = a.nextDay?.chaseRisk || "N/A";
+  const overnightRisk = a.nextDay?.overnightRisk || "N/A";
+  const reversalTrap = a.nextDay?.reversalTrap || "N/A";
+  const tomorrowRead = a.nextDay?.tomorrowRead || "N/A";
 
   let holdMinutes = 30;
   let earliestEntry = "10:00 AM ET";
@@ -1935,7 +2047,7 @@ function getConfirmationHoldEngine(a){
     openingRule = "Aggressive entry allowed only after price holds the trigger for at least 15 minutes.";
   }
 
-  if(chaseRisk === "MEDIUM" | overnightRisk === "HIGH" | oneDayMove >= 3 | Math.abs(fiveDayMove) >= 6){
+  if(chaseRisk === "MEDIUM" || overnightRisk === "HIGH" || oneDayMove >= 3 || Math.abs(fiveDayMove) >= 6){
     holdMinutes = 30;
     earliestEntry = "10:00 AM ET";
     confirmationStrength = "MODERATE";
@@ -1944,7 +2056,7 @@ function getConfirmationHoldEngine(a){
     openingRule = "Do not treat premarket as confirmation. Wait for regular-session price to hold the trigger.";
   }
 
-  if(chaseRisk === "HIGH" | reversalTrap === "HIGH" | tomorrowRead === "WAIT FOR PULLBACK" | oneDayMove >= 5 | Math.abs(fiveDayMove) >= 10){
+  if(chaseRisk === "HIGH" || reversalTrap === "HIGH" || tomorrowRead === "WAIT FOR PULLBACK" || oneDayMove >= 5 || Math.abs(fiveDayMove) >= 10){
     holdMinutes = 60;
     earliestEntry = "10:30 AM ET";
     confirmationStrength = "WEAK UNTIL PROVEN";
@@ -1960,8 +2072,8 @@ function getConfirmationHoldEngine(a){
     openingRule = "No entry unless the setup improves on a new scan.";
   }
 
-  const trigger = a.nextDay?.buyTrigger | "N/A";
-  const invalidation = a.nextDay?.invalidation | "N/A";
+  const trigger = a.nextDay?.buyTrigger || "N/A";
+  const invalidation = a.nextDay?.invalidation || "N/A";
   const checklist = trigger === "N/A"
     ? "No valid trigger available."
     : `1) Wait until ${earliestEntry}. 2) Price must hold above $${trigger}. 3) Avoid below $${invalidation}. 4) First pullback should get bought.`;
@@ -1975,19 +2087,19 @@ function getConfirmationHoldEngine(a){
 
 function getMultiTimeframeEntryEngine(a){
   a = ensureEngineDefaults(a);
-  const direction = a.direction | "WAIT";
-  const trigger = a.nextDay?.buyTrigger | "N/A";
-  const invalidation = a.nextDay?.invalidation | "N/A";
-  const quality = a.qualityDecision?.decision | "N/A";
-  const mismatch = a.longTermOptions?.mismatchRisk | "N/A";
-  const expRec = a.expirationConfidence?.recommendedDuration | "N/A";
-  const expScore = Number(a.expirationConfidence?.recommendedConfidence | 0);
-  const align = Number(a.alignmentScore?.score | 50);
-  const weeklyScore = Number(a.expirationConfidence?.weekly | a.longTermOptions?.weeklyScore | 0);
-  const oneMonthScore = Number(a.expirationConfidence?.oneMonth | a.longTermOptions?.oneToThreeMonthScore | 0);
-  const threeMonthScore = Number(a.expirationConfidence?.threeMonth | a.longTermOptions?.threeToSixMonthScore | 0);
-  const sixMonthScore = Number(a.expirationConfidence?.sixMonth | a.longTermOptions?.sixToTwelveMonthScore | 0);
-  const twelveMonthScore = Number(a.expirationConfidence?.twelveMonth | a.longTermOptions?.twelvePlusLeapScore | 0);
+  const direction = a.direction || "WAIT";
+  const trigger = a.nextDay?.buyTrigger || "N/A";
+  const invalidation = a.nextDay?.invalidation || "N/A";
+  const quality = a.qualityDecision?.decision || "N/A";
+  const mismatch = a.longTermOptions?.mismatchRisk || "N/A";
+  const expRec = a.expirationConfidence?.recommendedDuration || "N/A";
+  const expScore = Number(a.expirationConfidence?.recommendedConfidence || 0);
+  const align = Number(a.alignmentScore?.score || 50);
+  const weeklyScore = Number(a.expirationConfidence?.weekly || a.longTermOptions?.weeklyScore || 0);
+  const oneMonthScore = Number(a.expirationConfidence?.oneMonth || a.longTermOptions?.oneToThreeMonthScore || 0);
+  const threeMonthScore = Number(a.expirationConfidence?.threeMonth || a.longTermOptions?.threeToSixMonthScore || 0);
+  const sixMonthScore = Number(a.expirationConfidence?.sixMonth || a.longTermOptions?.sixToTwelveMonthScore || 0);
+  const twelveMonthScore = Number(a.expirationConfidence?.twelveMonth || a.longTermOptions?.twelvePlusLeapScore || 0);
 
   let weeklyPermission = "STRICT TRIGGER REQUIRED";
   let swingPermission = "PREFERRED TRIGGER REQUIRED";
@@ -2001,10 +2113,10 @@ function getMultiTimeframeEntryEngine(a){
     if(weeklyScore >= 80 && a.confirmationHold?.holdMinutes <= 30 && mismatch !== "HIGH"){
       weeklyPermission = "OK AFTER HOLD REQUIREMENT";
     }
-    if(oneMonthScore >= 80 | threeMonthScore >= 80){
+    if(oneMonthScore >= 80 || threeMonthScore >= 80){
       swingPermission = "ACCEPTABLE IF STRUCTURE HOLDS";
     }
-    if(sixMonthScore >= 80 | twelveMonthScore >= 80){
+    if(sixMonthScore >= 80 || twelveMonthScore >= 80){
       leapPermission = "ACCEPTABLE IF TREND STRUCTURE HOLDS";
     }
   }
@@ -2029,13 +2141,13 @@ function getMultiTimeframeEntryEngine(a){
 
   let bestEntryStyle = "WAIT";
   let bestReason = "No clean entry style is currently favored.";
-  if(expRec.includes("Weekly") | expRec.includes("Bi")){
+  if(expRec.includes("Weekly") || expRec.includes("Bi")){
     bestEntryStyle = "WEEKLY / BI-WEEKLY ENTRY";
     bestReason = "Short-term expiration confidence is strongest. Use strict trigger discipline.";
-  }else if(expRec.includes("1") | expRec.includes("3")){
+  }else if(expRec.includes("1") || expRec.includes("3")){
     bestEntryStyle = "SWING ENTRY";
     bestReason = "Swing duration is favored. Use trigger as preferred entry, but invalidation as the key thesis line.";
-  }else if(expRec.includes("6") | expRec.includes("12")){
+  }else if(expRec.includes("6") || expRec.includes("12")){
     bestEntryStyle = "LEAP / POSITION ENTRY";
     bestReason = "Long-duration trade is favored. Structure matters more than the exact short-term trigger.";
   }
@@ -2054,20 +2166,20 @@ function getMultiTimeframeEntryEngine(a){
 }
 
 function getExpirationRecommendationConfidence(a){
-  const lt = a.longTermOptions | {};
-  const confirmation = a.confirmationHold | {};
-  const nextDay = a.nextDay | {};
-  const quality = a.qualityDecision?.decision | "N/A";
-  const align = Number(a.alignmentScore?.score | 50);
-  const ttt = Number(a.timeTarget?.probability | 50);
+  const lt = a.longTermOptions || {};
+  const confirmation = a.confirmationHold || {};
+  const nextDay = a.nextDay || {};
+  const quality = a.qualityDecision?.decision || "N/A";
+  const align = Number(a.alignmentScore?.score || 50);
+  const ttt = Number(a.timeTarget?.probability || 50);
 
   function clamp(n){ return Math.max(0, Math.min(100, Math.round(n))); }
 
   // Scores are preserved for diagnostics, but v46.1 does not allow weekly/biweekly BUY recommendations.
-  let weekly = clamp(Number(lt.weeklyScore | ttt));
-  let biweekly = clamp(Number(lt.biweeklyScore | ttt));
-  let oneMonth = Number(lt.oneToThreeMonthScore | 55);
-  let threeMonth = Number(lt.threeToSixMonthScore | 55);
+  let weekly = clamp(Number(lt.weeklyScore || ttt));
+  let biweekly = clamp(Number(lt.biweeklyScore || ttt));
+  let oneMonth = Number(lt.oneToThreeMonthScore || 55);
+  let threeMonth = Number(lt.threeToSixMonthScore || 55);
 
   if(quality === "APPROVED"){ oneMonth += 8; threeMonth += 6; }
   else if(quality === "WAIT"){ oneMonth += 3; threeMonth += 5; }
@@ -2113,16 +2225,16 @@ function getExpirationRecommendationConfidence(a){
 }
 
 function getWheelExpirationEngine(a){
-  const wheel = a.wheelMode | {};
-  const sellPutScore = Number(wheel.sellPutScore | 50);
-  const sellCallScore = Number(wheel.sellCallScore | 50);
-  const bias = a.bias | "Neutral";
-  const volatility = a.volatility | "NORMAL";
-  const overnightRisk = a.nextDay?.overnightRisk | "N/A";
-  const chaseRisk = a.nextDay?.chaseRisk | "N/A";
-  const quality = a.qualityDecision?.decision | "N/A";
-  const align = Number(a.alignmentScore?.score | 50);
-  const noTrade = a.noTradeZone?.zone | "CLEAR";
+  const wheel = a.wheelMode || {};
+  const sellPutScore = Number(wheel.sellPutScore || 50);
+  const sellCallScore = Number(wheel.sellCallScore || 50);
+  const bias = a.bias || "Neutral";
+  const volatility = a.volatility || "NORMAL";
+  const overnightRisk = a.nextDay?.overnightRisk || "N/A";
+  const chaseRisk = a.nextDay?.chaseRisk || "N/A";
+  const quality = a.qualityDecision?.decision || "N/A";
+  const align = Number(a.alignmentScore?.score || 50);
+  const noTrade = a.noTradeZone?.zone || "CLEAR";
 
   function clamp(n){ return Math.max(0, Math.min(100, Math.round(n))); }
 
@@ -2169,7 +2281,7 @@ function getWheelExpirationEngine(a){
     }
 
     if(side === "CALL"){
-      if(bias === "Bearish" | bias === "Neutral") score += 6;
+      if(bias === "Bearish" || bias === "Neutral") score += 6;
       if(bias === "Bullish") score -= 8;
       if(a.momentumEngine && a.momentumEngine.includes("BULLISH")) score -= 10;
     }
@@ -2200,7 +2312,7 @@ function getWheelExpirationEngine(a){
   else wheelStyle = "LONG-DURATION INCOME / CAPITAL TIE-UP";
 
   let assignmentMode = "CONTROLLED";
-  if(best.days <= 14 && (overnightRisk === "HIGH" | chaseRisk === "HIGH")) assignmentMode = "FAST BUT HIGHER RISK";
+  if(best.days <= 14 && (overnightRisk === "HIGH" || chaseRisk === "HIGH")) assignmentMode = "FAST BUT HIGHER RISK";
   if(best.days >= 180) assignmentMode = "LOWER THETA EFFICIENCY / LONG CAPITAL HOLD";
 
   let reason = "v46.1 limits Wheel income recommendations to weekly and biweekly expirations so the income strategy stays separate from monthly option buying.";
@@ -2252,7 +2364,7 @@ function getLongTermOptionsEngine(price, closes, a){
   const favoredDirection = longBull >= longBear ? "LONG-TERM CALL" : "LONG-TERM PUT";
   const favoredScore = Math.max(longBull, longBear);
 
-  let weeklyScore = a.timeTarget?.probability | 50;
+  let weeklyScore = a.timeTarget?.probability || 50;
   if(a.nextDay?.chaseRisk === "HIGH") weeklyScore -= 15;
   if(a.nextDay?.reversalTrap === "HIGH") weeklyScore -= 15;
   if(a.nextDay?.overnightRisk === "HIGH") weeklyScore -= 8;
@@ -2306,7 +2418,7 @@ function getLongTermOptionsEngine(price, closes, a){
   let expirationFit = "FAST TRADE";
   if(best.label.includes("1-3")) expirationFit = "SWING TRADE";
   if(best.label.includes("3-6")) expirationFit = "POSITION TRADE";
-  if(best.label.includes("6-12") | best.label.includes("12+")) expirationFit = "LEAP TRADE";
+  if(best.label.includes("6-12") || best.label.includes("12+")) expirationFit = "LEAP TRADE";
 
   let longTermTrend = "WEAK";
   if(favoredScore >= 90) longTermTrend = "EXCEPTIONAL";
@@ -2340,13 +2452,13 @@ function getMarketRegimeFilter(closes, momentum, volatility){
   let action = "REDUCE SIZE";
   let reason = "Market conditions are mixed. Be selective and wait for confirmation.";
 
-  if((spyLikeTrend | bearishTrend) && absMomentum >= 0.02 && volatility !== "COMPRESSION"){
+  if((spyLikeTrend || bearishTrend) && absMomentum >= 0.02 && volatility !== "COMPRESSION"){
     state = "TRENDING";
     action = "GOOD FOR TRADING";
     reason = "Trend and momentum are aligned enough for active trading.";
   }
 
-  if(volatility === "COMPRESSION" | absMomentum < 0.012){
+  if(volatility === "COMPRESSION" || absMomentum < 0.012){
     state = "CHOPPY";
     action = "REDUCE SIZE";
     reason = "Low momentum or compressed volatility can cause false signals.";
@@ -2368,17 +2480,17 @@ function getAlignmentScore(direction, bias, momentumEngine, flow, volatility, re
     if(bias === "Bullish") score += 15;
     if(momentumEngine.includes("BULLISH")) score += 15;
     if(flow.includes("ACCUMULATION")) score += 10;
-    if(bias === "Bearish" | momentumEngine.includes("BEARISH") | flow.includes("SELLING")) score -= 20;
+    if(bias === "Bearish" || momentumEngine.includes("BEARISH") || flow.includes("SELLING")) score -= 20;
   }else if(direction === "BUY PUT"){
     if(bias === "Bearish") score += 15;
     if(momentumEngine.includes("BEARISH")) score += 15;
     if(flow.includes("SELLING")) score += 10;
-    if(bias === "Bullish" | momentumEngine.includes("BULLISH") | flow.includes("ACCUMULATION")) score -= 20;
+    if(bias === "Bullish" || momentumEngine.includes("BULLISH") || flow.includes("ACCUMULATION")) score -= 20;
   }else{
     score -= 25;
   }
 
-  if(regime === "TREND" | regime === "BREAKOUT") score += 10;
+  if(regime === "TREND" || regime === "BREAKOUT") score += 10;
   if(regime === "RANGE") score -= 8;
 
   if(edge === "Favorable") score += 10;
@@ -2388,9 +2500,9 @@ function getAlignmentScore(direction, bias, momentumEngine, flow, volatility, re
   if(volatility === "COMPRESSION") score -= 8;
 
   if(trapWarning && trapWarning !== "CLEAR") score -= 15;
-  if(nextDay && (nextDay.chaseRisk === "HIGH" | nextDay.overnightRisk === "HIGH" | nextDay.reversalTrap === "HIGH")) score -= 12;
+  if(nextDay && (nextDay.chaseRisk === "HIGH" || nextDay.overnightRisk === "HIGH" || nextDay.reversalTrap === "HIGH")) score -= 12;
   if(nextDay && nextDay.tomorrowRead === "VALID IF PRICE HOLDS") score += 8;
-  if(nextDay && (nextDay.tomorrowRead === "WAIT FOR PULLBACK" | nextDay.tomorrowRead === "INVALID UNTIL RECLAIM")) score -= 10;
+  if(nextDay && (nextDay.tomorrowRead === "WAIT FOR PULLBACK" || nextDay.tomorrowRead === "INVALID UNTIL RECLAIM")) score -= 10;
 
   score = Math.max(0, Math.min(100, Math.round(score)));
 
@@ -2447,10 +2559,10 @@ function getTradeQualityDecision(tradeFilter, grade, alignmentScore, marketRegim
   }else if(marketRegime.state === "DANGEROUS"){
     decision = "REJECT";
     reason = "Market regime is dangerous.";
-  }else if(nextDay && (nextDay.tomorrowRead === "WAIT FOR PULLBACK" | nextDay.tomorrowRead === "INVALID UNTIL RECLAIM")){
+  }else if(nextDay && (nextDay.tomorrowRead === "WAIT FOR PULLBACK" || nextDay.tomorrowRead === "INVALID UNTIL RECLAIM")){
     decision = "WAIT";
     reason = "Next-day confirmation is not clean enough.";
-  }else if(alignmentScore.score < 75 | marketRegime.state === "CHOPPY"){
+  }else if(alignmentScore.score < 75 || marketRegime.state === "CHOPPY"){
     decision = "REDUCED SIZE";
     reason = "Setup is tradable but should be sized smaller.";
   }
@@ -2572,7 +2684,7 @@ function analyze(closes, livePrice){
   const expirationPack = buildExpirationChoices(confidence, theta), ladder = buildContractLadder(price, direction, expectedMove, regime), timeTarget = buildTimeToTarget(direction, price, breakeven, expectedMove, momentumEngine, null);
   let score = 50; if(bias !== "Neutral") score += 10; if(confidence === "High") score += 20; if(edge === "Favorable") score += 15; if(volatility === "EXPANSION LIKELY") score += 10; if(timeTarget.probability >= 70) score += 5; score = Math.min(100, score);
   let grade = "C"; if(score > 90) grade = "A+"; else if(score > 80) grade = "A"; else if(score > 70) grade = "B";
-  let tradeFilter = "PASS"; if(grade === "C" | direction === "WAIT") tradeFilter = "FAIL";
+  let tradeFilter = "PASS"; if(grade === "C" || direction === "WAIT") tradeFilter = "FAIL";
 
   let contracts = 1, allocation = "5%", risk = "Low";
   if(grade === "A+" && confidence === "High"){ contracts = 5; allocation = "25%"; risk = "High"; }
@@ -2614,7 +2726,7 @@ function buildSmartAlerts(results){
     const ttt = typeof r.timeTarget?.probability === "number" ? r.timeTarget.probability : null;
 
     if(!Number.isNaN(live) && !Number.isNaN(breakeven)){
-      const hitBE = (r.type === "CALL" && live >= breakeven) | (r.type === "PUT" && live <= breakeven);
+      const hitBE = (r.type === "CALL" && live >= breakeven) || (r.type === "PUT" && live <= breakeven);
       if(hitBE) alerts.push({level:"green", message:`BREAKEVEN ALERT // ${r.ticker} reached breakeven.`});
     }
     if(r.status === "LOCK PROFITS") alerts.push({level:"green", message:`PROFIT TARGET ALERT // ${r.ticker} is in lock profits zone.`});
@@ -2626,13 +2738,13 @@ function buildSmartAlerts(results){
     if(r.profitScaling && r.profitScaling.action && r.profitScaling.action.includes("SELL")) alerts.push({level:"green", message:`SCALING ALERT // ${r.ticker} ${r.profitScaling.action}.`});
     if(r.profitScaling && r.profitScaling.action === "EXIT POSITION") alerts.push({level:"red", message:`EXIT ALERT // ${r.ticker} exit position.`});
     if(r.incomeMode && r.incomeMode.incomeSignal === "ON" && r.incomeMode.spreadType !== "WAIT / NO SPREAD") alerts.push({level:"green", message:`INCOME MODE ALERT // ${r.ticker} ${r.incomeMode.spreadType}.`});
-    if(r.holdDurationGuide && (r.holdDurationGuide.botAction.includes('EXIT') | r.holdDurationGuide.botAction.includes('LOCK'))) alerts.push({level:r.holdDurationGuide.botAction.includes('EXIT') ? 'red' : 'green', message:`HOLD GUIDE // ${r.ticker}: ${r.holdDurationGuide.botAction}.`});
+    if(r.holdDurationGuide && (r.holdDurationGuide.botAction.includes('EXIT') || r.holdDurationGuide.botAction.includes('LOCK'))) alerts.push({level:r.holdDurationGuide.botAction.includes('EXIT') ? 'red' : 'green', message:`HOLD GUIDE // ${r.ticker}: ${r.holdDurationGuide.botAction}.`});
     if(r.thesisIntegrity && r.thesisIntegrity.score < 40) alerts.push({level:"red", message:`THESIS BROKEN // ${r.ticker} exit recommended. Thesis ${r.thesisIntegrity.score}/100.`});
     if(r.thesisIntegrity && r.thesisIntegrity.score >= 75 && r.approxPnLPercent !== null && r.approxPnLPercent < 0) alerts.push({level:"green", message:`THESIS INTACT // ${r.ticker} red P/L but thesis still strong at ${r.thesisIntegrity.score}/100.`});
     if(r.targetConfidence && r.targetConfidence.holdScore < 50 && r.approxPnLPercent !== null && r.approxPnLPercent > 0) alerts.push({level:"green", message:`EXIT INTELLIGENCE // ${r.ticker} protect profits. Hold score ${r.targetConfidence.holdScore}/100.`});
     if(r.wheelAssignment && r.wheelAssignment.risk === "HIGH") alerts.push({level:"red", message:`WHEEL ALERT // ${r.ticker} ${r.wheelAssignment.outlook}.`});
-    if(r.tradeManagement && (r.tradeManagement.decision.includes("TAKE") | r.tradeManagement.decision.includes("LOCK") | r.tradeManagement.decision.includes("SCALE"))) alerts.push({level:"green", message:`MANAGEMENT ALERT // ${r.ticker} ${r.tradeManagement.decision}.`});
-    if(r.tradeManagement && (r.tradeManagement.decision.includes("EXIT") | r.tradeManagement.decision.includes("CUT"))) alerts.push({level:"red", message:`MANAGEMENT EXIT // ${r.ticker} ${r.tradeManagement.decision}.`});
+    if(r.tradeManagement && (r.tradeManagement.decision.includes("TAKE") || r.tradeManagement.decision.includes("LOCK") || r.tradeManagement.decision.includes("SCALE"))) alerts.push({level:"green", message:`MANAGEMENT ALERT // ${r.ticker} ${r.tradeManagement.decision}.`});
+    if(r.tradeManagement && (r.tradeManagement.decision.includes("EXIT") || r.tradeManagement.decision.includes("CUT"))) alerts.push({level:"red", message:`MANAGEMENT EXIT // ${r.ticker} ${r.tradeManagement.decision}.`});
     if(r.shortManagement && r.shortManagement.assignmentRisk === "HIGH") alerts.push({level:"red", message:`SHORT OPTION ALERT // ${r.ticker} assignment risk high.`});
     if(r.shortManagement && r.shortManagement.managementDecision.includes("TAKE")) alerts.push({level:"green", message:`SHORT OPTION PROFIT // ${r.ticker} consider closing for profit.`});
     if(r.qualityDecision && r.qualityDecision.decision === "REJECT") alerts.push({level:"yellow", message:`NEW ENTRY FILTER // ${r.ticker} new entries rejected. Check Position Intelligence before exiting.`});
@@ -2669,11 +2781,17 @@ function getTradeManagement(position, approxPnLPercent, dte, timeTarget, ai, sta
   }
 
   const badTomorrow = ai.nextDay && (
-    ai.nextDay.chaseRisk === "HIGH" | ai.nextDay.overnightRisk === "HIGH" | ai.nextDay.reversalTrap === "HIGH" | ai.nextDay.tomorrowRead === "WAIT FOR PULLBACK" | ai.nextDay.tomorrowRead === "INVALID UNTIL RECLAIM"
+    ai.nextDay.chaseRisk === "HIGH" ||
+    ai.nextDay.overnightRisk === "HIGH" ||
+    ai.nextDay.reversalTrap === "HIGH" ||
+    ai.nextDay.tomorrowRead === "WAIT FOR PULLBACK" ||
+    ai.nextDay.tomorrowRead === "INVALID UNTIL RECLAIM"
   );
 
   const weakQuality = ai.qualityDecision && (
-    ai.qualityDecision.decision === "REJECT" | ai.qualityDecision.decision === "WAIT" | ai.qualityDecision.decision === "REDUCED SIZE"
+    ai.qualityDecision.decision === "REJECT" ||
+    ai.qualityDecision.decision === "WAIT" ||
+    ai.qualityDecision.decision === "REDUCED SIZE"
   );
 
   if(pnl !== null){
@@ -2764,11 +2882,11 @@ function getTradeManagement(position, approxPnLPercent, dte, timeTarget, ai, sta
 
 
 function getTargetConfidenceEngine(position, approxPnLPercent, dte, timeTarget, ai, status){
-  const entryPremium = Number(position.entryPremium | 0);
+  const entryPremium = Number(position.entryPremium || 0);
   const ttt = typeof timeTarget?.probability === "number" ? timeTarget.probability : 50;
   const align = typeof ai.alignmentScore?.score === "number" ? ai.alignmentScore.score : 50;
-  const nextDay = ai.nextDay | {};
-  const quality = ai.qualityDecision?.decision | "N/A";
+  const nextDay = ai.nextDay || {};
+  const quality = ai.qualityDecision?.decision || "N/A";
 
   const conservativeGain = 20, idealGain = 40, stretchGain = 75;
   const conservativeTarget = entryPremium > 0 ? (entryPremium * 1.20).toFixed(2) : "N/A";
@@ -2849,7 +2967,7 @@ function getTargetConfidenceEngine(position, approxPnLPercent, dte, timeTarget, 
 function getWheelAssignmentEngine(position, livePrice, ai){
   const type = position.type, price = livePrice, strike = Number(position.strike);
   const dte = getDTE(position.expiration);
-  const expectedMove = parseFloat(ai.expectedMove | "0");
+  const expectedMove = parseFloat(ai.expectedMove || "0");
   const distance = Math.abs(price - strike);
   const distanceFactor = expectedMove > 0 ? Math.max(0, 1 - (distance / expectedMove)) : 0.5;
   let probability = Math.round(35 + distanceFactor * 45);
@@ -2857,14 +2975,14 @@ function getWheelAssignmentEngine(position, livePrice, ai){
   if(type === "SELL_PUT"){
     if(price > strike) probability -= 20;
     if(price < strike) probability += 25;
-    if(ai.bias === "Bearish" | ai.momentumEngine.includes("BEARISH")) probability += 15;
-    if(ai.bias === "Bullish" | ai.momentumEngine.includes("BULLISH")) probability -= 10;
+    if(ai.bias === "Bearish" || ai.momentumEngine.includes("BEARISH")) probability += 15;
+    if(ai.bias === "Bullish" || ai.momentumEngine.includes("BULLISH")) probability -= 10;
   }
   if(type === "SELL_CALL"){
     if(price < strike) probability -= 20;
     if(price > strike) probability += 25;
-    if(ai.bias === "Bullish" | ai.momentumEngine.includes("BULLISH")) probability += 15;
-    if(ai.bias === "Bearish" | ai.momentumEngine.includes("BEARISH")) probability -= 10;
+    if(ai.bias === "Bullish" || ai.momentumEngine.includes("BULLISH")) probability += 15;
+    if(ai.bias === "Bearish" || ai.momentumEngine.includes("BEARISH")) probability -= 10;
   }
 
   if(dte !== null && dte <= 2) probability += 10;
@@ -2883,9 +3001,9 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
   const price = livePrice;
   const type = position.type;
   const strike = Number(position.strike);
-  const credit = Number(position.entryPremium | 0);
+  const credit = Number(position.entryPremium || 0);
   const dte = getDTE(position.expiration);
-  const expectedMoveNum = parseFloat(ai.expectedMove | "0");
+  const expectedMoveNum = parseFloat(ai.expectedMove || "0");
   const timeTarget = buildTimeToTarget(type === "SELL_CALL" ? "BUY PUT" : "BUY CALL", price, strike, expectedMoveNum, ai.momentumEngine, dte);
 
   let status = "HOLD / LET THETA WORK";
@@ -2931,7 +3049,7 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
       cardClass = "sell-alert";
     }
 
-    if(ai.bias === "Bearish" | ai.momentumEngine.includes("BEARISH")){
+    if(ai.bias === "Bearish" || ai.momentumEngine.includes("BEARISH")){
       assignmentRisk = assignmentRisk === "LOW" ? "MEDIUM" : "HIGH";
       if(status === "HOLD / LET THETA WORK") status = "WATCH CLOSELY";
       reason += " Bearish momentum increases risk for a sold put.";
@@ -2961,7 +3079,7 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
       cardClass = "sell-alert";
     }
 
-    if(ai.bias === "Bullish" | ai.momentumEngine.includes("BULLISH")){
+    if(ai.bias === "Bullish" || ai.momentumEngine.includes("BULLISH")){
       assignmentRisk = assignmentRisk === "LOW" ? "MEDIUM" : "HIGH";
       if(status === "HOLD / LET THETA WORK") status = "WATCH CLOSELY";
       reason += " Bullish momentum increases risk for a sold call.";
@@ -2997,8 +3115,8 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
     ticker:position.ticker,
     type,
     strike,
-    breakeven: position.breakeven | strike,
-    expiration:position.expiration | "Not set",
+    breakeven: position.breakeven || strike,
+    expiration:position.expiration || "Not set",
     dte:dte === null ? "N/A" : dte,
     timeRisk:dte === null ? "Unknown" : dte <= 1 ? "Extreme" : dte <= 3 ? "High" : dte <= 7 ? "Moderate" : "Low",
     expirationFit:dte === null ? "Unknown" : dte <= 3 ? "Tight" : "Good",
@@ -3018,14 +3136,14 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
     marketRegimeFilter:ai.marketRegimeFilter,
     noTradeZone:ai.noTradeZone,
     confirmationHold:ai.confirmationHold,
-    shortManagement:{assignmentRisk, expirationDecision, managementDecision, closePlan, credit:credit | "N/A"},
+    shortManagement:{assignmentRisk, expirationDecision, managementDecision, closePlan, credit:credit || "N/A"},
     holdDurationGuide:getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent, dte, null, null),
     wheelAssignment:getWheelAssignmentEngine(position, livePrice, ai),
     wheelExpiration:ai.wheelExpiration,
     profitScaling:{
       action: managementDecision,
       color: managementDecision.includes("TAKE") ? "green" :
-             managementDecision.includes("EXIT") | managementDecision.includes("DEFENSIVE") ? "red" : "yellow",
+             managementDecision.includes("EXIT") || managementDecision.includes("DEFENSIVE") ? "red" : "yellow",
       firstScale:"+50%",
       secondScale:"+70%",
       finalRunner:"Expire or close near full premium capture"
@@ -3042,32 +3160,32 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
 
 function getStrategyRankings(a){
   a = ensureEngineDefaults(a);
-  const wheel = a.wheelMode | {};
+  const wheel = a.wheelMode || {};
   const rows = [
-    {name:"BUY CALL", score:clampScore(wheel.buyCallScore | 0)},
-    {name:"BUY PUT", score:clampScore(wheel.buyPutScore | 0)},
-    {name:"SELL CASH-SECURED PUT", score:clampScore(wheel.sellPutScore | 0)},
-    {name:"SELL COVERED CALL", score:clampScore(wheel.sellCallScore | 0)}
+    {name:"BUY CALL", score:clampScore(wheel.buyCallScore || 0)},
+    {name:"BUY PUT", score:clampScore(wheel.buyPutScore || 0)},
+    {name:"SELL CASH-SECURED PUT", score:clampScore(wheel.sellPutScore || 0)},
+    {name:"SELL COVERED CALL", score:clampScore(wheel.sellCallScore || 0)}
   ].sort((x,y)=>y.score-x.score);
-  const best = rows[0] | {name:"WAIT", score:0};
+  const best = rows[0] || {name:"WAIT", score:0};
   return {rows,best};
 }
 
 function getDurationOptimizer(a){
   a = ensureEngineDefaults(a);
-  const exp = a.expirationConfidence | {};
-  const lt = a.longTermOptions | {};
-  const wheelExp = a.wheelExpiration | {};
-  let duration = exp.recommendedDuration | lt.bestLabel | "N/A";
-  let confidence = clampScore(exp.recommendedConfidence | lt.bestScore | 0);
-  let vehicle = exp.vehicleType | lt.expirationFit | "N/A";
-  let reason = exp.rule | lt.reason | "Use the duration with the strongest confidence and lowest mismatch risk.";
+  const exp = a.expirationConfidence || {};
+  const lt = a.longTermOptions || {};
+  const wheelExp = a.wheelExpiration || {};
+  let duration = exp.recommendedDuration || lt.bestLabel || "N/A";
+  let confidence = clampScore(exp.recommendedConfidence || lt.bestScore || 0);
+  let vehicle = exp.vehicleType || lt.expirationFit || "N/A";
+  let reason = exp.rule || lt.reason || "Use the duration with the strongest confidence and lowest mismatch risk.";
 
-  if((a.wheelMode?.bestAction | "").includes("SELL") && wheelExp.bestDuration){
+  if((a.wheelMode?.bestAction || "").includes("SELL") && wheelExp.bestDuration){
     duration = wheelExp.bestDuration;
-    confidence = clampScore(wheelExp.bestScore | confidence);
+    confidence = clampScore(wheelExp.bestScore || confidence);
     vehicle = "WHEEL / PREMIUM SELLING";
-    reason = wheelExp.reason | reason;
+    reason = wheelExp.reason || reason;
   }
 
   return {duration,confidence,vehicle,reason};
@@ -3078,24 +3196,24 @@ function getPredatorBotDecision(a){
   const rankings = getStrategyRankings(a);
   const duration = getDurationOptimizer(a);
 
-  const quality = a.qualityDecision?.decision | "N/A";
-  const noTrade = a.noTradeZone?.zone | "CLEAR";
-  const marketState = a.marketRegimeFilter?.state | "N/A";
-  const align = clampScore(a.alignmentScore?.score | 50);
-  const ttt = clampScore(a.timeTarget?.probability | 50);
-  const expConf = clampScore(a.expirationConfidence?.recommendedConfidence | duration.confidence | 50);
+  const quality = a.qualityDecision?.decision || "N/A";
+  const noTrade = a.noTradeZone?.zone || "CLEAR";
+  const marketState = a.marketRegimeFilter?.state || "N/A";
+  const align = clampScore(a.alignmentScore?.score || 50);
+  const ttt = clampScore(a.timeTarget?.probability || 50);
+  const expConf = clampScore(a.expirationConfidence?.recommendedConfidence || duration.confidence || 50);
 
   let confidence = clampScore((align * .35) + (ttt * .25) + (expConf * .20) + (a.score * .20));
   let status = "BOT APPROVED";
-  let action = rankings.best?.name | a.direction | "WAIT";
+  let action = rankings.best?.name || a.direction || "WAIT";
   let permission = "APPROVED";
   let reason = "Trend, timing, and strategy ranking support this setup.";
-  let entryRule = a.confirmationHold?.openingRule | a.nextDay?.morningChecklist | "Wait for confirmation before entering.";
+  let entryRule = a.confirmationHold?.openingRule || a.nextDay?.morningChecklist || "Wait for confirmation before entering.";
   let riskRule = "Exit or avoid entry if invalidation breaks, alignment falls below 60, or thesis weakens.";
   let positionSize = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
-  let grade = a.grade | "C";
+  let grade = a.grade || "C";
 
-  if(a.tradeFilter === "FAIL" | a.direction === "WAIT"){
+  if(a.tradeFilter === "FAIL" || a.direction === "WAIT"){
     status = "BOT WAIT";
     permission = "WAIT";
     action = rankings.best.score >= 75 ? rankings.best.name : "WAIT";
@@ -3103,18 +3221,18 @@ function getPredatorBotDecision(a){
     reason = "Base direction is not clean enough for an automatic entry.";
   }
 
-  if(quality === "REJECT" | noTrade !== "CLEAR" | marketState === "DANGEROUS"){
+  if(quality === "REJECT" || noTrade !== "CLEAR" || marketState === "DANGEROUS"){
     status = "BOT REJECTED";
     permission = "REJECTED";
     action = "WAIT / NO TRADE";
     confidence = Math.min(confidence, 45);
     reason = quality === "REJECT" ? a.qualityDecision.reason : noTrade !== "CLEAR" ? a.noTradeZone.reason : a.marketRegimeFilter.reason;
     positionSize = "NO NEW POSITION";
-  }else if(quality === "WAIT" | quality === "REDUCED SIZE" | a.confirmationHold?.entryPermission?.includes("WAIT")){
+  }else if(quality === "WAIT" || quality === "REDUCED SIZE" || a.confirmationHold?.entryPermission?.includes("WAIT")){
     status = "BOT WAIT";
     permission = "WAIT";
     confidence = Math.min(confidence, 78);
-    reason = a.confirmationHold?.reason | a.qualityDecision?.reason | "Setup needs confirmation before entry.";
+    reason = a.confirmationHold?.reason || a.qualityDecision?.reason || "Setup needs confirmation before entry.";
     positionSize = "REDUCED SIZE / WAIT FOR TRIGGER";
   }
 
@@ -3132,8 +3250,8 @@ function getPredatorBotDecision(a){
   else if(status === "BOT REJECTED") grade = "F";
 
   const holdStyle = duration.vehicle.includes("SWING") ? "SWING TRADE" :
-                    duration.vehicle.includes("LEAP") | duration.duration.includes("6") | duration.duration.includes("12") ? "POSITION / LEAP TRADE" :
-                    duration.duration.includes("Weekly") | duration.duration.includes("Bi") ? "DAY TRADE / SHORT SWING" :
+                    duration.vehicle.includes("LEAP") || duration.duration.includes("6") || duration.duration.includes("12") ? "POSITION / LEAP TRADE" :
+                    duration.duration.includes("Weekly") || duration.duration.includes("Bi") ? "DAY TRADE / SHORT SWING" :
                     "TACTICAL TRADE";
 
   return {status,permission,action,confidence,grade,positionSize,reason,entryRule,riskRule,rankings,duration,holdStyle};
@@ -3143,12 +3261,12 @@ function getPredatorBotDecision(a){
 function getConfidenceClarity(a){
   a = ensureEngineDefaults(a);
   const bot = getPredatorBotDecision(a);
-  const entryQuality = clampScore(a.score | 0);
+  const entryQuality = clampScore(a.score || 0);
   const setupQuality = entryQuality;
-  const alignment = clampScore(a.alignmentScore?.score | 50);
-  const timeTarget = clampScore(a.timeTarget?.probability | 50);
-  const expiration = clampScore(a.expirationConfidence?.recommendedConfidence | 50);
-  const botConfidence = clampScore(bot.confidence | 0);
+  const alignment = clampScore(a.alignmentScore?.score || 50);
+  const timeTarget = clampScore(a.timeTarget?.probability || 50);
+  const expiration = clampScore(a.expirationConfidence?.recommendedConfidence || 50);
+  const botConfidence = clampScore(bot.confidence || 0);
 
   let entryLabel = "SPECULATIVE";
   if(entryQuality >= 90) entryLabel = "ELITE ENTRY";
@@ -3174,7 +3292,7 @@ function getConfidenceClarity(a){
   else thesisLabel = "THESIS BROKEN";
 
   return {
-    entryQuality, entryLabel, setupQuality, setupGrade:a.grade | "N/A",
+    entryQuality, entryLabel, setupQuality, setupGrade:a.grade || "N/A",
     positionQuality, positionLabel, thesisScore, thesisLabel,
     botConfidence, botStatus:bot.status,
     note:"Entry Quality asks if this is good to open now. Position Quality asks if it is good to hold. Thesis asks if the original reason is still intact."
@@ -3218,17 +3336,17 @@ function renderConfidenceClarityCard(a){
 function getEntryReadinessEngine(a){
   a = ensureEngineDefaults(a);
   const bot = getPredatorBotDecision(a);
-  const triggerNum = parseFloat(a.nextDay?.buyTrigger | "NaN");
-  const priceNum = parseFloat(a.price | "NaN");
-  const invalidation = a.nextDay?.invalidation | "N/A";
-  const holdMinutes = typeof getDynamicConfirmationEngine === 'function' ? Number(getDynamicConfirmationEngine(a).dynamicHold | a.confirmationHold?.holdMinutes | 30) : Number(a.confirmationHold?.holdMinutes | 30);
-  const entryPermission = a.confirmationHold?.entryPermission | "WAIT";
-  const quality = a.qualityDecision?.decision | "N/A";
+  const triggerNum = parseFloat(a.nextDay?.buyTrigger || "NaN");
+  const priceNum = parseFloat(a.price || "NaN");
+  const invalidation = a.nextDay?.invalidation || "N/A";
+  const holdMinutes = typeof getDynamicConfirmationEngine === 'function' ? Number(getDynamicConfirmationEngine(a).dynamicHold || a.confirmationHold?.holdMinutes || 30) : Number(a.confirmationHold?.holdMinutes || 30);
+  const entryPermission = a.confirmationHold?.entryPermission || "WAIT";
+  const quality = a.qualityDecision?.decision || "N/A";
 
-  const trendScore = clampScore(a.alignmentScore?.score | 50);
-  const momentumScore = clampScore(a.timeTarget?.probability | 50);
-  const thesisScore = clampScore(getConfidenceClarity(a).thesisScore | 50);
-  const durationScore = clampScore(a.expirationConfidence?.recommendedConfidence | 50);
+  const trendScore = clampScore(a.alignmentScore?.score || 50);
+  const momentumScore = clampScore(a.timeTarget?.probability || 50);
+  const thesisScore = clampScore(getConfidenceClarity(a).thesisScore || 50);
+  const durationScore = clampScore(a.expirationConfidence?.recommendedConfidence || 50);
 
   let priceConfirm = 50;
   if(Number.isFinite(triggerNum) && Number.isFinite(priceNum)){
@@ -3258,7 +3376,7 @@ function getEntryReadinessEngine(a){
   else if(thesisScore >= 60) conviction = "SPECULATIVE WATCH";
 
   let entryStatus = "WAIT FOR CONFIRMATION", bannerColor = "yellow";
-  if(bot.status === "BOT REJECTED" | quality === "REJECT"){ entryStatus = "DO NOT ENTER YET"; bannerColor = "red"; }
+  if(bot.status === "BOT REJECTED" || quality === "REJECT"){ entryStatus = "DO NOT ENTER YET"; bannerColor = "red"; }
   else if(bot.status === "BOT APPROVED" && currentReadiness >= 85 && priceConfirm >= 80 && openingConfirm >= 70){ entryStatus = "ENTRY READY"; bannerColor = "green"; }
   else if(bot.status === "BOT APPROVED" && currentReadiness >= 70){ entryStatus = "APPROVED SETUP â WAITING ON TRIGGER"; }
   else if(bot.status === "BOT WAIT" && thesisScore >= 80){ entryStatus = "GOOD SETUP â NOT READY YET"; }
@@ -3281,7 +3399,7 @@ function getEntryReadinessEngine(a){
     "No clean directional trigger is active."
   ) : "No valid trigger is active.";
 
-  return {entryStatus,bannerColor,conviction,currentReadiness,confirmedReadiness,trendScore,momentumScore,thesisScore,durationScore,priceConfirm,openingConfirm,trigger:a.nextDay?.buyTrigger | "N/A",invalidation,holdMinutes,missingPiece,plainEnglish,ifThenRule};
+  return {entryStatus,bannerColor,conviction,currentReadiness,confirmedReadiness,trendScore,momentumScore,thesisScore,durationScore,priceConfirm,openingConfirm,trigger:a.nextDay?.buyTrigger||"N/A",invalidation,holdMinutes,missingPiece,plainEnglish,ifThenRule};
 }
 
 function renderEntryReadinessCard(a){
@@ -3314,7 +3432,7 @@ function renderEntryReadinessCard(a){
 
 
 function getMarketSessionEngine(nowDate){
-  const now = nowDate | new Date();
+  const now = nowDate || new Date();
   const localMinutes = now.getHours() * 60 + now.getMinutes();
   let session = "After Hours / Closed";
   let color = "blue";
@@ -3388,20 +3506,20 @@ function getMarketConditionOverride(a){
   let confidencePenalty = 0;
   let reason = "Technical signals are operating normally.";
 
-  const overnight = a.nextDay?.overnightRisk | "N/A";
-  const chase = a.nextDay?.chaseRisk | "N/A";
-  const trap = a.trapWarning | "CLEAR";
-  const volatility = a.volatility | "NORMAL";
-  const oneDayMove = parseFloat(a.nextDay?.oneDayMovePct | "0");
-  const fiveDayMove = Math.abs(parseFloat(a.nextDay?.fiveDayMovePct | "0"));
+  const overnight = a.nextDay?.overnightRisk || "N/A";
+  const chase = a.nextDay?.chaseRisk || "N/A";
+  const trap = a.trapWarning || "CLEAR";
+  const volatility = a.volatility || "NORMAL";
+  const oneDayMove = parseFloat(a.nextDay?.oneDayMovePct || "0");
+  const fiveDayMove = Math.abs(parseFloat(a.nextDay?.fiveDayMovePct || "0"));
 
-  if(volatility === "EXPANSION LIKELY" | overnight === "HIGH" | chase === "HIGH" | trap !== "CLEAR"){
+  if(volatility === "EXPANSION LIKELY" || overnight === "HIGH" || chase === "HIGH" || trap !== "CLEAR"){
     status = "CAUTION";
     color = "yellow";
     confidencePenalty = 6;
     reason = "Volatility, chase risk, or trap risk is elevated. Require stronger confirmation.";
   }
-  if(oneDayMove >= 4.5 | fiveDayMove >= 9){
+  if(oneDayMove >= 4.5 || fiveDayMove >= 9){
     status = "RISK EVENT / EXTENDED MOVE";
     color = "red";
     confidencePenalty = 12;
@@ -3415,7 +3533,7 @@ function getDynamicConfirmationEngine(a){
   a = ensureEngineDefaults(a);
   const session = getMarketSessionEngine();
   const override = getMarketConditionOverride(a);
-  const baseHold = Number(a.confirmationHold?.holdMinutes | 30);
+  const baseHold = Number(a.confirmationHold?.holdMinutes || 30);
   let dynamicHold = Math.max(baseHold, session.recommendedHold);
 
   if(override.status.includes("RISK EVENT")) dynamicHold += 15;
@@ -3424,9 +3542,9 @@ function getDynamicConfirmationEngine(a){
   dynamicHold = Math.min(75, dynamicHold);
 
   let triggerConfidence = clampScore(
-    (a.alignmentScore?.score | 50) * 0.28 +
-    (a.timeTarget?.probability | 50) * 0.22 +
-    (a.expirationConfidence?.recommendedConfidence | 50) * 0.18 +
+    (a.alignmentScore?.score || 50) * 0.28 +
+    (a.timeTarget?.probability || 50) * 0.22 +
+    (a.expirationConfidence?.recommendedConfidence || 50) * 0.18 +
     session.reliability * 0.20 +
     (100 - session.fakeoutProbability) * 0.12 -
     override.confidencePenalty
@@ -3437,8 +3555,8 @@ function getDynamicConfirmationEngine(a){
   if(a.confirmationHold?.entryPermission?.includes("DO NOT")) entryWindow = "DO NOT ENTER";
   if(a.confirmationHold?.entryPermission?.includes("WAIT FOR PULLBACK")) entryWindow = "WAIT FOR PULLBACK";
 
-  const trigger = a.nextDay?.buyTrigger | "N/A";
-  const invalidation = a.nextDay?.invalidation | "N/A";
+  const trigger = a.nextDay?.buyTrigger || "N/A";
+  const invalidation = a.nextDay?.invalidation || "N/A";
   const sideWord = a.direction === "BUY PUT" ? "below" : a.direction === "BUY CALL" ? "above" : "through";
 
   const plainRule = trigger === "N/A"
@@ -3475,15 +3593,15 @@ function getHumanDecisionEngine(a){
   a = ensureEngineDefaults(a);
   const readiness = typeof getEntryReadinessEngine === "function" ? getEntryReadinessEngine(a) : {
     entryStatus:"WAIT FOR CONFIRMATION", bannerColor:"yellow", conviction:"WATCHLIST SETUP",
-    currentReadiness:50, confirmedReadiness:75, trigger:a.nextDay?.buyTrigger | "N/A",
-    invalidation:a.nextDay?.invalidation | "N/A", holdMinutes:a.confirmationHold?.holdMinutes | 30,
+    currentReadiness:50, confirmedReadiness:75, trigger:a.nextDay?.buyTrigger || "N/A",
+    invalidation:a.nextDay?.invalidation || "N/A", holdMinutes:a.confirmationHold?.holdMinutes || 30,
     plainEnglish:"The bot is waiting for confirmation.", missingPiece:"Needs confirmation.", ifThenRule:"Wait for trigger confirmation.",
-    trendScore:a.alignmentScore?.score | 50, momentumScore:a.timeTarget?.probability | 50,
-    thesisScore:75, durationScore:a.expirationConfidence?.recommendedConfidence | 50,
+    trendScore:a.alignmentScore?.score || 50, momentumScore:a.timeTarget?.probability || 50,
+    thesisScore:75, durationScore:a.expirationConfidence?.recommendedConfidence || 50,
     priceConfirm:50, openingConfirm:30
   };
   const bot = getPredatorBotDecision(a);
-  const direction = a.direction | bot.action | "WAIT";
+  const direction = a.direction || bot.action || "WAIT";
   const isCall = direction === "BUY CALL";
   const isPut = direction === "BUY PUT";
 
@@ -3491,13 +3609,13 @@ function getHumanDecisionEngine(a){
   let patienceColor = "yellow";
   if(bot.status === "BOT REJECTED"){ patienceStatus = "DO NOT TRADE"; patienceColor = "red"; }
   else if(readiness.entryStatus === "ENTRY READY"){ patienceStatus = "ENTER NOW"; patienceColor = "green"; }
-  else if(readiness.entryStatus.includes("APPROVED") | readiness.entryStatus.includes("GOOD SETUP")){ patienceStatus = "WAIT FOR CONFIRMATION"; patienceColor = "yellow"; }
+  else if(readiness.entryStatus.includes("APPROVED") || readiness.entryStatus.includes("GOOD SETUP")){ patienceStatus = "WAIT FOR CONFIRMATION"; patienceColor = "yellow"; }
 
-  const trigger = readiness.trigger | a.nextDay?.buyTrigger | "N/A";
-  const invalidation = readiness.invalidation | a.nextDay?.invalidation | "N/A";
-  const holdMinutes = readiness.holdMinutes | a.confirmationHold?.holdMinutes | 30;
+  const trigger = readiness.trigger || a.nextDay?.buyTrigger || "N/A";
+  const invalidation = readiness.invalidation || a.nextDay?.invalidation || "N/A";
+  const holdMinutes = readiness.holdMinutes || a.confirmationHold?.holdMinutes || 30;
 
-  const step1 = bot.status === "BOT REJECTED" ? "NO" : readiness.conviction.includes("ELITE") | readiness.conviction.includes("HIGH") ? "YES â HIGH QUALITY" : "MAYBE â WATCHLIST ONLY";
+  const step1 = bot.status === "BOT REJECTED" ? "NO" : readiness.conviction.includes("ELITE") || readiness.conviction.includes("HIGH") ? "YES â HIGH QUALITY" : "MAYBE â WATCHLIST ONLY";
   const step2 = patienceStatus === "ENTER NOW" ? "YES â ENTRY READY" : "NOT YET";
   const step3 = isCall ? `Wait for price to hold above $${trigger} for ${holdMinutes} minutes.` : isPut ? `Wait for price to hold below $${trigger} for ${holdMinutes} minutes.` : "Wait for a clean directional trigger.";
   const step4 = patienceStatus === "ENTER NOW" ? `${direction} is allowed now under the bot rules.` : `If confirmation happens, the favored action becomes ${direction}.`;
@@ -3580,12 +3698,12 @@ function renderPredatorCoachCard(a){
 
 function getStrategyExpirationPolicy(a){
   a = ensureEngineDefaults(a);
-  const wheel = a.wheelMode | {};
+  const wheel = a.wheelMode || {};
   const conviction = typeof getPredatorConvictionEngine === "function"
     ? getPredatorConvictionEngine(a)
     : {tier:"PASS", conviction:0, triggerReady:false};
 
-  const buyDirection = a.direction === "BUY CALL" | a.direction === "BUY PUT" ? a.direction : "WAIT";
+  const buyDirection = a.direction === "BUY CALL" || a.direction === "BUY PUT" ? a.direction : "WAIT";
   const buyScore = buyDirection === "BUY CALL"
     ? safeNum(wheel.buyCallScore, 0)
     : buyDirection === "BUY PUT"
@@ -3595,7 +3713,7 @@ function getStrategyExpirationPolicy(a){
   let buyWindow = "45â75 DTE MONTHLY";
   let buyWindowReason = "Default swing-buy window gives the directional thesis time to develop while avoiding weekly time pressure.";
 
-  if(a.nextDay?.overnightRisk === "HIGH" | a.nextDay?.chaseRisk === "HIGH" | a.confirmationHold?.holdMinutes >= 60){
+  if(a.nextDay?.overnightRisk === "HIGH" || a.nextDay?.chaseRisk === "HIGH" || a.confirmationHold?.holdMinutes >= 60){
     buyWindow = "60â90 DTE MONTHLY";
     buyWindowReason = "Elevated timing risk favors more time for the swing thesis to work.";
   } else if(a.alignmentScore?.score >= 85 && a.timeTarget?.probability >= 80 && a.nextDay?.chaseRisk !== "HIGH"){
@@ -3637,21 +3755,26 @@ function getSimplePredatorDecision(a){
   const session = typeof getDynamicConfirmationEngine === "function" ? getDynamicConfirmationEngine(a) : null;
 
   const direction = policy.buyDirection;
-  const validDirection = direction === "BUY CALL" | direction === "BUY PUT";
+  const validDirection = direction === "BUY CALL" || direction === "BUY PUT";
   const alignment = safeNum(a.alignmentScore?.score, 0);
   const timing = safeNum(a.timeTarget?.probability, 0);
-  const quality = a.qualityDecision?.decision | "N/A";
-  const noTrade = a.noTradeZone?.zone | "CLEAR";
-  const marketState = a.marketRegimeFilter?.state | "N/A";
+  const quality = a.qualityDecision?.decision || "N/A";
+  const noTrade = a.noTradeZone?.zone || "CLEAR";
+  const marketState = a.marketRegimeFilter?.state || "N/A";
 
-  const botStatus = String(brain?.botStatus | brain?.status | "").toUpperCase();
-  const brainVerdict = String(brain?.finalVerdict | brain?.verdict | "").toUpperCase();
-  const entryPermission = String(a.confirmationHold?.entryPermission | "").toUpperCase();
-  const entryTiming = String(a.entryTiming?.label | "").toUpperCase();
-  const tomorrowRead = String(a.nextDay?.tomorrowRead | "").toUpperCase();
+  const botStatus = String(brain?.botStatus || brain?.status || "").toUpperCase();
+  const brainVerdict = String(brain?.finalVerdict || brain?.verdict || "").toUpperCase();
+  const entryPermission = String(a.confirmationHold?.entryPermission || "").toUpperCase();
+  const entryTiming = String(a.entryTiming?.label || "").toUpperCase();
+  const tomorrowRead = String(a.nextDay?.tomorrowRead || "").toUpperCase();
 
   const hardReject =
-    !validDirection | !fit.affordable | quality === "REJECT" | noTrade !== "CLEAR" | marketState === "DANGEROUS" | alignment < 60;
+    !validDirection ||
+    !fit.affordable ||
+    quality === "REJECT" ||
+    noTrade !== "CLEAR" ||
+    marketState === "DANGEROUS" ||
+    alignment < 60;
 
   const setupIsGood =
     validDirection &&
@@ -3666,10 +3789,20 @@ function getSimplePredatorDecision(a){
   // SINGLE AUTHORITY ENTRY GATE:
   // A monthly swing BUY still needs explicit permission. Strong setup alone = WAIT.
   const explicitBuyPermission =
-    entryPermission.includes("CAN ENTER") | entryPermission.includes("APPROVED") | entryTiming === "ENTER NOW" | brainVerdict === "BUY" | botStatus === "BOT APPROVED";
+    entryPermission.includes("CAN ENTER") ||
+    entryPermission.includes("APPROVED") ||
+    entryTiming === "ENTER NOW" ||
+    brainVerdict === "BUY" ||
+    botStatus === "BOT APPROVED";
 
   const explicitWaitSignal =
-    entryPermission.includes("WAIT") | entryTiming.includes("WAIT") | tomorrowRead.includes("WAIT") | tomorrowRead.includes("CONFIRM") | botStatus.includes("WAIT") | brainVerdict.includes("WATCHLIST") | brainVerdict.includes("WAIT");
+    entryPermission.includes("WAIT") ||
+    entryTiming.includes("WAIT") ||
+    tomorrowRead.includes("WAIT") ||
+    tomorrowRead.includes("CONFIRM") ||
+    botStatus.includes("WAIT") ||
+    brainVerdict.includes("WATCHLIST") ||
+    brainVerdict.includes("WAIT");
 
   let decision = "PASS";
   let color = "red";
@@ -3677,7 +3810,7 @@ function getSimplePredatorDecision(a){
   let action = "Move to the next ticker.";
   let upgrade = "A new scan must produce a stronger setup.";
   let expiration = policy.buyWindow;
-  let invalidation = a.nextDay?.invalidation | "N/A";
+  let invalidation = a.nextDay?.invalidation || "N/A";
 
   if(hardReject){
     if(!validDirection){
@@ -3690,7 +3823,7 @@ function getSimplePredatorDecision(a){
       reason = `Price is currently in ${noTrade}. That is not a clean place to open a monthly option.`;
       action = "Pass for now and wait for a cleaner structure.";
     }else if(quality === "REJECT"){
-      reason = `The quality engine rejected the setup: ${a.qualityDecision?.reason | "trade quality is too weak"}.`;
+      reason = `The quality engine rejected the setup: ${a.qualityDecision?.reason || "trade quality is too weak"}.`;
       action = "Pass and move on.";
     }else if(alignment < 60){
       reason = "Trend alignment is too weak for a new monthly option position.";
@@ -3706,14 +3839,14 @@ function getSimplePredatorDecision(a){
     decision = "WAIT";
     color = "yellow";
 
-    if(a.nextDay?.chaseRisk === "HIGH" | entryTiming === "WAIT FOR PULLBACK"){
+    if(a.nextDay?.chaseRisk === "HIGH" || entryTiming === "WAIT FOR PULLBACK"){
       reason = "The monthly swing thesis is good, but price is too extended right now. Predator wants a better entry instead of chasing.";
       action = "Wait for the pullback or reclaim condition shown below.";
-      upgrade = brain?.upgradeRule | "Upgrade to BUY when price improves while the swing thesis stays intact.";
+      upgrade = brain?.upgradeRule || "Upgrade to BUY when price improves while the swing thesis stays intact.";
     }else{
       reason = "The monthly swing setup is good, but entry confirmation is not complete yet. The bot likes the trade direction, but has not granted permission to enter.";
       action = "Wait. Do not buy yet.";
-      upgrade = brain?.upgradeRule | session?.plainRule | "Upgrade to BUY only after the entry confirmation rule is satisfied.";
+      upgrade = brain?.upgradeRule || session?.plainRule || "Upgrade to BUY only after the entry confirmation rule is satisfied.";
     }
   }else{
     decision = "PASS";
@@ -3773,8 +3906,8 @@ function renderSimpleDecisionSnapshot(a){
   if(d.decision === "BUY") decisionColor = "green";
   else if(d.decision === "WAIT") decisionColor = "yellow";
 
-  let setupLabel = d.setupStatus | "N/A";
-  let entryLabel = d.entryStatus | "N/A";
+  let setupLabel = d.setupStatus || "N/A";
+  let entryLabel = d.entryStatus || "N/A";
 
   let plainMeaning = "Predator does not approve a new entry.";
   if(d.decision === "BUY"){
@@ -3831,15 +3964,15 @@ function getPredatorConvictionEngine(a){
     affordable:true, fit:"N/A", score:70, capitalRequired:0, usagePct:0
   };
 
-  const setup = clampScore(a.score | 0);
-  const alignment = clampScore(a.alignmentScore?.score | 50);
-  const timing = clampScore(a.timeTarget?.probability | 50);
-  const expiration = clampScore(a.expirationConfidence?.recommendedConfidence | 50);
+  const setup = clampScore(a.score || 0);
+  const alignment = clampScore(a.alignmentScore?.score || 50);
+  const timing = clampScore(a.timeTarget?.probability || 50);
+  const expiration = clampScore(a.expirationConfidence?.recommendedConfidence || 50);
   const dataReadiness = typeof getPredatorDataIntelligence === "function"
-    ? clampScore(getPredatorDataIntelligence().ready | 70)
+    ? clampScore(getPredatorDataIntelligence().ready || 70)
     : 70;
-  const triggerConfidence = clampScore(session?.triggerConfidence | 50);
-  const accountFit = clampScore(fit.score | 50);
+  const triggerConfidence = clampScore(session?.triggerConfidence || 50);
+  const accountFit = clampScore(fit.score || 50);
 
   let conviction = clampScore(
     setup * .22 +
@@ -3861,7 +3994,7 @@ function getPredatorConvictionEngine(a){
   conviction = clampScore(conviction);
 
   const triggerReady = brain
-    ? String(brain.finalVerdict | "").includes("BUY")
+    ? String(brain.finalVerdict || "").includes("BUY")
     : a.entryTiming?.label === "ENTER NOW";
 
   let tier = "PASS";
@@ -3877,7 +4010,7 @@ function getPredatorConvictionEngine(a){
     color = "green";
     sizeLabel = "FULL ALLOWED SIZE";
     riskPct = 3;
-    capitalPct = Math.min(accountProfile?.maxOptionAllocationPct | 15, 15);
+    capitalPct = Math.min(accountProfile?.maxOptionAllocationPct || 15, 15);
     aggression = "HIGH â WITH DISCIPLINE";
     coach = "If I were following these rules with my own money, this is the type of confirmed setup I would consider taking at the full allowed size.";
   }else if(conviction >= 88 && triggerReady){
@@ -3885,7 +4018,7 @@ function getPredatorConvictionEngine(a){
     color = "green";
     sizeLabel = "HALF SIZE";
     riskPct = 2;
-    capitalPct = Math.min(accountProfile?.maxOptionAllocationPct | 15, 10);
+    capitalPct = Math.min(accountProfile?.maxOptionAllocationPct || 15, 10);
     aggression = "MODERATE";
     coach = "This is a calculated trade, but not a maximum-conviction trade. Participate smaller and respect the invalidation.";
   }else if(conviction >= 82 && triggerReady){
@@ -3893,7 +4026,7 @@ function getPredatorConvictionEngine(a){
     color = "yellow";
     sizeLabel = "QUARTER SIZE";
     riskPct = 1;
-    capitalPct = Math.min(accountProfile?.maxOptionAllocationPct | 15, 5);
+    capitalPct = Math.min(accountProfile?.maxOptionAllocationPct || 15, 5);
     aggression = "LOW";
     coach = "The trade has an edge, but the evidence is not strong enough for normal size. Only take it if you accept the added uncertainty.";
   }else if(conviction >= 82 && !triggerReady){
@@ -3914,7 +4047,7 @@ function getPredatorConvictionEngine(a){
     coach = "There is enough potential to keep watching, but not enough agreement to risk money.";
   }
 
-  if(a.qualityDecision?.decision === "REJECT" | a.noTradeZone?.zone !== "CLEAR" | !fit.affordable){
+  if(a.qualityDecision?.decision === "REJECT" || a.noTradeZone?.zone !== "CLEAR" || !fit.affordable){
     tier = "PASS";
     color = "red";
     sizeLabel = "NO POSITION";
@@ -3942,7 +4075,7 @@ function getPredatorConvictionEngine(a){
   if(timing >= 75) reasonsFor.push("Timing and time-to-target remain supportive.");
   else reasonsAgainst.push("Timing is not yet strong enough.");
   if(a.qualityDecision?.decision === "APPROVED") reasonsFor.push("The quality filter approved the setup.");
-  else reasonsAgainst.push(`Quality decision is ${a.qualityDecision?.decision | "unclear"}.`);
+  else reasonsAgainst.push(`Quality decision is ${a.qualityDecision?.decision || "unclear"}.`);
   if(a.noTradeZone?.zone === "CLEAR") reasonsFor.push("Price is outside the major no-trade zones.");
   else reasonsAgainst.push(`Price is in ${a.noTradeZone?.zone}.`);
   if(triggerReady) reasonsFor.push("The entry trigger is confirmed under the current rules.");
@@ -3955,7 +4088,7 @@ function getPredatorConvictionEngine(a){
   const nextAction = tier.includes("BUY")
     ? `Take no more than ${finalContracts} contract${finalContracts===1?"":"s"} and exit if the invalidation breaks.`
     : tier.startsWith("WAIT")
-      ? `Wait for ${brain?.upgradeRule | "the trigger to confirm"}.`
+      ? `Wait for ${brain?.upgradeRule || "the trigger to confirm"}.`
       : tier === "WATCHLIST ONLY"
         ? "Recheck later only if momentum and confirmation improve."
         : "Move on to a better opportunity.";
@@ -4010,7 +4143,7 @@ function renderProfessionalReasonCard(a){
   const c = getPredatorConvictionEngine(a);
   return `
   <div class="card">
-    <div class="section-title">Why a Disciplined Trader Would ${c.tier === "PASS" ? "Avoid" : c.tier.startsWith("WAIT") | c.tier === "WATCHLIST ONLY" ? "Wait" : "Consider This"}</div>
+    <div class="section-title">Why a Disciplined Trader Would ${c.tier === "PASS" ? "Avoid" : c.tier.startsWith("WAIT") || c.tier === "WATCHLIST ONLY" ? "Wait" : "Consider This"}</div>
     <div class="pro-list">
       ${c.reasonsFor.map(x=>`<div class="pro-row"><span class="green">â</span> ${x}</div>`).join("")}
       ${c.reasonsAgainst.map(x=>`<div class="pro-row"><span class="red">â</span> ${x}</div>`).join("")}
@@ -4021,7 +4154,7 @@ function renderProfessionalReasonCard(a){
 }
 
 function getPositionConvictionCoach(r){
-  const command = r.predatorCommand | {};
+  const command = r.predatorCommand || {};
   const thesis = safeNum(r.thesisIntegrity?.score, 50);
   const holdScore = safeNum(r.targetConfidence?.holdScore, 50);
   const ttt = safeNum(r.timeTarget?.probability, 50);
@@ -4049,7 +4182,7 @@ function getPositionConvictionCoach(r){
     decision = "PREPARE TO EXIT";
     color = "red";
     instruction = "The thesis is close to breaking. Do not give the trade much more room.";
-  }else if(thesis < 60 | holdScore < 55){
+  }else if(thesis < 60 || holdScore < 55){
     decision = "REDUCE RISK";
     color = "yellow";
     instruction = "The position is still alive, but conviction has weakened. Do not add.";
@@ -4083,11 +4216,11 @@ function getPredatorBrain(a){
   const bot = getPredatorBotDecision(a);
   const human = typeof getHumanDecisionEngine === "function" ? getHumanDecisionEngine(a) : null;
   const session = typeof getDynamicConfirmationEngine === "function" ? getDynamicConfirmationEngine(a) : null;
-  const clarity = typeof getConfidenceClarity === "function" ? getConfidenceClarity(a) : {entryQuality:a.score | 0, thesisScore:a.alignmentScore?.score | 50, positionQuality:bot.confidence | 50};
-  const trigger = a.nextDay?.buyTrigger | "N/A";
-  const invalidation = a.nextDay?.invalidation | "N/A";
-  const holdMinutes = session?.dynamicHold | a.confirmationHold?.holdMinutes | 30;
-  const direction = bot.action | a.direction | "WAIT";
+  const clarity = typeof getConfidenceClarity === "function" ? getConfidenceClarity(a) : {entryQuality:a.score||0, thesisScore:a.alignmentScore?.score||50, positionQuality:bot.confidence||50};
+  const trigger = a.nextDay?.buyTrigger || "N/A";
+  const invalidation = a.nextDay?.invalidation || "N/A";
+  const holdMinutes = session?.dynamicHold || a.confirmationHold?.holdMinutes || 30;
+  const direction = bot.action || a.direction || "WAIT";
   let finalVerdict = "WAIT";
   let color = "yellow";
   let actionLine = "Wait for confirmation before risking money.";
@@ -4109,11 +4242,11 @@ function getPredatorBrain(a){
     actionLine = "This is not ready yet. Watch it, but do not force it.";
   }
   const checklist = [
-    {name:"Trend aligned", pass:(a.alignmentScore?.score | 0) >= 75},
-    {name:"Momentum/timing strong", pass:(a.timeTarget?.probability | 0) >= 70},
+    {name:"Trend aligned", pass:(a.alignmentScore?.score || 0) >= 75},
+    {name:"Momentum/timing strong", pass:(a.timeTarget?.probability || 0) >= 70},
     {name:"Quality filter passed", pass:a.qualityDecision?.decision === "APPROVED"},
     {name:"No-trade zone clear", pass:a.noTradeZone?.zone === "CLEAR"},
-    {name:"Expiration fit strong", pass:(a.expirationConfidence?.recommendedConfidence | 0) >= 75},
+    {name:"Expiration fit strong", pass:(a.expirationConfidence?.recommendedConfidence || 0) >= 75},
     {name:"Trigger confirmed", pass:human ? human.patienceStatus === "ENTER NOW" : false}
   ];
   const passed = checklist.filter(x=>x.pass).length;
@@ -4128,11 +4261,11 @@ function getPredatorBrain(a){
   else if(human && human.patienceStatus !== "ENTER NOW") biggestWeakness = "Entry confirmation is incomplete.";
   else if(a.nextDay?.chaseRisk === "HIGH") biggestWeakness = "Chase risk is elevated.";
   else if(a.nextDay?.overnightRisk === "HIGH") biggestWeakness = "Overnight risk is high.";
-  else if((a.expirationConfidence?.recommendedConfidence | 0) < 70) biggestWeakness = "Expiration fit is not strong enough.";
+  else if((a.expirationConfidence?.recommendedConfidence || 0) < 70) biggestWeakness = "Expiration fit is not strong enough.";
   const cancelRule = trigger === "N/A" ? "Cancel if the setup loses alignment or moves into a no-trade zone." : `Cancel if price invalidates near $${invalidation} or the thesis score weakens.`;
   const upgradeRule = trigger === "N/A" ? "Upgrade only if the bot receives a clean directional trigger." : `Upgrade if price holds the trigger near $${trigger} for ${holdMinutes} minutes without invalidating.`;
-  const iq = clampScore((clarity.entryQuality * .20) + (clarity.thesisScore * .25) + (bot.confidence * .25) + ((a.expirationConfidence?.recommendedConfidence | 50) * .15) + ((session?.triggerConfidence | 50) * .15));
-  const requirement = finalVerdict.includes("BUY") | finalVerdict === "PASS" ? iq : 90;
+  const iq = clampScore((clarity.entryQuality * .20) + (clarity.thesisScore * .25) + (bot.confidence * .25) + ((a.expirationConfidence?.recommendedConfidence || 50) * .15) + ((session?.triggerConfidence || 50) * .15));
+  const requirement = finalVerdict.includes("BUY") || finalVerdict === "PASS" ? iq : 90;
   const missing = Math.max(0, requirement - iq);
   return {finalVerdict,color,actionLine,plainEnglish,checklist,passed,total,biggestWeakness,cancelRule,upgradeRule,iq,requirement,missing,confidence:bot.confidence,direction,trigger,invalidation,holdMinutes};
 }
@@ -4162,13 +4295,13 @@ function renderPredatorBrainCard(a){
 }
 
 function getPredatorPositionCoach(result){
-  const cmd = result.predatorCommand | {};
-  const intel = result.positionIntelligence | {};
-  const thesis = result.thesisIntegrity | {score:intel.thesisScore | 50,label:intel.thesisLabel | "N/A"};
-  const target = result.targetConfidence | {};
+  const cmd = result.predatorCommand || {};
+  const intel = result.positionIntelligence || {};
+  const thesis = result.thesisIntegrity || {score:intel.thesisScore || 50,label:intel.thesisLabel || "N/A"};
+  const target = result.targetConfidence || {};
   const pnl = typeof result.approxPnLPercent === "number" ? result.approxPnLPercent : null;
-  let decision = cmd.action | intel.action | "WATCH CLOSELY";
-  let color = cmd.color | "yellow";
+  let decision = cmd.action || intel.action || "WATCH CLOSELY";
+  let color = cmd.color || "yellow";
   let coach = "Predator is monitoring this position. Follow the thesis, not emotion.";
   let profitPlan = "No profit plan active yet.";
   let emotionCheck = "Stay objective. Do not let one candle make the decision.";
@@ -4177,7 +4310,7 @@ function getPredatorPositionCoach(result){
     emotionCheck = pnl !== null && pnl < 0 ? "Do not panic sell just because the option is red if the thesis remains intact." : "Do not exit a healthy trade too early just because it moved.";
   }else if(decision === "WATCH CLOSELY"){
     coach = "The trade is still alive, but confidence is not strong enough to be careless. Hold only with discipline.";
-  }else if(decision === "LOCK PROFITS" | decision === "TAKE PROFIT"){
+  }else if(decision === "LOCK PROFITS" || decision === "TAKE PROFIT"){
     coach = "The trade has given you profit. Predator wants you to protect gains instead of hoping for the perfect top.";
     profitPlan = "Consider taking partial profits now and leaving only a runner if the thesis remains strong.";
   }else if(decision === "REDUCE RISK"){
@@ -4190,7 +4323,7 @@ function getPredatorPositionCoach(result){
   }
   if(target.bestTarget) profitPlan = `Best target is ${target.bestTarget.name}: ${target.bestTarget.confidence}/100 confidence, target ${target.bestTarget.target === "N/A" ? "N/A" : "$" + target.bestTarget.target}.`;
   else if(target.recommendedTarget) profitPlan = `Recommended target: ${target.recommendedTarget}.`;
-  return {decision,color,confidence:cmd.confidence | 50,coach,profitPlan,emotionCheck,thesisScore:thesis.score | intel.thesisScore | 50,thesisLabel:thesis.label | intel.thesisLabel | "N/A",nextCheckpoint:cmd.nextCheckpoint | intel.positionRule | "Re-scan before making a decision."};
+  return {decision,color,confidence:cmd.confidence || 50,coach,profitPlan,emotionCheck,thesisScore:thesis.score || intel.thesisScore || 50,thesisLabel:thesis.label || intel.thesisLabel || "N/A",nextCheckpoint:cmd.nextCheckpoint || intel.positionRule || "Re-scan before making a decision."};
 }
 
 function renderPredatorPositionCoachCard(r){
@@ -4265,21 +4398,21 @@ function renderDurationOptimizerCard(a){
 
 
 function getPositionIntelligenceEngine(position, result){
-  const type = result.type | position.type;
-  const isLongOption = type === "CALL" | type === "PUT";
-  const thesis = result.thesisIntegrity | {score:50,label:"N/A",action:"HOLD BUT RECHECK",stopRule:"N/A"};
-  const target = result.targetConfidence | {holdScore:50,holdLabel:"HOLD / MONITOR",recommendedTarget:"N/A"};
-  const quality = result.qualityDecision?.decision | "N/A";
-  const noTrade = result.noTradeZone?.zone | "CLEAR";
-  const shortMgmt = result.shortManagement | {};
+  const type = result.type || position.type;
+  const isLongOption = type === "CALL" || type === "PUT";
+  const thesis = result.thesisIntegrity || {score:50,label:"N/A",action:"HOLD BUT RECHECK",stopRule:"N/A"};
+  const target = result.targetConfidence || {holdScore:50,holdLabel:"HOLD / MONITOR",recommendedTarget:"N/A"};
+  const quality = result.qualityDecision?.decision || "N/A";
+  const noTrade = result.noTradeZone?.zone || "CLEAR";
+  const shortMgmt = result.shortManagement || {};
   const pnl = typeof result.approxPnLPercent === "number" ? result.approxPnLPercent : null;
   const dte = typeof result.dte === "number" ? result.dte : parseInt(result.dte,10);
-  const ttt = Number(result.timeTarget?.probability | 50);
-  const align = Number(result.alignmentScore?.score | 50);
+  const ttt = Number(result.timeTarget?.probability || 50);
+  const align = Number(result.alignmentScore?.score || 50);
 
   let newEntryDecision = "NEW ENTRY WAIT";
   if(quality === "APPROVED" && noTrade === "CLEAR") newEntryDecision = "NEW ENTRY APPROVED";
-  if(quality === "REJECT" | noTrade !== "CLEAR") newEntryDecision = "NEW ENTRIES REJECTED";
+  if(quality === "REJECT" || noTrade !== "CLEAR") newEntryDecision = "NEW ENTRIES REJECTED";
 
   let existingPositionDecision = "WATCH CLOSELY";
   let action = "WATCH CLOSELY";
@@ -4310,7 +4443,7 @@ function getPositionIntelligenceEngine(position, result){
       reason = "Short option remains manageable.";
       holdPermission = "HOLD WHILE STRIKE RISK IS CONTROLLED";
     }
-    return {newEntryDecision,existingPositionDecision,action,reason,exitUrgency,holdPermission,positionRule,normalNoiseRead,thesisScore:thesis.score | 50,thesisLabel:thesis.label | "N/A",alignment:align,timeToTarget:ttt};
+    return {newEntryDecision,existingPositionDecision,action,reason,exitUrgency,holdPermission,positionRule,normalNoiseRead,thesisScore:thesis.score || 50,thesisLabel:thesis.label || "N/A",alignment:align,timeToTarget:ttt};
   }
 
   if(thesis.score < 40){
@@ -4367,44 +4500,44 @@ function getPositionIntelligenceEngine(position, result){
     holdPermission = "DO NOT HOLD";
   }
 
-  return {newEntryDecision,existingPositionDecision,action,reason,exitUrgency,holdPermission,positionRule,normalNoiseRead,thesisScore:thesis.score | 50,thesisLabel:thesis.label | "N/A",alignment:align,timeToTarget:ttt};
+  return {newEntryDecision,existingPositionDecision,action,reason,exitUrgency,holdPermission,positionRule,normalNoiseRead,thesisScore:thesis.score || 50,thesisLabel:thesis.label || "N/A",alignment:align,timeToTarget:ttt};
 }
 
 function getPredatorCommandCenter(position, result){
-  const type = result.type | position.type;
-  const thesis = result.thesisIntegrity | {score:50,label:"N/A",action:"N/A"};
-  const hold = result.holdDurationGuide | {botAction:"WAIT / RECHECK", holdStyle:"N/A", suggestedHold:"N/A", reviewFrequency:"N/A", maxHoldRule:"N/A", botGrade:"B"};
-  const target = result.targetConfidence | {recommendedTarget:"N/A", holdScore:50, protectionStatus:"N/A"};
-  const shortMgmt = result.shortManagement | null;
-  const wheelAssign = result.wheelAssignment | null;
-  const posIntel = result.positionIntelligence | getPositionIntelligenceEngine(position, result);
+  const type = result.type || position.type;
+  const thesis = result.thesisIntegrity || {score:50,label:"N/A",action:"N/A"};
+  const hold = result.holdDurationGuide || {botAction:"WAIT / RECHECK", holdStyle:"N/A", suggestedHold:"N/A", reviewFrequency:"N/A", maxHoldRule:"N/A", botGrade:"B"};
+  const target = result.targetConfidence || {recommendedTarget:"N/A", holdScore:50, protectionStatus:"N/A"};
+  const shortMgmt = result.shortManagement || null;
+  const wheelAssign = result.wheelAssignment || null;
+  const posIntel = result.positionIntelligence || getPositionIntelligenceEngine(position, result);
 
-  let action = posIntel.action | "RECHECK";
-  let confidence = Math.round((Number(posIntel.thesisScore | thesis.score | 50) * 0.55) + (Number(target.holdScore | 50) * 0.25) + (Number(result.timeTarget?.probability | 50) * 0.20));
-  let reason = posIntel.reason | "System needs a cleaner read.";
-  let nextCheckpoint = posIntel.positionRule | hold.maxHoldRule | "Re-scan before making a decision.";
-  let botInstruction = posIntel.holdPermission | hold.suggestedHold | "Wait for clearer confirmation.";
+  let action = posIntel.action || "RECHECK";
+  let confidence = Math.round((Number(posIntel.thesisScore || thesis.score || 50) * 0.55) + (Number(target.holdScore || 50) * 0.25) + (Number(result.timeTarget?.probability || 50) * 0.20));
+  let reason = posIntel.reason || "System needs a cleaner read.";
+  let nextCheckpoint = posIntel.positionRule || hold.maxHoldRule || "Re-scan before making a decision.";
+  let botInstruction = posIntel.holdPermission || hold.suggestedHold || "Wait for clearer confirmation.";
 
-  if(type === "CALL" | type === "PUT"){
+  if(type === "CALL" || type === "PUT"){
     if(posIntel.action === "EXIT"){
       action = "EXIT";
-      confidence = Math.max(70, 100 - Number(posIntel.thesisScore | thesis.score | 50));
+      confidence = Math.max(70, 100 - Number(posIntel.thesisScore || thesis.score || 50));
       botInstruction = "Exit only because the position thesis is broken, not because new entries are rejected.";
     }else if(posIntel.action === "REDUCE RISK"){
       action = "REDUCE RISK";
-      confidence = Math.max(60, Number(posIntel.thesisScore | thesis.score | 50));
+      confidence = Math.max(60, Number(posIntel.thesisScore || thesis.score || 50));
     }else if(posIntel.action === "LOCK PROFITS"){
       action = "LOCK PROFITS";
-      confidence = Math.max(70, Number(target.holdScore | 50));
+      confidence = Math.max(70, Number(target.holdScore || 50));
     }else if(posIntel.action === "HOLD"){
       action = "HOLD";
-      confidence = Math.min(98, Math.round((Number(posIntel.thesisScore | thesis.score | 50) + Number(target.holdScore | posIntel.thesisScore | thesis.score | 50)) / 2));
+      confidence = Math.min(98, Math.round((Number(posIntel.thesisScore || thesis.score || 50) + Number(target.holdScore || posIntel.thesisScore || thesis.score || 50)) / 2));
     }else{
       action = "WATCH CLOSELY";
-      confidence = Math.round(Number(posIntel.thesisScore | thesis.score | 50));
+      confidence = Math.round(Number(posIntel.thesisScore || thesis.score || 50));
     }
   }else{
-    if(shortMgmt && (shortMgmt.managementDecision | "").includes("TAKE")){
+    if(shortMgmt && (shortMgmt.managementDecision || "").includes("TAKE")){
       action = "TAKE PROFIT";
       confidence = 85;
       reason = "Premium capture is strong enough to consider closing.";
@@ -4418,28 +4551,28 @@ function getPredatorCommandCenter(position, result){
       botInstruction = "Manage the wheel position defensively.";
     }else{
       action = "LET THETA WORK";
-      confidence = wheelAssign ? Math.max(60, 100 - Number(wheelAssign.probability | 40)) : 70;
+      confidence = wheelAssign ? Math.max(60, 100 - Number(wheelAssign.probability || 40)) : 70;
       reason = "Premium-selling setup is still manageable.";
       nextCheckpoint = "Watch strike distance and assignment risk.";
-      botInstruction = hold.suggestedHold | "Hold while risk stays controlled.";
+      botInstruction = hold.suggestedHold || "Hold while risk stays controlled.";
     }
   }
 
   let color = "yellow";
   if(["HOLD","LET THETA WORK","TAKE PROFIT","LOCK PROFITS"].includes(action)) color = "green";
-  if(action.includes("EXIT") | action.includes("ROLL")) color = "red";
+  if(action.includes("EXIT") || action.includes("ROLL")) color = "red";
 
-  return {action,confidence:clampScore(confidence),reason,nextCheckpoint,botInstruction,color,grade:hold.botGrade | "B",newEntryDecision:posIntel.newEntryDecision,existingPositionDecision:posIntel.existingPositionDecision,exitUrgency:posIntel.exitUrgency};
+  return {action,confidence:clampScore(confidence),reason,nextCheckpoint,botInstruction,color,grade:hold.botGrade || "B",newEntryDecision:posIntel.newEntryDecision,existingPositionDecision:posIntel.existingPositionDecision,exitUrgency:posIntel.exitUrgency};
 }
 
 function setPredatorViewMode(){
-  const mode = document.getElementById("predatorViewMode")?.value | "simple";
+  const mode = document.getElementById("predatorViewMode")?.value || "simple";
   localStorage.setItem("signal_predator_view_mode", mode);
   document.body.classList.toggle("advanced-on", mode === "advanced");
 }
 
 function initPredatorViewMode(){
-  const mode = localStorage.getItem("signal_predator_view_mode") | "simple";
+  const mode = localStorage.getItem("signal_predator_view_mode") || "simple";
   const sel = document.getElementById("predatorViewMode");
   if(sel) sel.value = mode;
   document.body.classList.toggle("advanced-on", mode === "advanced");
@@ -4447,14 +4580,14 @@ function initPredatorViewMode(){
 
 function getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent, dte, thesisIntegrity, targetConfidence){
   const type = position.type;
-  const exp = ai.expirationConfidence | {};
-  const thesisScore = Number(thesisIntegrity?.score | 50);
-  const holdScore = Number(targetConfidence?.holdScore | 50);
-  const rec = exp.recommendedDuration | "N/A";
-  const expConfidence = Number(exp.recommendedConfidence | 0);
-  const quality = ai.qualityDecision?.decision | "N/A";
-  const mismatch = ai.longTermOptions?.mismatchRisk | "N/A";
-  const overnight = ai.nextDay?.overnightRisk | "N/A";
+  const exp = ai.expirationConfidence || {};
+  const thesisScore = Number(thesisIntegrity?.score || 50);
+  const holdScore = Number(targetConfidence?.holdScore || 50);
+  const rec = exp.recommendedDuration || "N/A";
+  const expConfidence = Number(exp.recommendedConfidence || 0);
+  const quality = ai.qualityDecision?.decision || "N/A";
+  const mismatch = ai.longTermOptions?.mismatchRisk || "N/A";
+  const overnight = ai.nextDay?.overnightRisk || "N/A";
 
   let holdStyle = "RECHECK FIRST";
   let suggestedHold = "No clear hold window.";
@@ -4463,7 +4596,7 @@ function getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent,
   let reviewFrequency = "Re-scan before making a decision.";
   let maxHoldRule = "Do not hold if thesis integrity breaks.";
 
-  if(type === "CALL" | type === "PUT"){
+  if(type === "CALL" || type === "PUT"){
     if(thesisScore < 40){
       holdStyle = "EXIT NOW";
       suggestedHold = "Do not keep holding.";
@@ -4471,7 +4604,7 @@ function getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent,
       reason = "Thesis integrity is broken.";
       reviewFrequency = "No further holding recommended.";
       maxHoldRule = "Protect capital.";
-    }else if(rec.includes("Weekly") | rec.includes("Bi")){
+    }else if(rec.includes("Weekly") || rec.includes("Bi")){
       holdStyle = "DAY TRADE / SHORT SWING";
       suggestedHold = "Intraday to 1-3 trading days.";
       botAction = "HOLD ONLY WHILE MOMENTUM STAYS VALID";
@@ -4482,14 +4615,14 @@ function getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent,
         suggestedHold = "Same day to next day only.";
         maxHoldRule = "Avoid holding close to expiration unless thesis is extremely strong.";
       }
-    }else if(rec.includes("1") | rec.includes("3")){
+    }else if(rec.includes("1") || rec.includes("3")){
       holdStyle = "1-3 MONTH SWING";
       suggestedHold = "Several days to several weeks, as long as thesis remains intact.";
       botAction = "HOLD IF THESIS SCORE STAYS ABOVE 60";
       reason = "Swing duration is favored over forcing a weekly trade.";
       reviewFrequency = "Re-scan daily or every major support/resistance break.";
       maxHoldRule = "Exit if thesis score drops below 60 or price breaks invalidation.";
-    }else if(rec.includes("6") | rec.includes("12")){
+    }else if(rec.includes("6") || rec.includes("12")){
       holdStyle = "POSITION / LEAP HOLD";
       suggestedHold = "Weeks to months, focused on structure instead of daily noise.";
       botAction = "HOLD WHILE LONG-TERM STRUCTURE HOLDS";
@@ -4515,7 +4648,7 @@ function getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent,
       reason = "Profit is available but hold score is weakening.";
     }
 
-    if(overnight === "HIGH" && (rec.includes("Weekly") | rec.includes("Bi"))){
+    if(overnight === "HIGH" && (rec.includes("Weekly") || rec.includes("Bi"))){
       maxHoldRule = "Avoid overnight unless thesis integrity and hold score remain strong.";
     }
 
@@ -4534,7 +4667,7 @@ function getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent,
   let botGrade = "B";
   if(thesisScore >= 85 && expConfidence >= 80 && quality === "APPROVED") botGrade = "A";
   if(thesisScore >= 90 && expConfidence >= 90 && quality === "APPROVED" && mismatch !== "HIGH") botGrade = "A+";
-  if(thesisScore < 60 | quality === "REJECT") botGrade = "C";
+  if(thesisScore < 60 || quality === "REJECT") botGrade = "C";
   if(thesisScore < 40) botGrade = "F";
 
   return {holdStyle,suggestedHold,botAction,reason,reviewFrequency,maxHoldRule,botGrade,thesisScore,expirationConfidence:expConfidence,mismatch,note:"Rule-based guidance, not a guarantee."};
@@ -4544,16 +4677,16 @@ function getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte
   const type = position.type;
   const direction = type === "CALL" ? "BUY CALL" : type === "PUT" ? "BUY PUT" : type;
   const price = Number(livePrice);
-  const align = Number(ai.alignmentScore?.score | 50);
-  const quality = ai.qualityDecision?.decision | "N/A";
-  const noTrade = ai.noTradeZone?.zone | "CLEAR";
-  const marketState = ai.marketRegimeFilter?.state | "N/A";
-  const invalidation = Number(ai.nextDay?.invalidation | NaN);
-  const ttt = Number(timeTarget?.probability | ai.timeTarget?.probability | 50);
-  const momentum = ai.momentumEngine | "Neutral";
-  const trap = ai.trapWarning | "CLEAR";
-  const overnightRisk = ai.nextDay?.overnightRisk | "N/A";
-  const chaseRisk = ai.nextDay?.chaseRisk | "N/A";
+  const align = Number(ai.alignmentScore?.score || 50);
+  const quality = ai.qualityDecision?.decision || "N/A";
+  const noTrade = ai.noTradeZone?.zone || "CLEAR";
+  const marketState = ai.marketRegimeFilter?.state || "N/A";
+  const invalidation = Number(ai.nextDay?.invalidation || NaN);
+  const ttt = Number(timeTarget?.probability || ai.timeTarget?.probability || 50);
+  const momentum = ai.momentumEngine || "Neutral";
+  const trap = ai.trapWarning || "CLEAR";
+  const overnightRisk = ai.nextDay?.overnightRisk || "N/A";
+  const chaseRisk = ai.nextDay?.chaseRisk || "N/A";
 
   let score = 50;
   const positives = [];
@@ -4570,8 +4703,8 @@ function getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte
   if(noTrade === "CLEAR"){ score += 8; positives.push("No-trade zone remains clear."); }
   else { score -= 12; negatives.push("Trade moved into a no-trade zone."); }
 
-  if(marketState === "TRENDING" | marketState === "BREAKOUT"){ score += 8; positives.push("Market state still supports trend continuation."); }
-  if(marketState === "CHOP" | marketState === "RANGE"){ score -= 8; negatives.push("Market state is getting choppy."); }
+  if(marketState === "TRENDING" || marketState === "BREAKOUT"){ score += 8; positives.push("Market state still supports trend continuation."); }
+  if(marketState === "CHOP" || marketState === "RANGE"){ score -= 8; negatives.push("Market state is getting choppy."); }
 
   if(type === "CALL"){
     if(momentum.includes("BULLISH")){ score += 12; positives.push("Momentum still supports the call thesis."); }
@@ -4626,10 +4759,10 @@ function getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte
 }
 
 function analyzePosition(position, livePrice, ai, priceSource){
-  if(position.type === "SELL_CALL" | position.type === "SELL_PUT"){
+  if(position.type === "SELL_CALL" || position.type === "SELL_PUT"){
     return analyzeShortOptionPosition(position, livePrice, ai, priceSource);
   }
-  const price = livePrice, type = position.type, strike = position.strike, breakeven = position.breakeven, entryPremium = position.entryPremium | 0, dte = getDTE(position.expiration);
+  const price = livePrice, type = position.type, strike = position.strike, breakeven = position.breakeven, entryPremium = position.entryPremium || 0, dte = getDTE(position.expiration);
   const intrinsic = type === "CALL" ? Math.max(0, price - strike) : Math.max(0, strike - price);
   const approxOptionValue = intrinsic + (price * 0.01);
   const approxPnLPercent = entryPremium > 0 ? Math.round(((approxOptionValue - entryPremium) / entryPremium) * 100) : null;
@@ -4640,15 +4773,15 @@ function analyzePosition(position, livePrice, ai, priceSource){
   let status = "STALKING", reason = "Setup still active but needs close monitoring", cardClass = "weak-alert";
 
   if(type === "CALL"){
-    if((dte !== null && dte <= 1 && price < breakeven) | ai.theta === "High" | ai.tradeFilter === "FAIL" | timeTarget.probability < 35){ status = "STRIKE NOW"; reason = "Not enough time or probability left for the call to work"; cardClass = "sell-alert"; }
+    if((dte !== null && dte <= 1 && price < breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL" || timeTarget.probability < 35){ status = "STRIKE NOW"; reason = "Not enough time or probability left for the call to work"; cardClass = "sell-alert"; }
     else if(throughTargetCall){ status = "LOCK PROFITS"; reason = "Price pushed through the call profit zone"; cardClass = "sell-alert"; }
-    else if(price >= breakeven && ai.momentumEngine.includes("BULLISH") && (dte === null | dte > 2) && timeTarget.probability >= 70){ status = "TARGET LOCKED"; reason = "Above breakeven with time left and strong odds to keep working"; cardClass = "hold-alert"; }
+    else if(price >= breakeven && ai.momentumEngine.includes("BULLISH") && (dte === null || dte > 2) && timeTarget.probability >= 70){ status = "TARGET LOCKED"; reason = "Above breakeven with time left and strong odds to keep working"; cardClass = "hold-alert"; }
     else if(closeToBE && !ai.momentumEngine.includes("STRONG BEARISH")){ status = "STALKING"; reason = "Near breakeven, but still needs more follow-through"; cardClass = "weak-alert"; }
     else if(ai.momentumEngine.includes("BEARISH") && dte !== null && dte <= 3){ status = "STRIKE NOW"; reason = "Momentum turned against the call with little time remaining"; cardClass = "sell-alert"; }
   }else{
-    if((dte !== null && dte <= 1 && price > breakeven) | ai.theta === "High" | ai.tradeFilter === "FAIL" | timeTarget.probability < 35){ status = "STRIKE NOW"; reason = "Not enough time or probability left for the put to work"; cardClass = "sell-alert"; }
+    if((dte !== null && dte <= 1 && price > breakeven) || ai.theta === "High" || ai.tradeFilter === "FAIL" || timeTarget.probability < 35){ status = "STRIKE NOW"; reason = "Not enough time or probability left for the put to work"; cardClass = "sell-alert"; }
     else if(throughTargetPut){ status = "LOCK PROFITS"; reason = "Price pushed through the put profit zone"; cardClass = "sell-alert"; }
-    else if(price <= breakeven && ai.momentumEngine.includes("BEARISH") && (dte === null | dte > 2) && timeTarget.probability >= 70){ status = "TARGET LOCKED"; reason = "Below breakeven with time left and strong odds to keep working"; cardClass = "hold-alert"; }
+    else if(price <= breakeven && ai.momentumEngine.includes("BEARISH") && (dte === null || dte > 2) && timeTarget.probability >= 70){ status = "TARGET LOCKED"; reason = "Below breakeven with time left and strong odds to keep working"; cardClass = "hold-alert"; }
     else if(closeToBE && !ai.momentumEngine.includes("STRONG BULLISH")){ status = "STALKING"; reason = "Near breakeven, but still needs more downside follow-through"; cardClass = "weak-alert"; }
     else if(ai.momentumEngine.includes("BULLISH") && dte !== null && dte <= 3){ status = "STRIKE NOW"; reason = "Momentum turned against the put with little time remaining"; cardClass = "sell-alert"; }
   }
@@ -4658,7 +4791,7 @@ function analyzePosition(position, livePrice, ai, priceSource){
   const targetConfidence = getTargetConfidenceEngine(position, approxPnLPercent, dte, timeTarget, ai, status);
   const thesisIntegrity = getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte, timeTarget, status);
   const holdDurationGuide = getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent, dte, thesisIntegrity, targetConfidence);
-  const baseResult = {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration | "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence,thesisIntegrity,holdDurationGuide};
+  const baseResult = {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence,thesisIntegrity,holdDurationGuide};
   baseResult.positionIntelligence = getPositionIntelligenceEngine(position, baseResult);
   baseResult.predatorCommand = getPredatorCommandCenter(position, baseResult);
   return baseResult;
@@ -4677,7 +4810,7 @@ function renderPositionScanSafely(results){
     return renderPositionCards(Array.isArray(results) ? results : []);
   }catch(err){
     showSafeError("Render Position Cards", err);
-    return `<div class="card sell-alert"><div class="section-title">Position Scan Error</div><div class="metric">${err.message}</div></div>`;
+    return `<div class="card sell-alert"><div class="section-title">Position Scan Error</div><div class="metric">${escapeHtml(err.message)}</div></div>`;
   }
 }
 
@@ -4689,7 +4822,7 @@ function renderPositionCards(results){
   return results.map(r=>`
     <div class="card ${r.cardClass}">
       <div class="section-title">Predator Command Center</div>
-      ${(()=>{ const cmd = r.predatorCommand | getPredatorCommandCenter({type:r.type}, r); return `
+      ${(()=>{ const cmd = r.predatorCommand || getPredatorCommandCenter({type:r.type}, r); return `
         <div class="command-box">
           <div class="command-action ${cmd.color}">${cmd.action}</div>
           <div class="metric"><b>Position Command Confidence:</b> ${cmd.confidence}/100</div>
@@ -4721,7 +4854,7 @@ function renderPositionCards(results){
       <div class="metric"><b>Time Window:</b> <span class="${signalClass(r.timeTarget.window)}">${r.timeTarget.window}</span></div>
       <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(r.timeTarget.bias)}">${r.timeTarget.bias}</span></div>
       <div class="metric"><b>Likely Move:</b> ${r.predictiveEngine.likelyMove}</div>
-      <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning | "CLEAR")}">${r.trapWarning | "CLEAR"}</span></div>
+      <div class="metric"><b>Trap Warning:</b> <span class="${signalClass(r.trapWarning || "CLEAR")}">${r.trapWarning || "CLEAR"}</span></div>
       <div class="metric"><b>Status:</b> <span class="${signalClass(r.status)}">${r.status}</span></div>
       ${r.shortManagement ? `
       <div class="divider"></div>
@@ -4949,7 +5082,7 @@ function renderFull(ticker, a){
     <div class="metric"><b>Assignment Mode:</b> ${a.wheelExpiration.assignmentMode}</div>
     <div class="metric"><b>Best Sell Put Duration:</b> ${a.wheelExpiration.putBestDuration} â ${a.wheelExpiration.putBestScore}/100</div>
     <div class="metric"><b>Best Sell Call Duration:</b> ${a.wheelExpiration.callBestDuration} â ${a.wheelExpiration.callBestScore}/100</div>
-    ${(a.wheelExpiration?.rows | []).map(row => `
+    ${(a.wheelExpiration?.rows || []).map(row => `
       <div class="metric"><b>${row.label}:</b> Put ${row.sellPutScore}/100 â¢ Call ${row.sellCallScore}/100</div>
     `).join("")}
     <div class="metric"><b>Reason:</b> ${a.wheelExpiration.reason}</div>
@@ -5006,7 +5139,7 @@ function renderFull(ticker, a){
     <div class="metric"><b>Strong Profit Zone:</b> +25% to +40%</div>
     <div class="metric"><b>Runner Zone:</b> +40% or more only if alignment stays strong</div>
     <div class="metric"><b>Hold Guidance:</b> ${a.nextDay && a.nextDay.overnightRisk === "HIGH" ? "Avoid overnight unless already scaled out" : "Hold only while confirmation stays valid"}</div>
-    <div class="metric"><b>Overnight Rule:</b> ${a.nextDay && (a.nextDay.chaseRisk === "HIGH" | a.nextDay.reversalTrap === "HIGH") ? "Take profits before overnight if green" : "Can consider overnight only with strong confirmation"}</div>
+    <div class="metric"><b>Overnight Rule:</b> ${a.nextDay && (a.nextDay.chaseRisk === "HIGH" || a.nextDay.reversalTrap === "HIGH") ? "Take profits before overnight if green" : "Can consider overnight only with strong confirmation"}</div>
     <div class="divider"></div>
     <div class="section-title">Exit & Execution</div>
     <div class="metric"><b>Optimal Exit:</b> ${a.optimalExit}</div>
@@ -5044,7 +5177,7 @@ function renderCompact(ticker, a){
 function applyPortfolioAlertSummary(results, sourceLabel){
   let redAlerts = 0, yellowAlerts = 0;
   results.forEach(m=>{
-    if(m.status === "STRIKE NOW" | m.status === "LOCK PROFITS" | m.status === "UNAVAILABLE") redAlerts++;
+    if(m.status === "STRIKE NOW" || m.status === "LOCK PROFITS" || m.status === "UNAVAILABLE") redAlerts++;
     else if(m.status === "STALKING") yellowAlerts++;
   });
   if(redAlerts > 0) pushAlert(`${sourceLabel}: ${redAlerts} target${redAlerts>1?'s':''} need immediate action.`, "red");
@@ -5057,7 +5190,7 @@ function applyPortfolioAlertSummary(results, sourceLabel){
 
 function renderApiFailureDiagnostic(ticker, extraMessage=""){
   const issue = lastApiIssue;
-  const issueText = extraMessage | issue?.message | "Historical market data did not load.";
+  const issueText = extraMessage || issue?.message || "Historical market data did not load.";
   const lower = String(issueText).toLowerCase();
 
   const likelyLimit =
@@ -5100,7 +5233,7 @@ async function runFallbackAnalysis(ticker){
 
   const quote = await getGlobalQuotePrice(ticker);
   const intra = quote ? null : await getIntradayPrice(ticker);
-  const price = quote | intra;
+  const price = quote || intra;
 
   if(!price){
     output.innerHTML = renderApiFailureDiagnostic(ticker);
@@ -5130,7 +5263,7 @@ function saveLastAnalysis(ticker, analysisHtml, compactHtml, analysisData){
 function recheckLastAnalysis(){
   const output = document.getElementById("output");
   const cache = getStore("signal_predator_last_analysis", null);
-  if(!cache | !cache.analysisHtml){
+  if(!cache || !cache.analysisHtml){
     output.innerHTML = "<div class='card'>No last analysis saved yet. Run Predator Analysis once first.</div>";
     return;
   }
@@ -5184,11 +5317,11 @@ async function scanList(list, title){
     updateApiStatus(`Scanning ${ticker} (${i+1}/${list.length})...`, "blue");
 
     const closes = await getHistory(ticker);
-    if(!closes | !closes.length){
+    if(!closes || !closes.length){
       failures.push({
         ticker,
         stage:"Daily history",
-        message:lastApiIssue?.message | "Daily history unavailable."
+        message:lastApiIssue?.message || "Daily history unavailable."
       });
       continue;
     }
@@ -5198,7 +5331,7 @@ async function scanList(list, title){
       failures.push({
         ticker,
         stage:"Price",
-        message:lastApiIssue?.message | "Live/fallback price unavailable."
+        message:lastApiIssue?.message || "Live/fallback price unavailable."
       });
       continue;
     }
@@ -5231,11 +5364,15 @@ async function scanList(list, title){
   }
 
   buys.sort((x,y)=>
-    y.conviction - x.conviction | y.alignment - x.alignment | y.ttt - x.ttt
+    y.conviction - x.conviction ||
+    y.alignment - x.alignment ||
+    y.ttt - x.ttt
   );
 
   waits.sort((x,y)=>
-    y.conviction - x.conviction | y.alignment - x.alignment | y.ttt - x.ttt
+    y.conviction - x.conviction ||
+    y.alignment - x.alignment ||
+    y.ttt - x.ttt
   );
 
   const output = document.getElementById("output");
@@ -5288,10 +5425,10 @@ async function scanList(list, title){
           ${closest.map(r=>`
             <div class="card" style="padding:12px;margin-top:9px;">
               <div class="metric"><b>${r.ticker}</b> â <span class="yellow">WAIT</span></div>
-              <div class="metric"><b>Favored Trade:</b> ${cleanUiText(r.finalDecision.direction)}</div>
+              <div class="metric"><b>Favored Trade:</b> ${r.finalDecision.direction}</div>
               <div class="metric"><b>Why not yet:</b> ${r.finalDecision.reason}</div>
               <div class="metric"><b>What changes it to BUY:</b> ${r.finalDecision.upgrade}</div>
-              <div class="metric"><b>Expiration:</b> ${cleanUiText(r.finalDecision.expiration)}</div>
+              <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
             </div>
           `).join("")}
         ` : ""}
@@ -5318,7 +5455,7 @@ async function scanList(list, title){
           <div class="metric"><b>${r.ticker}</b> â <span class="green">${r.finalDecision.direction}</span></div>
           <div class="metric"><b>Final Decision:</b> <span class="green">BUY</span></div>
           <div class="metric"><b>Bot Confidence:</b> ${r.conviction}/100</div>
-          <div class="metric"><b>Expiration:</b> ${cleanUiText(r.finalDecision.expiration)}</div>
+          <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
           <div class="metric"><b>Account Fit:</b> ${r.finalDecision.accountFit}</div>
           <div class="metric"><b>Why:</b> ${r.finalDecision.reason}</div>
           <div class="metric"><b>What to do:</b> ${r.finalDecision.action}</div>
@@ -5375,7 +5512,7 @@ async function findBestTrade(){
         safeNum(a.alignmentScore?.score,0) +
         safeNum(a.timeTarget?.probability,0);
 
-      if(!best | rankScore > best.rankScore){
+      if(!best || rankScore > best.rankScore){
         best = {ticker, a, d, rankScore};
       }
     }
@@ -5421,12 +5558,12 @@ async function scanMyPositions(){
     const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
     const closes = await getHistory(ticker);
     if(!closes){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration | "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration | "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
       results.push(item); cache.results.push(item); continue;
     }
     const ai = analyze(closes, pricePack.price);
@@ -5444,7 +5581,7 @@ async function scanMyPositions(){
 function quickRecheckPositions(){
   const output = document.getElementById("output");
   const cache = getStore("ai_options_last_scan_cache", null);
-  if(!cache | !cache.results | !cache.results.length){
+  if(!cache || !cache.results || !cache.results.length){
     output.innerHTML = "<div class='card'>No recent live scan found yet. Run <b>Live Position Scan</b> once first, then Quick Recheck will work without API calls.</div>";
     clearActiveAlertsPanel();
     return;
@@ -5467,13 +5604,14 @@ function quickRecheckPositions(){
         }
       }
     }
-    copy.priceSource = String(copy.priceSource | "Cached") + " / Quick Recheck";
+    copy.priceSource = String(copy.priceSource || "Cached") + " / Quick Recheck";
     return copy;
   });
   applyPortfolioAlertSummary(refreshed, "TACTICAL QUICK RECHECK");
   output.innerHTML = `<div class='card'><div class='section-title'>Quick Recheck</div><div class='metric'>Using your most recent live scan from ${new Date(cache.scannedAt).toLocaleString()}.</div><div class='metric muted'>No new API calls were used.</div><div class="pill blue">CACHE MODE</div><div class="pill green">API SAFE</div></div>` + renderPositionCards(refreshed);
 }
 
+renderApiKeyStatus();
 renderWatchlist();
 renderPositions();
 renderPerformanceTracker();
