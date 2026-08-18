@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.0.1 Personal API Setup</title>
+  <title>Signal Predator AI v47.0.3 Full Render Repair</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.0.1 // personal API setup // clean core // stability hardening</div>
+  <div class="subtitle">v47.0.3 // full render repair // missing helper hardening</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-0.json";
+  a.download = "signal-predator-backup-v47-0-3.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -4927,6 +4927,37 @@ function renderPositionCards(results){
   `).join("");
 }
 
+function renderAdvancedScanToggle(){
+  return `
+    <div class="card">
+      <div class="section-title">Advanced Details</div>
+      <button class="secondary" onclick="toggleAdvancedScanDetails(this)">Show / Hide Advanced Metrics</button>
+      <div class="metric muted">The Final Answer above remains the only BUY / WAIT / NO TRADE authority.</div>
+    </div>`;
+}
+
+function toggleAdvancedScanDetails(button){
+  try{
+    const root = button ? button.closest(".card")?.parentElement : null;
+    const scope = root || document;
+    const panels = scope.querySelectorAll(".advanced-panel");
+    if(!panels.length) return;
+
+    let anyHidden = false;
+    panels.forEach(panel=>{
+      const hidden = getComputedStyle(panel).display === "none";
+      panel.style.display = hidden ? "block" : "none";
+      if(hidden) anyHidden = true;
+    });
+
+    if(button){
+      button.textContent = anyHidden ? "Hide Advanced Metrics" : "Show Advanced Metrics";
+    }
+  }catch(e){
+    console.warn("Advanced-details toggle skipped:", e);
+  }
+}
+
 function renderFull(ticker, a){
   a = ensureEngineDefaults(a);
   if(!a.multiTimeframeEntry && typeof getMultiTimeframeEntryEngine === 'function'){
@@ -4936,8 +4967,8 @@ function renderFull(ticker, a){
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderSimplePredatorDecision(a)}
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
-  ${renderApiWarningOnly()}
-  ${renderAdvancedScanToggle()}
+  ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
+  ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
   <div class="scan-support">
     ${renderExpirationPolicyCard(a)}
     ${renderPredatorConvictionCard(a)}
@@ -5157,8 +5188,8 @@ function renderCompact(ticker, a){
   a = ensureEngineDefaults(a);
   return `${renderSimplePredatorDecision(a)}
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
-  ${renderApiWarningOnly()}
-  ${renderAdvancedScanToggle()}
+  ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
+  ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
   <div class="scan-support">
     ${renderExpirationPolicyCard(a)}
     ${renderPredatorConvictionCard(a)}
@@ -5187,6 +5218,40 @@ function applyPortfolioAlertSummary(results, sourceLabel){
   renderActiveAlertsPanel(allAlerts);
 }
 
+
+function renderApiWarningOnly(){
+  const issue = lastApiIssue;
+  if(!issue) return "";
+
+  const message = String(issue.message || "Market data warning.");
+  const lower = message.toLowerCase();
+
+  let title = "DATA WARNING";
+  let detail = "One or more market-data requests returned an incomplete response.";
+  let action = "Predator will use only data that passed validation.";
+
+  if(/limit|frequency|rate|too many requests|call volume|thank you for using alpha vantage/i.test(message)){
+    title = "API LIMIT WARNING";
+    detail = "Alpha Vantage reported a rate or usage limit.";
+    action = "Pause additional scans and retry after the API window resets.";
+  }else if(/premium|subscribe|higher api call frequency/i.test(message)){
+    title = "API ENDPOINT WARNING";
+    detail = "Alpha Vantage returned a premium-access message for a requested endpoint.";
+    action = "Predator will fall back when possible. Do not treat missing data as a trading signal.";
+  }else if(/invalid api call|invalid symbol|symbol/i.test(message)){
+    title = "SYMBOL / API WARNING";
+    detail = "The ticker or API response appears invalid.";
+    action = "Check the ticker symbol before rescanning.";
+  }
+
+  return `
+    <div class="card weak-alert">
+      <div class="section-title">${title}</div>
+      <div class="metric"><b>What happened:</b> ${escapeHtml(detail)}</div>
+      <div class="metric"><b>API detail:</b> ${escapeHtml(message.slice(0,260))}</div>
+      <div class="metric"><b>What to do:</b> ${escapeHtml(action)}</div>
+    </div>`;
+}
 
 function renderApiFailureDiagnostic(ticker, extraMessage=""){
   const issue = lastApiIssue;
