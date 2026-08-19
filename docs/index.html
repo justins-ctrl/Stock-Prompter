@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.4 Position Management Coach</title>
+  <title>Signal Predator AI v47.5 Adaptive Contract Selection</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.4 // position management coach // hold-profit-exit guidance</div>
+  <div class="subtitle">v47.5 // adaptive contract selection // quality OTM path // profile ranking</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-4.json";
+  a.download = "signal-predator-backup-v47-5.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3993,31 +3993,84 @@ function getContractSelectionCoach(a){
     ? portfolioValue * (maxAllocPct / 100)
     : safeNum(account.maxCapital, 0);
 
-  const exp = d.expiration || "45-75 DTE Monthly";
   const swing = d.swingValidation || getSwingValidationEngine(a);
+  const expiration = d.expiration || "45-75 DTE Monthly";
+  const direction = d.direction || "N/A";
+  const triggerConfirmed = !!swing.triggerConfirmed;
 
-  let acceptableDeltaMin = 0.55;
-  let acceptableDeltaMax = 0.70;
-  let idealDeltaMin = 0.60;
-  let idealDeltaMax = 0.65;
-  let acceptableStrikeStyle = "ATM to 1 strike ITM";
-  let idealStrikeStyle = "ATM or slightly ITM";
-  let idealDte = "50-65 DTE";
-  let premiumBuffer = 0.90;
+  const profiles = [
+    {
+      name:"CONSERVATIVE",
+      deltaMin:0.60,
+      deltaMax:0.70,
+      strikeStyle:"ITM to ATM",
+      dte:"50-65 DTE",
+      description:"Highest stock-like exposure and lower leverage."
+    },
+    {
+      name:"BALANCED",
+      deltaMin:0.45,
+      deltaMax:0.60,
+      strikeStyle:"ATM to modestly OTM",
+      dte:"50-70 DTE",
+      description:"Balances cost, probability, and directional leverage."
+    },
+    {
+      name:"AGGRESSIVE",
+      deltaMin:0.30,
+      deltaMax:0.45,
+      strikeStyle:"Modestly OTM",
+      dte:"55-75 DTE",
+      description:"Lower capital and higher leverage, but requires a larger underlying move."
+    }
+  ];
 
-  if(swing.monthlyThesis === "ELITE"){
-    acceptableDeltaMin = 0.55;
-    acceptableDeltaMax = 0.70;
-    idealDeltaMin = 0.60;
-    idealDeltaMax = 0.65;
-    premiumBuffer = 0.95;
-  }else if(swing.monthlyThesis === "STRONG"){
-    acceptableDeltaMin = 0.50;
-    acceptableDeltaMax = 0.65;
-    idealDeltaMin = 0.55;
-    idealDeltaMax = 0.60;
-    premiumBuffer = 0.90;
+  let recommendedProfile = "CONSERVATIVE";
+  let recommendationReason = "The account can prioritize higher-delta, stock-like exposure.";
+
+  if(d.decision === "BUY"){
+    const earlyEntry = !triggerConfirmed;
+    const thesisElite = swing.monthlyThesis === "ELITE";
+    const thesisStrong = swing.monthlyThesis === "STRONG";
+
+    if(maxCapital > 0 && maxCapital <= 500){
+      recommendedProfile = "BALANCED";
+      recommendationReason = "The saved allocation is small enough that a quality modest-OTM contract may fit better than a higher-delta contract.";
+    }
+
+    if(earlyEntry){
+      recommendationReason += " Because this is an early structural entry, avoid compounding timing risk with a low-delta contract.";
+    }
+
+    if(!thesisElite && thesisStrong){
+      recommendedProfile = "CONSERVATIVE";
+      recommendationReason = "The setup is strong but not elite, so prefer higher-delta exposure rather than adding OTM leverage.";
+    }
+
+    if(!thesisElite && !thesisStrong){
+      recommendedProfile = "CONSERVATIVE";
+      recommendationReason = "Weak monthly setups should not be pushed farther OTM.";
+    }
   }
+
+  const qualityOtmAllowed =
+    d.decision === "BUY" &&
+    (swing.monthlyThesis === "ELITE" || swing.monthlyThesis === "STRONG") &&
+    swing.structureValid &&
+    safeNum(a.alignmentScore?.score, 0) >= 75 &&
+    safeNum(getPredatorConvictionEngine(a)?.conviction, 0) >= 75;
+
+  const aggressiveAllowed =
+    qualityOtmAllowed &&
+    triggerConfirmed &&
+    swing.monthlyThesis === "ELITE" &&
+    safeNum(a.alignmentScore?.score, 0) >= 85 &&
+    safeNum(getPredatorConvictionEngine(a)?.conviction, 0) >= 85;
+
+  const premiumBuffer =
+    swing.monthlyThesis === "ELITE" ? 0.95 :
+    swing.monthlyThesis === "STRONG" ? 0.90 :
+    0.85;
 
   const maxPremiumPerContract = maxCapital > 0
     ? Math.max(0, Math.floor((maxCapital * premiumBuffer) / 100 * 100) / 100)
@@ -4031,14 +4084,12 @@ function getContractSelectionCoach(a){
     ? Math.floor(maxPremiumPerContract * 100)
     : 0;
 
-  const direction = d.direction || "N/A";
-
   let buyType = "NO BUY";
   let buyTypeColor = "red";
   let buyTypeMeaning = "No contract should be selected unless the Final Answer is BUY.";
 
   if(d.decision === "BUY"){
-    if(swing.triggerConfirmed){
+    if(triggerConfirmed){
       buyType = "BUY - CONFIRMED ENTRY";
       buyTypeColor = "green";
       buyTypeMeaning = "The monthly thesis is approved and the preferred price trigger is confirmed.";
@@ -4057,17 +4108,34 @@ function getContractSelectionCoach(a){
     buyTypeMeaning = "Do not spend premium on this setup.";
   }
 
+  const rankedProfiles = profiles.map(p=>{
+    let score = 50;
+
+    if(p.name === recommendedProfile) score += 25;
+    if(p.name === "CONSERVATIVE") score += triggerConfirmed ? 10 : 5;
+    if(p.name === "BALANCED") score += qualityOtmAllowed ? 12 : -20;
+    if(p.name === "AGGRESSIVE") score += aggressiveAllowed ? 10 : -35;
+
+    if(!triggerConfirmed && p.name === "AGGRESSIVE") score -= 20;
+    if(swing.monthlyThesis !== "ELITE" && p.name === "AGGRESSIVE") score -= 20;
+    if(maxCapital > 0 && maxCapital <= 500 && p.name === "BALANCED") score += 10;
+
+    score = Math.max(0, Math.min(100, score));
+
+    return {
+      ...p,
+      score,
+      allowed:
+        p.name === "CONSERVATIVE" ? true :
+        p.name === "BALANCED" ? qualityOtmAllowed :
+        aggressiveAllowed
+    };
+  }).sort((a,b)=>b.score-a.score);
+
   return {
     decision:d.decision,
     direction,
-    expiration:exp,
-    idealDte,
-    idealDeltaMin,
-    idealDeltaMax,
-    acceptableDeltaMin,
-    acceptableDeltaMax,
-    idealStrikeStyle,
-    acceptableStrikeStyle,
+    expiration,
     maxCapital:Math.max(0, Math.round(maxCapital)),
     maxPremiumPerContract,
     maxPremiumDisplay,
@@ -4076,9 +4144,15 @@ function getContractSelectionCoach(a){
     buyType,
     buyTypeColor,
     buyTypeMeaning,
-    triggerConfirmed:!!swing.triggerConfirmed,
+    triggerConfirmed,
     trigger:swing.trigger || "N/A",
-    invalidation:swing.invalidation || "N/A"
+    invalidation:swing.invalidation || "N/A",
+    monthlyThesis:swing.monthlyThesis,
+    qualityOtmAllowed,
+    aggressiveAllowed,
+    recommendedProfile,
+    recommendationReason,
+    rankedProfiles
   };
 }
 function renderContractSelectionCoach(a){
@@ -4087,31 +4161,50 @@ function renderContractSelectionCoach(a){
   if(c.decision !== "BUY"){
     return `
       <div class="card">
-        <div class="section-title">Execution Coach</div>
+        <div class="section-title">Adaptive Contract Coach</div>
         <div class="metric"><b>Status:</b> <span class="${c.buyTypeColor}">${escapeHtml(c.buyType)}</span></div>
         <div class="metric muted">${escapeHtml(c.buyTypeMeaning)}</div>
       </div>`;
   }
 
+  const profileCards = c.rankedProfiles.map((p, idx)=>{
+    const recommended = p.name === c.recommendedProfile;
+    const state = p.allowed ? (recommended ? "BEST FIT" : "ALLOWED") : "NOT RECOMMENDED";
+    const stateClass = p.allowed ? (recommended ? "green" : "yellow") : "red";
+
+    return `
+      <div class="card" style="padding:12px;margin-top:10px;">
+        <div class="metric"><b>${idx+1}. ${escapeHtml(p.name)}</b> <span class="${stateClass}">${state}</span></div>
+        <div class="metric"><b>Profile Score:</b> ${p.score}/100</div>
+        <div class="metric"><b>DTE:</b> ${escapeHtml(p.dte)}</div>
+        <div class="metric"><b>Strike Style:</b> ${escapeHtml(p.strikeStyle)}</div>
+        <div class="metric"><b>Delta:</b> ${p.deltaMin.toFixed(2)}-${p.deltaMax.toFixed(2)}</div>
+        <div class="metric"><b>Purpose:</b> ${escapeHtml(p.description)}</div>
+      </div>`;
+  }).join("");
+
   return `
     <div class="card">
-      <div class="section-title">Execution Coach</div>
+      <div class="section-title">Adaptive Contract Coach</div>
 
       <div class="metric"><b>Entry Classification:</b> <span class="${c.buyTypeColor}">${escapeHtml(c.buyType)}</span></div>
       <div class="metric">${escapeHtml(c.buyTypeMeaning)}</div>
 
       <div class="divider"></div>
-      <div class="section-title">Ideal Contract</div>
-      <div class="metric"><b>Trade:</b> ${escapeHtml(c.direction)}</div>
-      <div class="metric"><b>Ideal DTE:</b> ${escapeHtml(c.idealDte)}</div>
-      <div class="metric"><b>Ideal Strike:</b> ${escapeHtml(c.idealStrikeStyle)}</div>
-      <div class="metric"><b>Ideal Delta:</b> ${c.idealDeltaMin.toFixed(2)}-${c.idealDeltaMax.toFixed(2)}</div>
+      <div class="section-title">Best Contract Profile for This Account</div>
+      <div class="metric"><b>Recommended Profile:</b> <span class="green">${escapeHtml(c.recommendedProfile)}</span></div>
+      <div class="metric"><b>Why:</b> ${escapeHtml(c.recommendationReason)}</div>
 
       <div class="divider"></div>
-      <div class="section-title">Acceptable Contract Range</div>
-      <div class="metric"><b>Expiration Window:</b> ${escapeHtml(c.expiration)}</div>
-      <div class="metric"><b>Strike Style:</b> ${escapeHtml(c.acceptableStrikeStyle)}</div>
-      <div class="metric"><b>Acceptable Delta:</b> ${c.acceptableDeltaMin.toFixed(2)}-${c.acceptableDeltaMax.toFixed(2)}</div>
+      <div class="section-title">Contract Profiles</div>
+      ${profileCards}
+
+      <div class="divider"></div>
+      <div class="section-title">Quality OTM Rules</div>
+      <div class="metric"><b>Quality OTM Allowed:</b> ${c.qualityOtmAllowed ? "YES" : "NO"}</div>
+      <div class="metric"><b>Aggressive OTM Allowed:</b> ${c.aggressiveAllowed ? "YES" : "NO"}</div>
+      <div class="metric">Predator never moves farther OTM merely because the option is cheaper. OTM requires a valid monthly thesis, strong alignment, sufficient conviction, and intact structure.</div>
+      ${!c.triggerConfirmed ? `<div class="metric yellow"><b>Early-entry guard:</b> Because the preferred trigger is not confirmed, Predator will not recommend the aggressive low-delta profile.</div>` : ""}
 
       <div class="divider"></div>
       <div class="section-title">Capital Guard</div>
@@ -4123,12 +4216,12 @@ function renderContractSelectionCoach(a){
       <div class="divider"></div>
       <div class="section-title">Robinhood Contract Checklist</div>
       <div class="metric">1. Open ${escapeHtml(c.direction === "BUY CALL" ? "Calls" : "Puts")} for the ticker.</div>
-      <div class="metric">2. Choose an expiration inside ${escapeHtml(c.expiration)}; ideally ${escapeHtml(c.idealDte)}.</div>
-      <div class="metric">3. Start with ${escapeHtml(c.idealStrikeStyle.toLowerCase())}.</div>
-      <div class="metric">4. Prefer Delta ${c.idealDeltaMin.toFixed(2)}-${c.idealDeltaMax.toFixed(2)}; acceptable ${c.acceptableDeltaMin.toFixed(2)}-${c.acceptableDeltaMax.toFixed(2)}.</div>
+      <div class="metric">2. Choose a monthly expiration inside ${escapeHtml(c.expiration)}.</div>
+      <div class="metric">3. Start with the ${escapeHtml(c.recommendedProfile)} profile above.</div>
+      <div class="metric">4. Match the closest available strike/Delta combination.</div>
       <div class="metric">5. Do not pay more than $${c.maxPremiumDisplay} per share.</div>
-      <div class="metric">6. Prefer a tighter bid/ask spread when similar contracts are available.</div>
-      <div class="metric">7. Avoid paying unusually rich premium when comparable strikes/expirations are materially cheaper.</div>
+      <div class="metric">6. Prefer tighter bid/ask spreads when similar contracts are available.</div>
+      <div class="metric">7. Prefer stronger liquidity and avoid unusually rich premium.</div>
       <div class="metric">8. Never exceed the saved account allocation.</div>
 
       <div class="divider"></div>
@@ -4210,7 +4303,7 @@ function renderSimplePredatorDecision(a){
     </div>
 
     <div class="divider"></div>
-    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div><div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Execution Coach below to choose the ideal contract, acceptable range, and max premium. After entry, use Live Position Scan for HOLD / TAKE PROFIT / REDUCE / EXIT guidance.</div>
+    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div><div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Adaptive Contract Coach below to compare conservative, balanced, and aggressive contract profiles and stay within the max premium. After entry, use Live Position Scan for HOLD / TAKE PROFIT / REDUCE / EXIT guidance.</div>
     ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
     <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
   </div>`;
