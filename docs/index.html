@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.0.3 Full Render Repair</title>
+  <title>Signal Predator AI v47.1 Swing Validation + Opportunity Funnel</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.0.3 // full render repair // missing helper hardening</div>
+  <div class="subtitle">v47.1 // monthly swing validation // opportunity funnel // near-miss tracker</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-0-3.json";
+  a.download = "signal-predator-backup-v47-1.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3745,126 +3745,125 @@ function getStrategyExpirationPolicy(a){
   };
 }
 
-function getSimplePredatorDecision(a){
+function getSwingValidationEngine(a){
   a = ensureEngineDefaults(a);
-
   const policy = getStrategyExpirationPolicy(a);
-  const conviction = getPredatorConvictionEngine(a);
-  const fit = getAccountFit(a, "MOMENTUM");
-  const brain = typeof getPredatorBrain === "function" ? getPredatorBrain(a) : null;
-  const session = typeof getDynamicConfirmationEngine === "function" ? getDynamicConfirmationEngine(a) : null;
-
   const direction = policy.buyDirection;
   const validDirection = direction === "BUY CALL" || direction === "BUY PUT";
   const alignment = safeNum(a.alignmentScore?.score, 0);
   const timing = safeNum(a.timeTarget?.probability, 0);
+  const conviction = safeNum(getPredatorConvictionEngine(a)?.conviction, 0);
   const quality = a.qualityDecision?.decision || "N/A";
   const noTrade = a.noTradeZone?.zone || "CLEAR";
   const marketState = a.marketRegimeFilter?.state || "N/A";
+  const trigger = parseFloat(a.nextDay?.buyTrigger || "NaN");
+  const invalidation = parseFloat(a.nextDay?.invalidation || "NaN");
+  const price = parseFloat(a.price || "NaN");
+  const chaseRisk = a.nextDay?.chaseRisk || "N/A";
+  const reversalTrap = a.nextDay?.reversalTrap || "N/A";
+  const overnightRisk = a.nextDay?.overnightRisk || "N/A";
 
-  const botStatus = String(brain?.botStatus || brain?.status || "").toUpperCase();
-  const brainVerdict = String(brain?.finalVerdict || brain?.verdict || "").toUpperCase();
-  const entryPermission = String(a.confirmationHold?.entryPermission || "").toUpperCase();
-  const entryTiming = String(a.entryTiming?.label || "").toUpperCase();
-  const tomorrowRead = String(a.nextDay?.tomorrowRead || "").toUpperCase();
+  let structureValid = true;
+  let triggerConfirmed = false;
+  let distanceToTriggerPct = null;
+  let distanceToInvalidationPct = null;
 
-  const hardReject =
-    !validDirection ||
-    !fit.affordable ||
-    quality === "REJECT" ||
-    noTrade !== "CLEAR" ||
-    marketState === "DANGEROUS" ||
-    alignment < 60;
+  if(Number.isFinite(price) && Number.isFinite(trigger)){
+    if(direction === "BUY CALL"){
+      triggerConfirmed = price >= trigger;
+      distanceToTriggerPct = ((trigger - price) / Math.max(price,0.01)) * 100;
+    }else if(direction === "BUY PUT"){
+      triggerConfirmed = price <= trigger;
+      distanceToTriggerPct = ((price - trigger) / Math.max(price,0.01)) * 100;
+    }
+  }
 
-  const setupIsGood =
-    validDirection &&
-    fit.affordable &&
-    quality !== "REJECT" &&
-    noTrade === "CLEAR" &&
-    marketState !== "DANGEROUS" &&
-    alignment >= 70 &&
-    timing >= 65 &&
-    safeNum(conviction.conviction,0) >= 75;
+  if(Number.isFinite(price) && Number.isFinite(invalidation)){
+    if(direction === "BUY CALL"){
+      structureValid = price > invalidation;
+      distanceToInvalidationPct = ((price - invalidation) / Math.max(price,0.01)) * 100;
+    }else if(direction === "BUY PUT"){
+      structureValid = price < invalidation;
+      distanceToInvalidationPct = ((invalidation - price) / Math.max(price,0.01)) * 100;
+    }
+  }
 
-  // SINGLE AUTHORITY ENTRY GATE:
-  // A monthly swing BUY still needs explicit permission. Strong setup alone = WAIT.
-  const explicitBuyPermission =
-    entryPermission.includes("CAN ENTER") ||
-    entryPermission.includes("APPROVED") ||
-    entryTiming === "ENTER NOW" ||
-    brainVerdict === "BUY" ||
-    botStatus === "BOT APPROVED";
+  const hardBlock = !validDirection || quality === "REJECT" || noTrade !== "CLEAR" || marketState === "DANGEROUS" || !structureValid || alignment < 60;
+  const strongMonthlyThesis = validDirection && !hardBlock && alignment >= 75 && timing >= 65 && conviction >= 75;
+  const eliteMonthlyThesis = validDirection && !hardBlock && alignment >= 85 && timing >= 75 && conviction >= 85;
+  const riskNeedsStrictConfirmation = chaseRisk === "HIGH" || reversalTrap === "HIGH" || overnightRisk === "HIGH" || (distanceToInvalidationPct !== null && distanceToInvalidationPct < 1.0);
 
-  const explicitWaitSignal =
-    entryPermission.includes("WAIT") ||
-    entryTiming.includes("WAIT") ||
-    tomorrowRead.includes("WAIT") ||
-    tomorrowRead.includes("CONFIRM") ||
-    botStatus.includes("WAIT") ||
-    brainVerdict.includes("WATCHLIST") ||
-    brainVerdict.includes("WAIT");
+  let validation = "PASS";
+  let entryMode = "NO ENTRY";
+  let reason = "Monthly setup is not strong enough.";
+  let blocker = "SETUP QUALITY";
 
-  let decision = "PASS";
-  let color = "red";
+  if(hardBlock){
+    blocker = !structureValid ? "STRUCTURE INVALIDATION" : noTrade !== "CLEAR" ? "NO-TRADE ZONE" : quality === "REJECT" ? "QUALITY REJECT" : alignment < 60 ? "ALIGNMENT" : "SETUP QUALITY";
+    reason = "The monthly thesis is not structurally valid enough to enter.";
+  }else if(eliteMonthlyThesis && !riskNeedsStrictConfirmation){
+    validation = "BUY";
+    entryMode = triggerConfirmed ? "CONFIRMED SWING ENTRY" : "STRUCTURAL SWING ENTRY";
+    blocker = "NONE";
+    reason = triggerConfirmed ? "Strong monthly thesis and preferred trigger are both confirmed." : "Monthly thesis is strong enough that the trigger is preferred, not mandatory. Structure remains valid.";
+  }else if(strongMonthlyThesis && triggerConfirmed && !riskNeedsStrictConfirmation){
+    validation = "BUY";
+    entryMode = "CONFIRMED SWING ENTRY";
+    blocker = "NONE";
+    reason = "Monthly thesis is strong and the preferred trigger is confirmed.";
+  }else if(strongMonthlyThesis && !triggerConfirmed && !riskNeedsStrictConfirmation){
+    validation = "WAIT";
+    entryMode = "NEAR-MISS SWING";
+    blocker = "PRICE VALIDATION";
+    reason = "The monthly thesis is good, but not strong enough to waive the preferred trigger.";
+  }else if(strongMonthlyThesis && riskNeedsStrictConfirmation){
+    validation = "WAIT";
+    entryMode = "STRICT CONFIRMATION REQUIRED";
+    blocker = "RISK / PRICE VALIDATION";
+    reason = "The setup is good, but current extension or invalidation risk requires stricter price confirmation.";
+  }
+
+  let readiness = Math.round(alignment * 0.30 + timing * 0.20 + conviction * 0.25 + (structureValid ? 15 : 0) + (triggerConfirmed ? 10 : 5));
+  readiness = Math.max(0, Math.min(100, readiness));
+
+  return {validation,entryMode,reason,blocker,readiness,structureValid,triggerConfirmed,distanceToTriggerPct,distanceToInvalidationPct,trigger:Number.isFinite(trigger)?trigger.toFixed(2):"N/A",invalidation:Number.isFinite(invalidation)?invalidation.toFixed(2):"N/A",buyWindow:policy.buyWindow,monthlyThesis:eliteMonthlyThesis?"ELITE":strongMonthlyThesis?"STRONG":"WEAK"};
+}
+
+function getSimplePredatorDecision(a){
+  a = ensureEngineDefaults(a);
+  const policy = getStrategyExpirationPolicy(a);
+  const fit = getAccountFit(a, "MOMENTUM");
+  const swing = getSwingValidationEngine(a);
+  const direction = policy.buyDirection;
+  const validDirection = direction === "BUY CALL" || direction === "BUY PUT";
+
+  let decision = "PASS", color = "red";
   let reason = "The setup does not provide enough agreement to justify buying an option.";
   let action = "Move to the next ticker.";
   let upgrade = "A new scan must produce a stronger setup.";
   let expiration = policy.buyWindow;
-  let invalidation = a.nextDay?.invalidation || "N/A";
+  let invalidation = swing.invalidation;
 
-  if(hardReject){
-    if(!validDirection){
-      reason = "Predator does not see a clear directional call or put setup.";
-      action = "Pass and move to the next ticker.";
-    }else if(!fit.affordable){
-      reason = "The setup may be interesting, but the estimated contract cost does not fit the saved account allocation.";
-      action = "Pass and look for a more affordable monthly option setup.";
-    }else if(noTrade !== "CLEAR"){
-      reason = `Price is currently in ${noTrade}. That is not a clean place to open a monthly option.`;
-      action = "Pass for now and wait for a cleaner structure.";
-    }else if(quality === "REJECT"){
-      reason = `The quality engine rejected the setup: ${a.qualityDecision?.reason || "trade quality is too weak"}.`;
-      action = "Pass and move on.";
-    }else if(alignment < 60){
-      reason = "Trend alignment is too weak for a new monthly option position.";
-      action = "Pass and wait for stronger alignment.";
-    }
-  }else if(setupIsGood && explicitBuyPermission && !explicitWaitSignal){
-    decision = "BUY";
-    color = "green";
-    reason = `${direction === "BUY CALL" ? "Bullish" : "Bearish"} swing structure is strong, the monthly expiration fits the thesis, and the entry gate is approved.`;
+  if(!validDirection){
+    reason = "Predator does not see a clear directional call or put setup.";
+    action = "Pass and move to the next ticker.";
+  }else if(!fit.affordable){
+    reason = "The setup may be interesting, but the estimated contract cost does not fit the saved account allocation.";
+    action = "Pass and look for a more affordable monthly option setup.";
+  }else if(swing.validation === "PASS"){
+    reason = swing.reason;
+    action = "Pass and wait for a stronger or cleaner monthly setup.";
+  }else if(swing.validation === "BUY"){
+    decision = "BUY"; color = "green"; reason = swing.reason;
     action = `Use a monthly ${direction === "BUY CALL" ? "call" : "put"} in the ${policy.buyWindow} window and stay within the saved account-size limit.`;
     upgrade = "Already approved.";
-  }else if(setupIsGood){
-    decision = "WAIT";
-    color = "yellow";
-
-    if(a.nextDay?.chaseRisk === "HIGH" || entryTiming === "WAIT FOR PULLBACK"){
-      reason = "The monthly swing thesis is good, but price is too extended right now. Predator wants a better entry instead of chasing.";
-      action = "Wait for the pullback or reclaim condition shown below.";
-      upgrade = brain?.upgradeRule || "Upgrade to BUY when price improves while the swing thesis stays intact.";
-    }else{
-      reason = "The monthly swing setup is good, but entry confirmation is not complete yet. The bot likes the trade direction, but has not granted permission to enter.";
-      action = "Wait. Do not buy yet.";
-      upgrade = brain?.upgradeRule || session?.plainRule || "Upgrade to BUY only after the entry confirmation rule is satisfied.";
-    }
   }else{
-    decision = "PASS";
-    color = "red";
-    reason = "Predator sees some potential, but the setup quality is not strong enough for a monthly option purchase.";
-    action = "Pass and keep scanning for a stronger setup.";
+    decision = "WAIT"; color = "yellow"; reason = swing.reason; action = "Wait. Do not buy yet.";
+    upgrade = swing.blocker.includes("PRICE") ? `Preferred trigger: $${swing.trigger}. If structure stays valid and price confirms, this can upgrade to BUY.` : "Upgrade to BUY when the remaining swing blocker clears.";
   }
 
-  return {
-    decision,color,direction,reason,action,upgrade,expiration,invalidation,
-    conviction:conviction.conviction,
-    accountFit:fit.fit,
-    policy,
-    setupStatus: setupIsGood ? "GOOD SETUP" : "WEAK / REJECTED SETUP",
-    entryStatus: decision === "BUY" ? "ENTRY APPROVED" : decision === "WAIT" ? "ENTRY NOT APPROVED YET" : "NO ENTRY"
-  };
+  return {decision,color,direction,reason,action,upgrade,expiration,invalidation,conviction:safeNum(getPredatorConvictionEngine(a)?.conviction,0),accountFit:fit.fit,policy,swingValidation:swing,setupStatus:swing.monthlyThesis==="ELITE"?"ELITE MONTHLY SETUP":swing.monthlyThesis==="STRONG"?"GOOD MONTHLY SETUP":"WEAK / REJECTED SETUP",entryStatus:decision==="BUY"?swing.entryMode:decision==="WAIT"?"ENTRY NOT APPROVED YET":"NO ENTRY"};
 }
-
 function renderSimplePredatorDecision(a){
   const d = getSimplePredatorDecision(a);
   const directionText = d.direction === "WAIT" ? "No directional buy" : d.direction;
@@ -3889,6 +3888,22 @@ function renderSimplePredatorDecision(a){
     ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
     <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
   </div>`;
+}
+
+function getOpportunityFunnelRow(a){
+  const d = getSimplePredatorDecision(a);
+  const s = d.swingValidation || getSwingValidationEngine(a);
+  return {decision:d.decision,blocker:s.blocker||"UNKNOWN",readiness:s.readiness||0,direction:d.direction,trigger:s.trigger||"N/A",invalidation:s.invalidation||"N/A",expiration:d.expiration,reason:d.reason};
+}
+
+function renderOpportunityFunnelSummary(rows, title="Opportunity Funnel"){
+  rows = Array.isArray(rows) ? rows : [];
+  const counts = {BUY:0,WAIT:0,PASS:0};
+  const blockers = {};
+  rows.forEach(r=>{ counts[r.decision]=(counts[r.decision]||0)+1; const b=r.blocker||"UNKNOWN"; blockers[b]=(blockers[b]||0)+1; });
+  const topBlocker = Object.entries(blockers).sort((a,b)=>b[1]-a[1])[0];
+  const nearMisses = rows.filter(r=>r.decision==="WAIT").sort((a,b)=>b.readiness-a.readiness).slice(0,3);
+  return `<div class="card"><div class="section-title">${title}</div><div class="metric"><b>BUY-ready:</b> ${counts.BUY||0}</div><div class="metric"><b>WAIT:</b> ${counts.WAIT||0}</div><div class="metric"><b>NO TRADE:</b> ${counts.PASS||0}</div><div class="metric"><b>Most Common Blocker:</b> ${topBlocker?`${topBlocker[0]} (${topBlocker[1]})`:"NONE"}</div>${nearMisses.length?`<div class="divider"></div><div class="section-title">Closest Near-Misses</div>${nearMisses.map(r=>`<div class="card" style="padding:10px;margin-top:8px;"><div class="metric"><b>${r.ticker||""}</b> ${r.direction} - ${r.readiness}% READY</div><div class="metric"><b>Blocker:</b> ${r.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${r.trigger==="N/A"?"N/A":"$"+r.trigger}</div><div class="metric"><b>Invalidation:</b> ${r.invalidation==="N/A"?"N/A":"$"+r.invalidation}</div><div class="metric"><b>Why:</b> ${r.reason}</div></div>`).join("")}`:""}</div>`;
 }
 
 function renderSimpleDecisionSnapshot(a){
@@ -4969,6 +4984,7 @@ function renderFull(ticker, a){
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
+  ${(()=>{ const s=getSwingValidationEngine(a); return `<div class="card"><div class="section-title">Monthly Swing Validation</div><div class="metric"><b>Validation:</b> <span class="${signalClass(s.validation)}">${s.validation}</span></div><div class="metric"><b>Entry Mode:</b> ${s.entryMode}</div><div class="metric"><b>Monthly Thesis:</b> ${s.monthlyThesis}</div><div class="metric"><b>Readiness:</b> ${s.readiness}/100</div><div class="metric"><b>Blocker:</b> ${s.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${s.trigger==="N/A"?"N/A":"$"+s.trigger}</div><div class="metric"><b>Structural Invalidation:</b> ${s.invalidation==="N/A"?"N/A":"$"+s.invalidation}</div><div class="metric"><b>Trigger Confirmed:</b> ${s.triggerConfirmed?"YES":"NO"}</div><div class="metric"><b>Structure Valid:</b> ${s.structureValid?"YES":"NO"}</div><div class="metric"><b>Reason:</b> ${s.reason}</div></div>`; })()}
   <div class="scan-support">
     ${renderExpirationPolicyCard(a)}
     ${renderPredatorConvictionCard(a)}
@@ -5375,6 +5391,7 @@ async function scanList(list, title){
   const waits = [];
   const noTrades = [];
   const failures = [];
+  const funnelRows = [];
   let processed = 0;
 
   for(let i=0; i<list.length; i++){
@@ -5403,6 +5420,9 @@ async function scanList(list, title){
 
     const a = analyze(closes, pricePack.price);
     const finalDecision = getSimplePredatorDecision(a);
+    const funnel = getOpportunityFunnelRow(a);
+    funnel.ticker = ticker;
+    funnelRows.push(funnel);
     processed++;
 
     const row = {
@@ -5484,6 +5504,7 @@ async function scanList(list, title){
         ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length}</div>` : ""}
         <div class="metric ${completeScan ? "green" : "yellow"}"><b>${completeScan ? "No individual rescans are needed." : "Do not assume the failed tickers are NO TRADE."}</b></div>
 
+        ${renderOpportunityFunnelSummary(funnelRows, "Monthly Buy Opportunity Funnel")}
         ${closest.length ? `
           <div class="divider"></div>
           <div class="section-title">Closest Watchlist Setups</div>
@@ -5528,6 +5549,7 @@ async function scanList(list, title){
         </div>
       `).join("")}
 
+      ${renderOpportunityFunnelSummary(funnelRows, "Monthly Buy Opportunity Funnel")}
       <div class="divider"></div>
       <div class="metric"><b>Other WAIT names:</b> ${waits.length}</div>
       <div class="metric"><b>Other NO TRADE names:</b> ${noTrades.length}</div>
