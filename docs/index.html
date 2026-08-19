@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.1.1 API Saver + Display Cleanup</title>
+  <title>Signal Predator AI v47.2 Contract Selection Coach</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.1.1 // API saver cache // scan reuse // display cleanup</div>
+  <div class="subtitle">v47.2 // contract selection coach // max premium guard // monthly buy execution helper</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-1-1.json";
+  a.download = "signal-predator-backup-v47-2.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3829,6 +3829,102 @@ function getSwingValidationEngine(a){
   return {validation,entryMode,reason,blocker,readiness,structureValid,triggerConfirmed,distanceToTriggerPct,distanceToInvalidationPct,trigger:Number.isFinite(trigger)?trigger.toFixed(2):"N/A",invalidation:Number.isFinite(invalidation)?invalidation.toFixed(2):"N/A",buyWindow:policy.buyWindow,monthlyThesis:eliteMonthlyThesis?"ELITE":strongMonthlyThesis?"STRONG":"WEAK"};
 }
 
+function getContractSelectionCoach(a){
+  a = ensureEngineDefaults(a);
+
+  const d = getSimplePredatorDecision(a);
+  const account = getAccountFit(a, "MOMENTUM");
+  const profile = accountProfile || {};
+  const portfolioValue = safeNum(profile.portfolioValue, safeNum(account.accountSize, 0));
+  const maxAllocPct = safeNum(profile.maxOptionAllocationPct, safeNum(account.maxAllocationPct, 0));
+  const maxCapital = portfolioValue > 0 && maxAllocPct > 0
+    ? portfolioValue * (maxAllocPct / 100)
+    : safeNum(account.maxCapital, 0);
+
+  const exp = d.expiration || "45-75 DTE Monthly";
+
+  let deltaMin = 0.55;
+  let deltaMax = 0.70;
+  let strikeStyle = "ATM to slightly ITM";
+  let premiumBuffer = 0.90;
+
+  if(d.swingValidation?.monthlyThesis === "ELITE"){
+    deltaMin = 0.55;
+    deltaMax = 0.70;
+    strikeStyle = "ATM to 1 strike ITM";
+    premiumBuffer = 0.95;
+  }else if(d.swingValidation?.monthlyThesis === "STRONG"){
+    deltaMin = 0.50;
+    deltaMax = 0.65;
+    strikeStyle = "ATM to 1 strike ITM";
+    premiumBuffer = 0.90;
+  }
+
+  const maxPremiumPerContract = maxCapital > 0
+    ? Math.max(0, Math.floor((maxCapital * premiumBuffer) / 100 * 100) / 100)
+    : 0;
+
+  const maxPremiumDisplay = maxPremiumPerContract > 0
+    ? maxPremiumPerContract.toFixed(2)
+    : "N/A";
+
+  const contractBudget = maxPremiumPerContract > 0
+    ? Math.floor(maxPremiumPerContract * 100)
+    : 0;
+
+  const direction = d.direction || "N/A";
+
+  let coach = "No contract should be selected unless the Final Answer is BUY.";
+  if(d.decision === "BUY"){
+    coach = `For this monthly ${direction === "BUY CALL" ? "call" : "put"}, favor ${strikeStyle.toLowerCase()} with delta roughly ${deltaMin.toFixed(2)}-${deltaMax.toFixed(2)} and stay under the max premium.`;
+  }else if(d.decision === "WAIT"){
+    coach = "Do not choose a contract yet. Wait for the setup to upgrade to BUY.";
+  }else{
+    coach = "Do not spend premium on this setup.";
+  }
+
+  return {
+    decision:d.decision,
+    direction,
+    expiration:exp,
+    deltaMin,
+    deltaMax,
+    strikeStyle,
+    maxCapital:Math.max(0, Math.round(maxCapital)),
+    maxPremiumPerContract,
+    maxPremiumDisplay,
+    contractBudget,
+    coach,
+    accountFit:d.accountFit || account.fit || "N/A"
+  };
+}
+
+function renderContractSelectionCoach(a){
+  const c = getContractSelectionCoach(a);
+  if(c.decision !== "BUY"){
+    return `
+      <div class="card">
+        <div class="section-title">Contract Selection Coach</div>
+        <div class="metric muted">${escapeHtml(c.coach)}</div>
+      </div>`;
+  }
+
+  return `
+    <div class="card">
+      <div class="section-title">Contract Selection Coach</div>
+      <div class="metric"><b>Trade:</b> ${escapeHtml(c.direction)}</div>
+      <div class="metric"><b>Expiration Window:</b> ${escapeHtml(c.expiration)}</div>
+      <div class="metric"><b>Strike Style:</b> ${escapeHtml(c.strikeStyle)}</div>
+      <div class="metric"><b>Target Delta:</b> ${c.deltaMin.toFixed(2)}-${c.deltaMax.toFixed(2)}</div>
+      <div class="metric"><b>Max Capital for This Trade:</b> $${c.maxCapital}</div>
+      <div class="metric"><b>DO NOT PAY ABOVE:</b> <span class="yellow">$${c.maxPremiumDisplay} per share</span></div>
+      <div class="metric"><b>Approx. Max Contract Cost:</b> ${c.contractBudget > 0 ? "$"+c.contractBudget : "N/A"}</div>
+      <div class="metric"><b>Account Fit:</b> ${escapeHtml(c.accountFit)}</div>
+      <div class="metric"><b>Coach:</b> ${escapeHtml(c.coach)}</div>
+      <div class="metric muted">Use the actual Robinhood option chain to find the closest contract matching these characteristics. Predator is not using live option-chain bid/ask or Greeks yet.</div>
+    </div>`;
+}
+
 function getSimplePredatorDecision(a){
   a = ensureEngineDefaults(a);
   const policy = getStrategyExpirationPolicy(a);
@@ -3884,7 +3980,7 @@ function renderSimplePredatorDecision(a){
     </div>
 
     <div class="divider"></div>
-    <div class="metric"><b>What to do:</b> ${d.action}</div>
+    <div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Contract Selection Coach below to choose the expiration, strike/Delta zone, and max premium.</div>
     ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
     <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
   </div>`;
@@ -4981,6 +5077,7 @@ function renderFull(ticker, a){
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderSimplePredatorDecision(a)}
+  ${renderContractSelectionCoach(a)}
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
