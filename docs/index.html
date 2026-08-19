@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.2 Contract Selection Coach</title>
+  <title>Signal Predator AI v47.3 Execution Coach</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.2 // contract selection coach // max premium guard // monthly buy execution helper</div>
+  <div class="subtitle">v47.3 // execution coach // ideal contract // early-vs-confirmed entry</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-2.json";
+  a.download = "signal-predator-backup-v47-3.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3842,21 +3842,28 @@ function getContractSelectionCoach(a){
     : safeNum(account.maxCapital, 0);
 
   const exp = d.expiration || "45-75 DTE Monthly";
+  const swing = d.swingValidation || getSwingValidationEngine(a);
 
-  let deltaMin = 0.55;
-  let deltaMax = 0.70;
-  let strikeStyle = "ATM to slightly ITM";
+  let acceptableDeltaMin = 0.55;
+  let acceptableDeltaMax = 0.70;
+  let idealDeltaMin = 0.60;
+  let idealDeltaMax = 0.65;
+  let acceptableStrikeStyle = "ATM to 1 strike ITM";
+  let idealStrikeStyle = "ATM or slightly ITM";
+  let idealDte = "50-65 DTE";
   let premiumBuffer = 0.90;
 
-  if(d.swingValidation?.monthlyThesis === "ELITE"){
-    deltaMin = 0.55;
-    deltaMax = 0.70;
-    strikeStyle = "ATM to 1 strike ITM";
+  if(swing.monthlyThesis === "ELITE"){
+    acceptableDeltaMin = 0.55;
+    acceptableDeltaMax = 0.70;
+    idealDeltaMin = 0.60;
+    idealDeltaMax = 0.65;
     premiumBuffer = 0.95;
-  }else if(d.swingValidation?.monthlyThesis === "STRONG"){
-    deltaMin = 0.50;
-    deltaMax = 0.65;
-    strikeStyle = "ATM to 1 strike ITM";
+  }else if(swing.monthlyThesis === "STRONG"){
+    acceptableDeltaMin = 0.50;
+    acceptableDeltaMax = 0.65;
+    idealDeltaMin = 0.55;
+    idealDeltaMax = 0.60;
     premiumBuffer = 0.90;
   }
 
@@ -3874,57 +3881,112 @@ function getContractSelectionCoach(a){
 
   const direction = d.direction || "N/A";
 
-  let coach = "No contract should be selected unless the Final Answer is BUY.";
+  let buyType = "NO BUY";
+  let buyTypeColor = "red";
+  let buyTypeMeaning = "No contract should be selected unless the Final Answer is BUY.";
+
   if(d.decision === "BUY"){
-    coach = `For this monthly ${direction === "BUY CALL" ? "call" : "put"}, favor ${strikeStyle.toLowerCase()} with delta roughly ${deltaMin.toFixed(2)}-${deltaMax.toFixed(2)} and stay under the max premium.`;
+    if(swing.triggerConfirmed){
+      buyType = "BUY - CONFIRMED ENTRY";
+      buyTypeColor = "green";
+      buyTypeMeaning = "The monthly thesis is approved and the preferred price trigger is confirmed.";
+    }else{
+      buyType = "BUY - EARLY STRUCTURAL ENTRY";
+      buyTypeColor = "yellow";
+      buyTypeMeaning = "The monthly thesis is approved, but the preferred trigger is not confirmed. This is a valid earlier swing entry with more timing risk.";
+    }
   }else if(d.decision === "WAIT"){
-    coach = "Do not choose a contract yet. Wait for the setup to upgrade to BUY.";
+    buyType = "WAIT - NO ENTRY YET";
+    buyTypeColor = "yellow";
+    buyTypeMeaning = "Do not choose a contract yet. Wait for the setup to upgrade to BUY.";
   }else{
-    coach = "Do not spend premium on this setup.";
+    buyType = "NO TRADE";
+    buyTypeColor = "red";
+    buyTypeMeaning = "Do not spend premium on this setup.";
   }
 
   return {
     decision:d.decision,
     direction,
     expiration:exp,
-    deltaMin,
-    deltaMax,
-    strikeStyle,
+    idealDte,
+    idealDeltaMin,
+    idealDeltaMax,
+    acceptableDeltaMin,
+    acceptableDeltaMax,
+    idealStrikeStyle,
+    acceptableStrikeStyle,
     maxCapital:Math.max(0, Math.round(maxCapital)),
     maxPremiumPerContract,
     maxPremiumDisplay,
     contractBudget,
-    coach,
-    accountFit:d.accountFit || account.fit || "N/A"
+    accountFit:d.accountFit || account.fit || "N/A",
+    buyType,
+    buyTypeColor,
+    buyTypeMeaning,
+    triggerConfirmed:!!swing.triggerConfirmed,
+    trigger:swing.trigger || "N/A",
+    invalidation:swing.invalidation || "N/A"
   };
 }
-
 function renderContractSelectionCoach(a){
   const c = getContractSelectionCoach(a);
+
   if(c.decision !== "BUY"){
     return `
       <div class="card">
-        <div class="section-title">Contract Selection Coach</div>
-        <div class="metric muted">${escapeHtml(c.coach)}</div>
+        <div class="section-title">Execution Coach</div>
+        <div class="metric"><b>Status:</b> <span class="${c.buyTypeColor}">${escapeHtml(c.buyType)}</span></div>
+        <div class="metric muted">${escapeHtml(c.buyTypeMeaning)}</div>
       </div>`;
   }
 
   return `
     <div class="card">
-      <div class="section-title">Contract Selection Coach</div>
+      <div class="section-title">Execution Coach</div>
+
+      <div class="metric"><b>Entry Classification:</b> <span class="${c.buyTypeColor}">${escapeHtml(c.buyType)}</span></div>
+      <div class="metric">${escapeHtml(c.buyTypeMeaning)}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Ideal Contract</div>
       <div class="metric"><b>Trade:</b> ${escapeHtml(c.direction)}</div>
+      <div class="metric"><b>Ideal DTE:</b> ${escapeHtml(c.idealDte)}</div>
+      <div class="metric"><b>Ideal Strike:</b> ${escapeHtml(c.idealStrikeStyle)}</div>
+      <div class="metric"><b>Ideal Delta:</b> ${c.idealDeltaMin.toFixed(2)}-${c.idealDeltaMax.toFixed(2)}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Acceptable Contract Range</div>
       <div class="metric"><b>Expiration Window:</b> ${escapeHtml(c.expiration)}</div>
-      <div class="metric"><b>Strike Style:</b> ${escapeHtml(c.strikeStyle)}</div>
-      <div class="metric"><b>Target Delta:</b> ${c.deltaMin.toFixed(2)}-${c.deltaMax.toFixed(2)}</div>
+      <div class="metric"><b>Strike Style:</b> ${escapeHtml(c.acceptableStrikeStyle)}</div>
+      <div class="metric"><b>Acceptable Delta:</b> ${c.acceptableDeltaMin.toFixed(2)}-${c.acceptableDeltaMax.toFixed(2)}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Capital Guard</div>
       <div class="metric"><b>Max Capital for This Trade:</b> $${c.maxCapital}</div>
       <div class="metric"><b>DO NOT PAY ABOVE:</b> <span class="yellow">$${c.maxPremiumDisplay} per share</span></div>
       <div class="metric"><b>Approx. Max Contract Cost:</b> ${c.contractBudget > 0 ? "$"+c.contractBudget : "N/A"}</div>
       <div class="metric"><b>Account Fit:</b> ${escapeHtml(c.accountFit)}</div>
-      <div class="metric"><b>Coach:</b> ${escapeHtml(c.coach)}</div>
-      <div class="metric muted">Use the actual Robinhood option chain to find the closest contract matching these characteristics. Predator is not using live option-chain bid/ask or Greeks yet.</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Robinhood Contract Checklist</div>
+      <div class="metric">1. Open ${escapeHtml(c.direction === "BUY CALL" ? "Calls" : "Puts")} for the ticker.</div>
+      <div class="metric">2. Choose an expiration inside ${escapeHtml(c.expiration)}; ideally ${escapeHtml(c.idealDte)}.</div>
+      <div class="metric">3. Start with ${escapeHtml(c.idealStrikeStyle.toLowerCase())}.</div>
+      <div class="metric">4. Prefer Delta ${c.idealDeltaMin.toFixed(2)}-${c.idealDeltaMax.toFixed(2)}; acceptable ${c.acceptableDeltaMin.toFixed(2)}-${c.acceptableDeltaMax.toFixed(2)}.</div>
+      <div class="metric">5. Do not pay more than $${c.maxPremiumDisplay} per share.</div>
+      <div class="metric">6. Prefer a tighter bid/ask spread when similar contracts are available.</div>
+      <div class="metric">7. Avoid paying unusually rich premium when comparable strikes/expirations are materially cheaper.</div>
+      <div class="metric">8. Never exceed the saved account allocation.</div>
+
+      <div class="divider"></div>
+      <div class="metric"><b>Preferred Trigger:</b> ${c.trigger === "N/A" ? "N/A" : "$"+c.trigger}</div>
+      <div class="metric"><b>Trigger Confirmed:</b> ${c.triggerConfirmed ? "YES" : "NO"}</div>
+      <div class="metric"><b>Structural Invalidation:</b> ${c.invalidation === "N/A" ? "N/A" : "$"+c.invalidation}</div>
+
+      <div class="metric muted">Manual execution remains required. Predator is not yet reading Robinhood's live option-chain bid/ask, IV, open interest, volume, or live Greeks.</div>
     </div>`;
 }
-
 function getSimplePredatorDecision(a){
   a = ensureEngineDefaults(a);
   const policy = getStrategyExpirationPolicy(a);
@@ -3960,6 +4022,22 @@ function getSimplePredatorDecision(a){
 
   return {decision,color,direction,reason,action,upgrade,expiration,invalidation,conviction:safeNum(getPredatorConvictionEngine(a)?.conviction,0),accountFit:fit.fit,policy,swingValidation:swing,setupStatus:swing.monthlyThesis==="ELITE"?"ELITE MONTHLY SETUP":swing.monthlyThesis==="STRONG"?"GOOD MONTHLY SETUP":"WEAK / REJECTED SETUP",entryStatus:decision==="BUY"?swing.entryMode:decision==="WAIT"?"ENTRY NOT APPROVED YET":"NO ENTRY"};
 }
+function getEntryClassificationLabel(a){
+  const d = getSimplePredatorDecision(a);
+  const s = d.swingValidation || getSwingValidationEngine(a);
+
+  if(d.decision !== "BUY"){
+    return {
+      label:d.decision === "WAIT" ? "WAIT - NO ENTRY YET" : "NO TRADE",
+      color:d.decision === "WAIT" ? "yellow" : "red"
+    };
+  }
+
+  return s.triggerConfirmed
+    ? {label:"BUY - CONFIRMED ENTRY", color:"green"}
+    : {label:"BUY - EARLY STRUCTURAL ENTRY", color:"yellow"};
+}
+
 function renderSimplePredatorDecision(a){
   const d = getSimplePredatorDecision(a);
   const directionText = d.direction === "WAIT" ? "No directional buy" : d.direction;
@@ -3980,7 +4058,7 @@ function renderSimplePredatorDecision(a){
     </div>
 
     <div class="divider"></div>
-    <div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Contract Selection Coach below to choose the expiration, strike/Delta zone, and max premium.</div>
+    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div><div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Execution Coach below to choose the ideal contract, acceptable range, and max premium.</div>
     ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
     <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
   </div>`;
