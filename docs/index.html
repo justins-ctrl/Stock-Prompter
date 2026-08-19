@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.1 Swing Validation + Opportunity Funnel</title>
+  <title>Signal Predator AI v47.1.1 API Saver + Display Cleanup</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.1 // monthly swing validation // opportunity funnel // near-miss tracker</div>
+  <div class="subtitle">v47.1.1 // API saver cache // scan reuse // display cleanup</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -464,7 +464,7 @@ body.advanced-on .scan-support{display:block}
 
   <div class="card expiration-policy">
     <div class="section-title">v46.1 Strategy Split</div>
-    <div class="metric"><span class="green"><b>Buying calls/puts:</b></span> Monthly only, 30â90 DTE. Preferred 45â75 DTE.</div>
+    <div class="metric"><span class="green"><b>Buying calls/puts:</b></span> Monthly only, 30-90 DTE. Preferred 45-75 DTE.</div>
     <div class="metric"><span class="green"><b>Selling puts/calls:</b></span> Weekly or biweekly only.</div>
     <div class="metric"><b>User-facing decision:</b> BUY, WAIT, or PASS â with a plain-English reason and exact next step.</div>
     <div class="metric muted">The advanced scoring remains available below the final answer for transparency.</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-1.json";
+  a.download = "signal-predator-backup-v47-1-1.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -1823,8 +1823,8 @@ function buildExpirationChoices(confidence, theta){
   const weekly = nextFridayFrom(today);
   const biweekly = new Date(weekly); biweekly.setDate(weekly.getDate()+7);
   let suggested = "5-10 Days";
-  if(confidence === "High" && theta === "Low") suggested = "45â75 DTE Monthly";
-  if(theta === "High") suggested = "45â75 DTE Monthly";
+  if(confidence === "High" && theta === "Low") suggested = "45-75 DTE Monthly";
+  if(theta === "High") suggested = "45-75 DTE Monthly";
   return { suggested, weeklyLabel:`${formatDate(weekly)} (Weekly)`, biweeklyLabel:`${formatDate(biweekly)} (Bi-Weekly)` };
 }
 function buildContractLadder(price, direction, expectedMove, regime){
@@ -2198,10 +2198,10 @@ function getExpirationRecommendationConfidence(a){
   oneMonth = clamp(oneMonth);
   threeMonth = clamp(threeMonth);
 
-  // Internal monthly buckets: 30â60 DTE versus 60â90 DTE.
+  // Internal monthly buckets: 30â60 DTE versus 60-90 DTE.
   const monthlyOptions = [
-    {label:"45â60 DTE Monthly", confidence:oneMonth},
-    {label:"60â90 DTE Monthly", confidence:threeMonth}
+    {label:"45-60 DTE Monthly", confidence:oneMonth},
+    {label:"60-90 DTE Monthly", confidence:threeMonth}
   ].sort((x,y)=>y.confidence-x.confidence);
 
   const best = monthlyOptions[0];
@@ -2219,7 +2219,7 @@ function getExpirationRecommendationConfidence(a){
     recommendedConfidence:best.confidence,
     vehicleType:"MONTHLY SWING OPTION",
     confidenceGrade,
-    rule:"Long call/put purchases use monthly expirations only, normally 30â90 DTE with 45â75 DTE preferred.",
+    rule:"Long call/put purchases use monthly expirations only, normally 30-90 DTE with 45-75 DTE preferred.",
     warning:"WEEKLY BUYING DISABLED"
   };
 }
@@ -3710,14 +3710,14 @@ function getStrategyExpirationPolicy(a){
       ? safeNum(wheel.buyPutScore, 0)
       : 0;
 
-  let buyWindow = "45â75 DTE MONTHLY";
+  let buyWindow = "45-75 DTE MONTHLY";
   let buyWindowReason = "Default swing-buy window gives the directional thesis time to develop while avoiding weekly time pressure.";
 
   if(a.nextDay?.overnightRisk === "HIGH" || a.nextDay?.chaseRisk === "HIGH" || a.confirmationHold?.holdMinutes >= 60){
-    buyWindow = "60â90 DTE MONTHLY";
+    buyWindow = "60-90 DTE MONTHLY";
     buyWindowReason = "Elevated timing risk favors more time for the swing thesis to work.";
   } else if(a.alignmentScore?.score >= 85 && a.timeTarget?.probability >= 80 && a.nextDay?.chaseRisk !== "HIGH"){
-    buyWindow = "45â60 DTE MONTHLY";
+    buyWindow = "45-60 DTE MONTHLY";
     buyWindowReason = "Strong alignment supports the shorter end of the monthly swing window.";
   }
 
@@ -3727,8 +3727,8 @@ function getStrategyExpirationPolicy(a){
   const weeklyCall = safeNum(a.wheelExpiration?.rows?.find(x=>x.label==="Weekly")?.sellCallScore, wheel.sellCallScore);
   const biCall = safeNum(a.wheelExpiration?.rows?.find(x=>x.label==="Bi-Weekly")?.sellCallScore, wheel.sellCallScore);
 
-  const putDuration = biPut >= weeklyPut ? "BI-WEEKLY (ABOUT 8â14 DTE)" : "WEEKLY (ABOUT 5â7 DTE)";
-  const callDuration = biCall >= weeklyCall ? "BI-WEEKLY (ABOUT 8â14 DTE)" : "WEEKLY (ABOUT 5â7 DTE)";
+  const putDuration = biPut >= weeklyPut ? "BI-WEEKLY (ABOUT 8-14 DTE)" : "WEEKLY (ABOUT 5â7 DTE)";
+  const callDuration = biCall >= weeklyCall ? "BI-WEEKLY (ABOUT 8-14 DTE)" : "WEEKLY (ABOUT 5â7 DTE)";
 
   return {
     buyDirection,
@@ -3868,7 +3868,7 @@ function renderSimplePredatorDecision(a){
   const d = getSimplePredatorDecision(a);
   const directionText = d.direction === "WAIT" ? "No directional buy" : d.direction;
   const displayDecision = d.decision === "PASS" ? "NO TRADE" : d.decision;
-  const permissionText = d.decision === "BUY" ? "YES â ENTRY APPROVED" : d.decision === "WAIT" ? "NO â WAIT" : "NO â NO TRADE";
+  const permissionText = d.decision === "BUY" ? "YES - ENTRY APPROVED" : d.decision === "WAIT" ? "NO - WAIT" : "NO - NO TRADE";
 
   return `
   <div class="card final-answer-card">
@@ -5331,6 +5331,75 @@ async function runFallbackAnalysis(ticker){
     </div>`;
 }
 
+const PREDATOR_SCAN_CACHE_KEY = "signal_predator_fresh_scan_cache";
+const PREDATOR_SCAN_CACHE_TTL_MS = 15 * 60 * 1000;
+
+function getFreshScanCache(){
+  const cache = getStore(PREDATOR_SCAN_CACHE_KEY, {});
+  return cache && typeof cache === "object" ? cache : {};
+}
+
+function saveFreshTickerAnalysis(ticker, analysisData, priceSource="Previous Scan"){
+  try{
+    if(analysisData){
+      // A completed analysis is valid. Clear a stale warning left by an optional
+      // quote/intraday request so it does not visually contradict the final answer.
+      lastApiIssue = null;
+    }
+    const symbol = normalizeTicker(ticker);
+    if(!symbol || !analysisData) return;
+    const cache = getFreshScanCache();
+    cache[symbol] = {
+      ticker:symbol,
+      savedAt:new Date().toISOString(),
+      analysisData,
+      priceSource
+    };
+
+    // Keep storage bounded.
+    const entries = Object.entries(cache)
+      .sort((a,b)=>new Date(b[1]?.savedAt||0)-new Date(a[1]?.savedAt||0))
+      .slice(0,30);
+
+    setStore(PREDATOR_SCAN_CACHE_KEY, Object.fromEntries(entries));
+  }catch(e){
+    console.warn("Fresh scan cache skipped:", e);
+  }
+}
+
+function getFreshTickerAnalysis(ticker){
+  try{
+    const symbol = normalizeTicker(ticker);
+    const cache = getFreshScanCache();
+    const item = cache[symbol];
+    if(!item || !item.analysisData || !item.savedAt) return null;
+
+    const ageMs = Date.now() - new Date(item.savedAt).getTime();
+    if(!Number.isFinite(ageMs) || ageMs < 0 || ageMs > PREDATOR_SCAN_CACHE_TTL_MS){
+      return null;
+    }
+
+    return {
+      ...item,
+      ageMs,
+      ageMinutes:Math.max(0, Math.floor(ageMs/60000))
+    };
+  }catch(e){
+    return null;
+  }
+}
+
+function renderFreshDataNotice(cacheItem){
+  if(!cacheItem) return "";
+  return `
+    <div class="card">
+      <div class="section-title">API Saver</div>
+      <div class="metric"><b>Using fresh scan data:</b> ${cacheItem.ageMinutes} minute${cacheItem.ageMinutes===1?"":"s"} old</div>
+      <div class="metric"><b>Source:</b> ${escapeHtml(cacheItem.priceSource || "Previous scan")}</div>
+      <div class="metric green"><b>No new Alpha Vantage request was needed for this recheck.</b></div>
+    </div>`;
+}
+
 function saveLastAnalysis(ticker, analysisHtml, compactHtml, analysisData){
   setStore("signal_predator_last_analysis", {
     ticker,
@@ -5363,23 +5432,53 @@ async function runAI(){
   const ticker = normalizeTicker(document.getElementById("ticker").value);
   const output = document.getElementById("output");
   const mode = document.getElementById("uiMode").value;
-  if(!ticker){ output.innerHTML = "<div class='card'>Enter a ticker first.</div>"; return; }
-  renderThinkingCard(["TRACKING MARKET MOVEMENT...","LOCKING ONTO TARGET...","CALCULATING STRIKE PROBABILITY..."]);
+
+  if(!ticker){
+    output.innerHTML = "<div class='card'>Enter a ticker first.</div>";
+    return;
+  }
+
+  // API SAVER: if Find Best Trade / Watchlist / Momentum already analyzed this
+  // ticker successfully within 15 minutes, reuse the exact analysis instead of
+  // burning another group of Alpha Vantage calls.
+  const fresh = getFreshTickerAnalysis(ticker);
+  if(fresh){
+    const a = ensureEngineDefaults(fresh.analysisData);
+    const fullHtml = safeRender(()=>renderFull(ticker, a));
+    const compactHtml = safeRender(()=>renderCompact(ticker, a));
+    saveLastAnalysis(ticker, fullHtml, compactHtml, a);
+    output.innerHTML = renderFreshDataNotice(fresh) + (mode === "compact" ? compactHtml : fullHtml);
+    updateApiStatus(`Reused fresh ${ticker} scan data. No API request used.`, "green");
+    return;
+  }
+
+  renderThinkingCard([
+    "TRACKING MARKET MOVEMENT...",
+    "LOCKING ONTO TARGET...",
+    "CALCULATING MONTHLY SWING SETUP..."
+  ]);
+
   const closes = await getHistory(ticker);
-  if(!closes){ await runFallbackAnalysis(ticker); return; }
+  if(!closes){
+    await runFallbackAnalysis(ticker);
+    return;
+  }
+
   const pricePack = await getBestAvailablePrice(ticker, closes);
   if(pricePack.price === null){
     updateApiStatus("Price unavailable after history loaded.", "yellow");
     output.innerHTML = "<div class='card'>Price unavailable. Try again later or check the ticker symbol.</div>";
     return;
   }
+
   const a = analyze(closes, pricePack.price);
+  saveFreshTickerAnalysis(ticker, a, pricePack.source);
+
   const fullHtml = safeRender(()=>renderFull(ticker, a));
   const compactHtml = safeRender(()=>renderCompact(ticker, a));
   saveLastAnalysis(ticker, fullHtml, compactHtml, a);
   output.innerHTML = mode === "compact" ? compactHtml : fullHtml;
 }
-
 async function scanList(list, title){
   renderThinkingCard([
     "SCANNING WITH THE FINAL DECISION ENGINE...",
@@ -5408,17 +5507,21 @@ async function scanList(list, title){
       continue;
     }
 
-    const pricePack = await getBestAvailablePrice(ticker, closes);
-    if(pricePack.price === null){
+    // API SAVER: list scans are previous-close screening scans.
+    // Daily history already contains the latest completed close, so do not spend
+    // extra Global Quote + Intraday calls on every ticker.
+    const scanPrice = closes[0];
+    if(!Number.isFinite(scanPrice)){
       failures.push({
         ticker,
         stage:"Price",
-        message:lastApiIssue?.message || "Live/fallback price unavailable."
+        message:"Latest completed daily close unavailable."
       });
       continue;
     }
 
-    const a = analyze(closes, pricePack.price);
+    const a = analyze(closes, scanPrice);
+    saveFreshTickerAnalysis(ticker, a, "Latest Completed Daily Close");
     const finalDecision = getSimplePredatorDecision(a);
     const funnel = getOpportunityFunnelRow(a);
     funnel.ticker = ticker;
@@ -5444,7 +5547,7 @@ async function scanList(list, title){
 
     // Preserve the API-saving throttle only after a ticker was actually processed.
     if(i < list.length - 1){
-      await new Promise(r => setTimeout(r, 15000));
+      await new Promise(r => setTimeout(r, 1250));
     }
   }
 
@@ -5580,13 +5683,23 @@ async function findBestTrade(){
 
   for(let i=0; i<customWatchlist.length; i++){
     const ticker = normalizeTicker(customWatchlist[i]);
-    const closes = await getHistory(ticker);
-    if(!closes) continue;
 
-    const pricePack = await getBestAvailablePrice(ticker, closes);
-    if(pricePack.price === null) continue;
+    let a = null;
+    const cached = getFreshTickerAnalysis(ticker);
 
-    const a = analyze(closes, pricePack.price);
+    if(cached){
+      a = ensureEngineDefaults(cached.analysisData);
+    }else{
+      const closes = await getHistory(ticker);
+      if(!closes || !closes.length) continue;
+
+      const scanPrice = closes[0];
+      if(!Number.isFinite(scanPrice)) continue;
+
+      a = analyze(closes, scanPrice);
+      saveFreshTickerAnalysis(ticker, a, "Latest Completed Daily Close");
+    }
+
     const d = getSimplePredatorDecision(a);
 
     if(d.decision === "WAIT"){
@@ -5604,7 +5717,7 @@ async function findBestTrade(){
       }
     }
 
-    await new Promise(r => setTimeout(r, 15000));
+    await new Promise(r => setTimeout(r, 1250));
   }
 
   if(!best){
@@ -5631,6 +5744,7 @@ async function findBestTrade(){
       <div class="metric"><b>Why:</b> ${best.d.reason}</div>
       <div class="metric"><b>What to do:</b> ${best.d.action}</div>
       <div class="metric"><b>Invalidation:</b> ${best.d.invalidation}</div>
+      <div class="metric green"><b>API Saver:</b> This analysis is cached for 15 minutes. Scanning ${best.ticker} individually during that window will reuse it without new API calls.</div>
     </div>`;
 }
 
