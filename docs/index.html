@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.3 Execution Coach</title>
+  <title>Signal Predator AI v47.4 Position Management Coach</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.3 // execution coach // ideal contract // early-vs-confirmed entry</div>
+  <div class="subtitle">v47.4 // position management coach // hold-profit-exit guidance</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-3.json";
+  a.download = "signal-predator-backup-v47-4.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3829,6 +3829,158 @@ function getSwingValidationEngine(a){
   return {validation,entryMode,reason,blocker,readiness,structureValid,triggerConfirmed,distanceToTriggerPct,distanceToInvalidationPct,trigger:Number.isFinite(trigger)?trigger.toFixed(2):"N/A",invalidation:Number.isFinite(invalidation)?invalidation.toFixed(2):"N/A",buyWindow:policy.buyWindow,monthlyThesis:eliteMonthlyThesis?"ELITE":strongMonthlyThesis?"STRONG":"WEAK"};
 }
 
+function getPositionManagementCoach(a, position={}){
+  a = ensureEngineDefaults(a);
+
+  const d = getSimplePredatorDecision(a);
+  const swing = d.swingValidation || getSwingValidationEngine(a);
+
+  const direction = position.direction || d.direction || "N/A";
+  const entryUnderlying = safeNum(position.entryUnderlying, 0);
+  const currentUnderlying = safeNum(a.price, entryUnderlying);
+  const optionEntry = safeNum(position.optionEntryPrice, 0);
+  const optionCurrent = safeNum(position.optionCurrentPrice, 0);
+  const contracts = Math.max(1, Math.floor(safeNum(position.contracts, 1)));
+
+  const invalidation = parseFloat(swing.invalidation || d.invalidation || "NaN");
+  const trigger = parseFloat(swing.trigger || "NaN");
+
+  let optionPnlPct = null;
+  if(optionEntry > 0 && optionCurrent > 0){
+    optionPnlPct = ((optionCurrent - optionEntry) / optionEntry) * 100;
+  }
+
+  let underlyingPnlPct = null;
+  if(entryUnderlying > 0 && currentUnderlying > 0){
+    const raw = ((currentUnderlying - entryUnderlying) / entryUnderlying) * 100;
+    underlyingPnlPct = direction === "BUY PUT" ? -raw : raw;
+  }
+
+  let structureBroken = false;
+  if(Number.isFinite(invalidation) && currentUnderlying > 0){
+    if(direction === "BUY CALL") structureBroken = currentUnderlying <= invalidation;
+    if(direction === "BUY PUT") structureBroken = currentUnderlying >= invalidation;
+  }
+
+  const thesisScore = safeNum(
+    a.thesisIntegrity?.score,
+    safeNum(a.alignmentScore?.score, 0)
+  );
+
+  const timing = safeNum(a.timeTarget?.probability, 0);
+  const conviction = safeNum(getPredatorConvictionEngine(a)?.conviction, 0);
+
+  let action = "HOLD";
+  let color = "green";
+  let urgency = "NORMAL";
+  let reason = "The underlying structure and thesis remain intact.";
+  let managementRule = "Continue holding while structure and thesis remain valid.";
+
+  if(structureBroken){
+    action = "EXIT";
+    color = "red";
+    urgency = "HIGH";
+    reason = "The underlying has crossed the structural invalidation level.";
+    managementRule = "Exit rather than relying on the option premium to recover after the thesis breaks.";
+  }else if(thesisScore < 55 || conviction < 55){
+    action = "EXIT / REDUCE";
+    color = "red";
+    urgency = "HIGH";
+    reason = "The original thesis has weakened materially.";
+    managementRule = "Reduce or exit because the trade logic is no longer strong enough.";
+  }else if(optionPnlPct !== null && optionPnlPct >= 80){
+    action = "TAKE PROFIT";
+    color = "green";
+    urgency = "HIGH";
+    reason = "The option has produced a large gain relative to the original premium.";
+    managementRule = "Consider taking substantial profit and only leave a runner if the structure remains exceptionally strong.";
+  }else if(optionPnlPct !== null && optionPnlPct >= 45){
+    action = "LOCK PROFIT / REDUCE";
+    color = "yellow";
+    urgency = "MEDIUM";
+    reason = "The option has a meaningful gain worth protecting.";
+    managementRule = "Consider taking partial profit or tightening the management plan while keeping exposure to the thesis.";
+  }else if(optionPnlPct !== null && optionPnlPct <= -35 && thesisScore < 70){
+    action = "EXIT / REDUCE";
+    color = "red";
+    urgency = "HIGH";
+    reason = "The option drawdown is large and the thesis is no longer strong enough to justify giving it more room.";
+    managementRule = "Do not hold purely because the contract has time remaining.";
+  }else if(optionPnlPct !== null && optionPnlPct <= -25 && thesisScore >= 75 && !structureBroken){
+    action = "HOLD WITH CAUTION";
+    color = "yellow";
+    urgency = "MEDIUM";
+    reason = "The option is down, but the underlying thesis remains strong and structure has not invalidated.";
+    managementRule = "Avoid panic-selling solely because of option P/L; monitor the underlying invalidation and thesis score.";
+  }else if(thesisScore >= 80 && conviction >= 80 && timing >= 65){
+    action = "HOLD";
+    color = "green";
+    urgency = "NORMAL";
+    reason = "Structure, conviction, and timing still support the trade.";
+    managementRule = "Continue holding unless the invalidation breaks or the thesis meaningfully deteriorates.";
+  }
+
+  let nextCheckpoint = "Recheck after a meaningful stock move, major news event, or thesis-score change.";
+  if(Number.isFinite(trigger)){
+    nextCheckpoint += ` Preferred trigger reference: $${trigger.toFixed(2)}.`;
+  }
+
+  return {
+    action,
+    color,
+    urgency,
+    reason,
+    managementRule,
+    nextCheckpoint,
+    direction,
+    contracts,
+    entryUnderlying:entryUnderlying || null,
+    currentUnderlying:currentUnderlying || null,
+    optionEntry:optionEntry || null,
+    optionCurrent:optionCurrent || null,
+    optionPnlPct,
+    underlyingPnlPct,
+    thesisScore,
+    conviction,
+    timing,
+    invalidation:Number.isFinite(invalidation) ? invalidation.toFixed(2) : "N/A",
+    trigger:Number.isFinite(trigger) ? trigger.toFixed(2) : "N/A",
+    structureBroken
+  };
+}
+
+function renderPositionManagementCoach(a, position={}){
+  const p = getPositionManagementCoach(a, position);
+
+  const fmtPct = v => v === null ? "N/A" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+
+  return `
+    <div class="card">
+      <div class="section-title">Position Management Coach</div>
+      <div class="metric"><b>Current Action:</b> <span class="${p.color}">${escapeHtml(p.action)}</span></div>
+      <div class="metric"><b>Urgency:</b> ${escapeHtml(p.urgency)}</div>
+      <div class="metric"><b>Why:</b> ${escapeHtml(p.reason)}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Position Health</div>
+      <div class="metric"><b>Thesis Score:</b> ${Math.round(p.thesisScore)}/100</div>
+      <div class="metric"><b>Conviction:</b> ${Math.round(p.conviction)}/100</div>
+      <div class="metric"><b>Timing:</b> ${Math.round(p.timing)}/100</div>
+      <div class="metric"><b>Structure Broken:</b> ${p.structureBroken ? "YES" : "NO"}</div>
+      <div class="metric"><b>Structural Invalidation:</b> ${p.invalidation === "N/A" ? "N/A" : "$"+p.invalidation}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Profit / Loss Context</div>
+      <div class="metric"><b>Underlying Move vs Entry:</b> ${fmtPct(p.underlyingPnlPct)}</div>
+      <div class="metric"><b>Option P/L:</b> ${fmtPct(p.optionPnlPct)}</div>
+
+      <div class="divider"></div>
+      <div class="metric"><b>Management Rule:</b> ${escapeHtml(p.managementRule)}</div>
+      <div class="metric"><b>Next Checkpoint:</b> ${escapeHtml(p.nextCheckpoint)}</div>
+      <div class="metric muted">This coach uses the stock's structure and thesis first, then option P/L as supporting context. Manual execution remains required.</div>
+    </div>`;
+}
+
 function getContractSelectionCoach(a){
   a = ensureEngineDefaults(a);
 
@@ -4058,7 +4210,7 @@ function renderSimplePredatorDecision(a){
     </div>
 
     <div class="divider"></div>
-    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div><div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Execution Coach below to choose the ideal contract, acceptable range, and max premium.</div>
+    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div><div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Execution Coach below to choose the ideal contract, acceptable range, and max premium. After entry, use Live Position Scan for HOLD / TAKE PROFIT / REDUCE / EXIT guidance.</div>
     ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
     <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
   </div>`;
@@ -5924,6 +6076,10 @@ async function findBestTrade(){
 }
 
 async function scanMyPositions(){
+  const manualEntryUnderlying = safeNum(document.getElementById("positionEntryUnderlying")?.value, 0);
+  const manualOptionEntry = safeNum(document.getElementById("positionOptionEntry")?.value, 0);
+  const manualOptionCurrent = safeNum(document.getElementById("positionOptionCurrent")?.value, 0);
+  const manualContracts = Math.max(1, Math.floor(safeNum(document.getElementById("positionContracts")?.value, 1)));
   const output = document.getElementById("output");
   if(!savedPositions.length){ output.innerHTML = "<div class='card'>No saved positions yet.</div>"; clearActiveAlertsPanel(); return; }
   renderThinkingCard(["TRACKING SAVED POSITIONS...","RECALCULATING TARGET ODDS...","CHECKING FOR STRIKE ALERTS..."]);
