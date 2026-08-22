@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.5 Adaptive Contract Selection</title>
+  <title>Signal Predator AI v47.6 Live Contract Grader</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.5 // adaptive contract selection // quality OTM path // profile ranking</div>
+  <div class="subtitle">v47.6 // live contract grader // spread-liquidity-IV execution quality</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-5.json";
+  a.download = "signal-predator-backup-v47-6.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3981,6 +3981,234 @@ function renderPositionManagementCoach(a, position={}){
     </div>`;
 }
 
+function getContractGrader(a, contract={}){
+  a = ensureEngineDefaults(a);
+  const d = getSimplePredatorDecision(a);
+  const coach = getContractSelectionCoach(a);
+
+  const direction = contract.direction || d.direction || "N/A";
+  const strike = safeNum(contract.strike, 0);
+  const bid = safeNum(contract.bid, 0);
+  const ask = safeNum(contract.ask, 0);
+  const mark = safeNum(contract.mark, bid > 0 && ask > 0 ? (bid + ask) / 2 : 0);
+  const iv = safeNum(contract.iv, 0);
+  const volume = Math.max(0, Math.floor(safeNum(contract.volume, 0)));
+  const openInterest = Math.max(0, Math.floor(safeNum(contract.openInterest, 0)));
+  const deltaRaw = safeNum(contract.delta, 0);
+  const delta = Math.abs(deltaRaw);
+  const theta = safeNum(contract.theta, 0);
+  const dte = Math.max(0, Math.floor(safeNum(contract.dte, 0)));
+  const sharePrice = safeNum(contract.sharePrice, safeNum(a.price, 0));
+
+  const profileName = coach.recommendedProfile || "BALANCED";
+  const target = coach.rankedProfiles?.find(p=>p.name === profileName) || {
+    deltaMin:0.45, deltaMax:0.60
+  };
+  const maxPremium = safeNum(coach.maxPremiumPerContract, 0);
+
+  let deltaScore = 0;
+  if(delta > 0){
+    if(delta >= target.deltaMin && delta <= target.deltaMax) deltaScore = 100;
+    else{
+      const dist = delta < target.deltaMin ? target.deltaMin - delta : delta - target.deltaMax;
+      deltaScore = Math.max(0, Math.round(100 - dist * 250));
+    }
+  }
+
+  let dteScore = 0;
+  if(dte > 0){
+    if(dte >= 50 && dte <= 70) dteScore = 100;
+    else if(dte >= 45 && dte <= 75) dteScore = 85;
+    else if(dte >= 30 && dte <= 90) dteScore = 60;
+    else dteScore = 25;
+  }
+
+  let spreadPct = null;
+  let spreadScore = 0;
+  if(bid > 0 && ask > 0 && ask >= bid){
+    const mid = (bid + ask) / 2;
+    spreadPct = mid > 0 ? ((ask - bid) / mid) * 100 : null;
+    if(spreadPct !== null){
+      if(spreadPct <= 5) spreadScore = 100;
+      else if(spreadPct <= 10) spreadScore = 85;
+      else if(spreadPct <= 15) spreadScore = 70;
+      else if(spreadPct <= 25) spreadScore = 45;
+      else if(spreadPct <= 35) spreadScore = 25;
+      else spreadScore = 10;
+    }
+  }
+
+  let liquidityScore = 0;
+  if(volume >= 500 || openInterest >= 1000) liquidityScore = 100;
+  else if(volume >= 200 || openInterest >= 500) liquidityScore = 85;
+  else if(volume >= 75 || openInterest >= 200) liquidityScore = 70;
+  else if(volume >= 25 || openInterest >= 100) liquidityScore = 55;
+  else if(volume >= 10 || openInterest >= 50) liquidityScore = 40;
+  else if(volume > 0 || openInterest > 0) liquidityScore = 25;
+
+  let ivScore = 65;
+  if(iv > 0){
+    if(iv <= 30) ivScore = 90;
+    else if(iv <= 45) ivScore = 80;
+    else if(iv <= 60) ivScore = 65;
+    else if(iv <= 80) ivScore = 45;
+    else ivScore = 25;
+  }
+
+  let thetaScore = 70;
+  let thetaPct = null;
+  if(mark > 0 && theta !== 0){
+    thetaPct = Math.abs(theta) / mark * 100;
+    if(thetaPct <= 0.5) thetaScore = 100;
+    else if(thetaPct <= 1.0) thetaScore = 85;
+    else if(thetaPct <= 1.5) thetaScore = 70;
+    else if(thetaPct <= 2.0) thetaScore = 55;
+    else thetaScore = 30;
+  }
+
+  const referencePremium = mark > 0 ? mark : ask;
+  const capitalFits = maxPremium <= 0 ? true : (referencePremium > 0 && referencePremium <= maxPremium);
+  const capitalScore = capitalFits ? 100 : 0;
+
+  let moneyness = "N/A";
+  if(sharePrice > 0 && strike > 0){
+    if(direction === "BUY CALL"){
+      moneyness = strike < sharePrice ? "ITM" : (Math.abs(strike-sharePrice)/sharePrice <= 0.01 ? "ATM" : "OTM");
+    }else if(direction === "BUY PUT"){
+      moneyness = strike > sharePrice ? "ITM" : (Math.abs(strike-sharePrice)/sharePrice <= 0.01 ? "ATM" : "OTM");
+    }
+  }
+
+  const total = Math.round(
+    deltaScore * 0.22 +
+    dteScore * 0.14 +
+    spreadScore * 0.20 +
+    liquidityScore * 0.16 +
+    ivScore * 0.10 +
+    thetaScore * 0.08 +
+    capitalScore * 0.10
+  );
+
+  const hardReject =
+    d.decision !== "BUY" ||
+    !capitalFits ||
+    spreadScore <= 10 ||
+    (delta > 0 && delta < 0.25);
+
+  let verdict = "PASS";
+  let color = "red";
+  let execution = "DO NOT ENTER THIS CONTRACT";
+  let reason = "This specific option contract does not meet Predator's execution-quality rules.";
+
+  if(!hardReject && total >= 85 && spreadScore >= 70 && liquidityScore >= 55){
+    verdict = "APPROVED";
+    color = "green";
+    execution = "CONTRACT APPROVED";
+    reason = "The contract fits the directional thesis, capital guard, and execution-quality rules.";
+  }else if(!hardReject && total >= 70){
+    verdict = "CONDITIONAL";
+    color = "yellow";
+    execution = "LIMIT ORDER / IMPROVE EXECUTION";
+    reason = "The contract is usable, but one or more execution-quality factors need improvement.";
+  }
+
+  const suggestedLimit =
+    bid > 0 && ask > 0
+      ? Math.min(ask, Math.max(bid, mark > 0 ? mark : (bid+ask)/2))
+      : (mark > 0 ? mark : 0);
+
+  let primaryWarning = "NONE";
+  if(!capitalFits) primaryWarning = "PREMIUM EXCEEDS ACCOUNT LIMIT";
+  else if(spreadScore < 45) primaryWarning = "BID/ASK SPREAD TOO WIDE";
+  else if(liquidityScore < 45) primaryWarning = "LOW LIQUIDITY";
+  else if(deltaScore < 60) primaryWarning = "DELTA OUTSIDE TARGET";
+  else if(ivScore < 45) primaryWarning = "RICH IMPLIED VOLATILITY";
+
+  return {
+    verdict,color,execution,reason,total,
+    direction,strike,dte,bid,ask,mark,iv,volume,openInterest,
+    deltaRaw,delta,theta,sharePrice,moneyness,
+    deltaScore,dteScore,spreadScore,liquidityScore,ivScore,thetaScore,capitalScore,
+    spreadPct,thetaPct,capitalFits,maxPremium,
+    suggestedLimit,primaryWarning,profileName
+  };
+}
+
+function renderContractGrader(a, contract={}){
+  const g = getContractGrader(a, contract);
+  const pct = v => v === null ? "N/A" : `${v.toFixed(1)}%`;
+  const money = v => v > 0 ? `$${v.toFixed(2)}` : "N/A";
+
+  return `
+    <div class="card">
+      <div class="section-title">Live Contract Grader</div>
+      <div class="metric"><b>Final Contract Verdict:</b> <span class="${g.color}">${escapeHtml(g.verdict)}</span></div>
+      <div class="metric"><b>Contract Score:</b> ${g.total}/100</div>
+      <div class="metric"><b>Execution:</b> ${escapeHtml(g.execution)}</div>
+      <div class="metric"><b>Why:</b> ${escapeHtml(g.reason)}</div>
+      <div class="metric"><b>Primary Warning:</b> ${escapeHtml(g.primaryWarning)}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Contract Snapshot</div>
+      <div class="metric"><b>Strike:</b> ${g.strike ? "$"+g.strike.toFixed(2) : "N/A"} (${escapeHtml(g.moneyness)})</div>
+      <div class="metric"><b>DTE:</b> ${g.dte || "N/A"}</div>
+      <div class="metric"><b>Delta:</b> ${g.deltaRaw ? g.deltaRaw.toFixed(4) : "N/A"}</div>
+      <div class="metric"><b>IV:</b> ${g.iv ? g.iv.toFixed(2)+"%" : "N/A"}</div>
+      <div class="metric"><b>Theta:</b> ${g.theta ? g.theta.toFixed(4) : "N/A"}</div>
+      <div class="metric"><b>Bid / Ask:</b> ${money(g.bid)} / ${money(g.ask)}</div>
+      <div class="metric"><b>Mark:</b> ${money(g.mark)}</div>
+      <div class="metric"><b>Spread:</b> ${pct(g.spreadPct)}</div>
+      <div class="metric"><b>Volume:</b> ${g.volume}</div>
+      <div class="metric"><b>Open Interest:</b> ${g.openInterest}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Predator Scorecard</div>
+      <div class="metric"><b>Delta Fit:</b> ${g.deltaScore}/100</div>
+      <div class="metric"><b>DTE Fit:</b> ${g.dteScore}/100</div>
+      <div class="metric"><b>Spread Quality:</b> ${g.spreadScore}/100</div>
+      <div class="metric"><b>Liquidity:</b> ${g.liquidityScore}/100</div>
+      <div class="metric"><b>IV / Premium:</b> ${g.ivScore}/100</div>
+      <div class="metric"><b>Theta:</b> ${g.thetaScore}/100</div>
+      <div class="metric"><b>Capital Fit:</b> ${g.capitalScore}/100</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Execution Guard</div>
+      <div class="metric"><b>Suggested Limit Reference:</b> ${money(g.suggestedLimit)}</div>
+      <div class="metric"><b>Predator Max Premium:</b> ${g.maxPremium > 0 ? "$"+g.maxPremium.toFixed(2) : "N/A"}</div>
+      <div class="metric yellow">Do not chase a wide ask. A good contract can still be a bad fill.</div>
+      <div class="metric muted">This score grades the contract data you enter. It does not guarantee profit, and it does not place an order.</div>
+    </div>`;
+}
+
+function readManualContractInputs(){
+  return {
+    strike:safeNum(document.getElementById("cgStrike")?.value,0),
+    dte:safeNum(document.getElementById("cgDte")?.value,0),
+    bid:safeNum(document.getElementById("cgBid")?.value,0),
+    ask:safeNum(document.getElementById("cgAsk")?.value,0),
+    mark:safeNum(document.getElementById("cgMark")?.value,0),
+    iv:safeNum(document.getElementById("cgIv")?.value,0),
+    volume:safeNum(document.getElementById("cgVolume")?.value,0),
+    openInterest:safeNum(document.getElementById("cgOi")?.value,0),
+    delta:safeNum(document.getElementById("cgDelta")?.value,0),
+    theta:safeNum(document.getElementById("cgTheta")?.value,0),
+    sharePrice:safeNum(document.getElementById("cgSharePrice")?.value,0)
+  };
+}
+
+function gradeCurrentContract(){
+  const last = getLastAnalysis();
+  const output = document.getElementById("contractGradeOutput");
+  if(!last?.analysisData){
+    if(output) output.innerHTML = "<div class='card'>Run Predator Analysis first, then grade the option contract.</div>";
+    return;
+  }
+  const a = ensureEngineDefaults(last.analysisData);
+  const contract = readManualContractInputs();
+  contract.direction = getSimplePredatorDecision(a).direction;
+  if(output) output.innerHTML = renderContractGrader(a, contract);
+}
+
 function getContractSelectionCoach(a){
   a = ensureEngineDefaults(a);
 
@@ -4303,7 +4531,7 @@ function renderSimplePredatorDecision(a){
     </div>
 
     <div class="divider"></div>
-    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div><div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Adaptive Contract Coach below to compare conservative, balanced, and aggressive contract profiles and stay within the max premium. After entry, use Live Position Scan for HOLD / TAKE PROFIT / REDUCE / EXIT guidance.</div>
+    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div><div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Adaptive Contract Coach below to compare profiles, then enter Robinhood's live contract stats into the Contract Grader before placing the trade. After entry, use Live Position Scan for HOLD / TAKE PROFIT / REDUCE / EXIT guidance.</div>
     ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
     <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
   </div>`;
@@ -5401,6 +5629,33 @@ function renderFull(ticker, a){
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderSimplePredatorDecision(a)}
   ${renderContractSelectionCoach(a)}
+  <div class="card">
+    <div class="section-title">Grade a Robinhood Contract</div>
+    <div class="metric muted">Enter the values shown on Robinhood's contract detail screen. No extra Alpha Vantage request is used.</div>
+    <div class="grid-2">
+      <input id="cgStrike" type="number" step="0.01" inputmode="decimal" placeholder="Strike">
+      <input id="cgDte" type="number" step="1" inputmode="numeric" placeholder="DTE">
+    </div>
+    <div class="grid-2">
+      <input id="cgBid" type="number" step="0.01" inputmode="decimal" placeholder="Bid">
+      <input id="cgAsk" type="number" step="0.01" inputmode="decimal" placeholder="Ask">
+    </div>
+    <div class="grid-2">
+      <input id="cgMark" type="number" step="0.01" inputmode="decimal" placeholder="Mark">
+      <input id="cgIv" type="number" step="0.01" inputmode="decimal" placeholder="IV %">
+    </div>
+    <div class="grid-2">
+      <input id="cgVolume" type="number" step="1" inputmode="numeric" placeholder="Volume">
+      <input id="cgOi" type="number" step="1" inputmode="numeric" placeholder="Open Interest">
+    </div>
+    <div class="grid-2">
+      <input id="cgDelta" type="number" step="0.0001" inputmode="decimal" placeholder="Delta (e.g. -0.6089)">
+      <input id="cgTheta" type="number" step="0.0001" inputmode="decimal" placeholder="Theta">
+    </div>
+    <input id="cgSharePrice" type="number" step="0.01" inputmode="decimal" placeholder="Current share price">
+    <button onclick="safeAction('Grade Contract', gradeCurrentContract)">GRADE THIS CONTRACT</button>
+    <div id="contractGradeOutput"></div>
+  </div>
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
