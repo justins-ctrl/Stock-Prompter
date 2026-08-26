@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7 Persistent Position Thesis Engine</title>
+  <title>Signal Predator AI v47.7.1 Persistent Thesis Command Center Fix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7 // persistent position thesis // structural exit discipline // change tracking</div>
+  <div class="subtitle">v47.7.1 // command center persistent-thesis authority // encoding cleanup</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7.json";
+  a.download = "signal-predator-backup-v47-7-1.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3918,6 +3918,102 @@ function removePositionThesisSnapshot(ticker){
     delete store[symbol];
     setStore(PREDATOR_POSITION_THESIS_KEY, store);
   }catch(e){}
+}
+
+
+function getPositionCommandAuthority(ticker, a, position={}){
+  const p = getPersistentPositionRead(ticker, a, position);
+
+  let title = p.command;
+  let status = p.command;
+  let confidence = 70;
+  let instruction = p.checkpoint;
+  let reason = p.reason;
+  let nextCheckpoint = p.checkpoint;
+
+  if(p.command === "HOLD"){
+    title = "HOLD";
+    status = "HOLD - THESIS INTACT";
+    confidence = Math.max(65, Math.round((p.currentThesisScore + p.currentConviction) / 2));
+    instruction = "Keep managing the position from the original thesis and structural invalidation.";
+  }else if(p.command === "WATCH / REDUCE RISK"){
+    title = "WATCH";
+    status = "WATCH - THESIS WEAKENING";
+    confidence = Math.max(55, Math.round((p.currentThesisScore + p.currentConviction) / 2));
+    instruction = "Do not panic-exit. Reassess if the original invalidation is hit or additional thesis components fail.";
+  }else if(p.command === "EXIT"){
+    title = "EXIT";
+    status = "EXIT - THESIS CONFIRMED BROKEN";
+    confidence = Math.max(70, Math.round((100 - p.currentThesisScore + 100 - p.currentConviction) / 2));
+    instruction = "Exit because the persistent thesis failed, not merely because a new entry would be rejected.";
+  }else if(p.command === "HOLD WITH CAUTION"){
+    title = "HOLD";
+    status = "HOLD WITH CAUTION";
+    confidence = Math.max(60, Math.round((p.currentThesisScore + p.currentConviction) / 2));
+  }else if(p.command === "LOCK PROFIT / REDUCE"){
+    title = "LOCK PROFIT";
+    status = "LOCK PROFIT / REDUCE";
+    confidence = 80;
+  }else if(p.command === "TAKE PROFIT"){
+    title = "TAKE PROFIT";
+    status = "TAKE PROFIT";
+    confidence = 85;
+  }else if(p.command === "EXIT / REDUCE"){
+    title = "EXIT / REDUCE";
+    status = "EXIT / REDUCE";
+    confidence = 75;
+  }
+
+  return {
+    ...p,
+    title,
+    status,
+    confidence,
+    instruction,
+    reason,
+    nextCheckpoint
+  };
+}
+
+function renderPersistentCommandCenter(ticker, a, position={}){
+  const c = getPositionCommandAuthority(ticker, a, position);
+  const cmdColor =
+    c.title.includes("EXIT") ? "red" :
+    c.title.includes("WATCH") || c.title.includes("CAUTION") || c.title.includes("LOCK") ? "yellow" :
+    "green";
+
+  return `
+    <div class="card">
+      <div class="section-title">Predator Command Center</div>
+
+      <div class="card" style="padding:14px;">
+        <div class="${cmdColor}" style="font-size:2.1rem;font-weight:800;text-align:center;margin-bottom:12px;">
+          ${escapeHtml(c.title)}
+        </div>
+
+        <div class="metric"><b>Position Command Confidence:</b> ${Math.round(c.confidence)}/100</div>
+        <div class="metric"><b>Instruction:</b> ${escapeHtml(c.instruction)}</div>
+        <div class="metric"><b>Reason:</b> ${escapeHtml(c.reason)}</div>
+        <div class="metric"><b>Next Checkpoint:</b> ${escapeHtml(c.nextCheckpoint)}</div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-title">Position Intelligence</div>
+      <div class="metric"><b>Fresh Entry Read:</b> ${escapeHtml(c.thesis.latestDecision || "N/A")}</div>
+      <div class="metric"><b>Existing Position:</b> <span class="${cmdColor}">${escapeHtml(c.status)}</span></div>
+      <div class="metric"><b>Exit Urgency:</b> ${escapeHtml(c.urgency)}</div>
+      <div class="metric"><b>Original Thesis Score:</b> ${Math.round(c.originalThesisScore)}/100</div>
+      <div class="metric"><b>Current Thesis Score:</b> ${Math.round(c.currentThesisScore)}/100</div>
+      <div class="metric"><b>Original Invalidation:</b> ${c.originalInvalidation === "N/A" ? "N/A" : "$"+c.originalInvalidation}</div>
+      <div class="metric"><b>Invalidation Hit:</b> ${c.structuralInvalidationHit ? "YES" : "NO"}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">What Changed Since Entry</div>
+      ${c.changes.map(x=>`<div class="metric">${escapeHtml(x)}</div>`).join("")}
+
+      <div class="divider"></div>
+      <div class="metric muted">v47.7.1 authority rule: this Command Center now follows the persistent position thesis. A fresh WAIT / NO TRADE cannot override an existing position by itself.</div>
+    </div>`;
 }
 
 function getPersistentPositionRead(ticker, a, position={}){
