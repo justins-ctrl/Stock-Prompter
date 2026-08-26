@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.5 Legacy Baseline Clarity</title>
+  <title>Signal Predator AI v47.7.6 Management Baseline Button Fix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.5 // legacy onboarding // baseline clarity // verified management snapshots</div>
+  <div class="subtitle">v47.7.6 // management baseline button fix // safe persistence // no duplicate onboarding</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-5.json";
+  a.download = "signal-predator-backup-v47-7-6.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3924,6 +3924,21 @@ function getPositionThesisSnapshot(ticker){
   }
 }
 
+function clearPositionThesisSnapshot(ticker){
+  const symbol = normalizeTicker(ticker);
+  if(!symbol) return false;
+  try{
+    const all = getStore(POSITION_THESIS_KEY, {});
+    if(!all || typeof all !== "object") return false;
+    if(Object.prototype.hasOwnProperty.call(all, symbol)){
+      delete all[symbol];
+      setStore(POSITION_THESIS_KEY, all);
+    }
+    return true;
+  }catch(e){ return false; }
+}
+
+
 function removePositionThesisSnapshot(ticker){
   try{
     const symbol = normalizeTicker(ticker);
@@ -4062,48 +4077,42 @@ function renderPersistentCommandCenter(ticker, a, position={}){
 function establishLegacyManagementBaseline(ticker){
   try{
     const symbol = normalizeTicker(ticker);
-    if(!symbol){
-      alert("Could not identify this saved position.");
-      return;
-    }
+    if(!symbol){ alert("Could not identify this saved position."); return; }
+    const saved = (savedPositions || []).find(p => normalizeTicker(p?.ticker) === symbol);
+    if(!saved){ alert("Saved position not found."); return; }
 
-    const saved = (savedPositions || []).find(
-      p => normalizeTicker(p?.ticker) === symbol
-    );
-
-    if(!saved){
-      alert("Saved position not found.");
+    const existing = getPositionThesisSnapshot(symbol);
+    if(existing?.baselineProvenance === "MANAGEMENT_BASELINE"){
+      alert("A verified management baseline already exists for " + symbol + ". Predator will keep the existing baseline instead of replacing it.");
       return;
     }
 
     const cache = getStore("ai_options_last_scan_cache", null);
-    const row = cache?.results?.find(
-      r => normalizeTicker(r?.ticker) === symbol && r?._analysisData
-    );
-
+    const row = cache?.results?.find(r => normalizeTicker(r?.ticker) === symbol && r?._analysisData);
     if(!row || !row._analysisData){
       alert("Run LIVE POSITION SCAN first. Predator needs a fresh position analysis before it can establish a management baseline.");
       return;
     }
 
-    // Remove only the old reconstructed/legacy thesis snapshot.
-    // The saved trade itself remains untouched.
-    clearPositionThesisSnapshot(symbol);
+    const cleared = clearPositionThesisSnapshot(symbol);
+    if(!cleared){
+      alert("Predator could not safely clear the old reconstructed thesis snapshot. No management baseline was created.");
+      return;
+    }
 
-    // Save today's scan as an explicitly labeled MANAGEMENT baseline.
-    // This does NOT claim to be the original entry thesis.
-    savePositionThesisSnapshot(symbol, row._analysisData, {
+    const snapshot = savePositionThesisSnapshot(symbol, row._analysisData, {
       ...saved,
       _baselineProvenance:"MANAGEMENT_BASELINE"
     });
 
-    alert(
-      "Management baseline established for " + symbol + ". " +
-      "Predator will use this snapshot for FUTURE position-management comparisons. " +
-      "Your original entry thesis remains labeled NOT RECORDED."
-    );
+    const verify = getPositionThesisSnapshot(symbol);
+    if(!snapshot || !verify || verify.baselineProvenance !== "MANAGEMENT_BASELINE"){
+      clearPositionThesisSnapshot(symbol);
+      alert("Predator could not verify the management baseline save. The EXIT gate remains protected. Please run Live Position Scan and try again.");
+      return;
+    }
 
-    // Re-render from the same cached scan; no additional API request.
+    alert("Management baseline established for " + symbol + ". Predator will use this verified snapshot for FUTURE position-management comparisons. Your original entry thesis remains labeled NOT RECORDED.");
     quickRecheckPositions();
   }catch(err){
     alert("Could not establish management baseline: " + (err?.message || err));
@@ -4133,9 +4142,10 @@ function getPersistentPositionRead(ticker, a, position={}){
     (hadExistingThesis ? "LEGACY_UNKNOWN" : "RECONSTRUCTED_AT_FIRST_POSITION_SCAN");
 
   const baselineReliable =
-    baselineProvenance === "ENTRY_SNAPSHOT" ||
-    baselineProvenance === "MANUAL_ENTRY_SNAPSHOT" ||
-    baselineProvenance === "MANAGEMENT_BASELINE";
+    !!thesis &&
+    (baselineProvenance === "ENTRY_SNAPSHOT" ||
+     baselineProvenance === "MANUAL_ENTRY_SNAPSHOT" ||
+     baselineProvenance === "MANAGEMENT_BASELINE");
 
   const direction = position.direction || thesis?.direction || d.direction || "N/A";
   const currentPrice = safeNum(a.price, 0);
@@ -6131,7 +6141,8 @@ function renderPositionCards(results){
               ? `<div class="metric"><b>Entry Thesis:</b> NOT RECORDED</div>
                  <div class="metric"><b>Reconstructed Baseline:</b> ${cmd.originalThesisScore}/100</div>
                  <div class="metric muted">This reconstructed score is not treated as your original entry thesis.</div>
-                 <button class="secondary-btn" onclick="establishLegacyManagementBaseline('${escapeHtml(r.ticker)}')">ESTABLISH MANAGEMENT BASELINE</button>`
+                 <button class="secondary-btn" onclick="establishLegacyManagementBaseline('${escapeHtml(r.ticker)}')">ESTABLISH MANAGEMENT BASELINE</button>
+                 <div class="metric muted">One-time onboarding: once verified, Predator will not silently replace this management baseline.</div>`
               : cmd.baselineDisplayType === "MANAGEMENT"
                 ? `<div class="metric"><b>Entry Thesis:</b> NOT RECORDED</div>
                    <div class="metric"><b>Management Baseline:</b> ${cmd.originalThesisScore}/100</div>
