@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.2 Evidence-Based Exit Engine</title>
+  <title>Signal Predator AI v47.7.3 Clean Command Authority Fix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-2.json";
+  a.download = "signal-predator-backup-v47-7-3.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -2739,7 +2739,7 @@ function buildSmartAlerts(results){
     if(r.profitScaling && r.profitScaling.action === "EXIT POSITION") alerts.push({level:"red", message:`EXIT ALERT // ${r.ticker} exit position.`});
     if(r.incomeMode && r.incomeMode.incomeSignal === "ON" && r.incomeMode.spreadType !== "WAIT / NO SPREAD") alerts.push({level:"green", message:`INCOME MODE ALERT // ${r.ticker} ${r.incomeMode.spreadType}.`});
     if(r.holdDurationGuide && (r.holdDurationGuide.botAction.includes('EXIT') || r.holdDurationGuide.botAction.includes('LOCK'))) alerts.push({level:r.holdDurationGuide.botAction.includes('EXIT') ? 'red' : 'green', message:`HOLD GUIDE // ${r.ticker}: ${r.holdDurationGuide.botAction}.`});
-    if(r.thesisIntegrity && r.thesisIntegrity.score < 40) alerts.push({level:"red", message:`THESIS BROKEN // ${r.ticker} exit recommended. Thesis ${r.thesisIntegrity.score}/100.`});
+    if(r.thesisIntegrity && r.thesisIntegrity.score < 40) alerts.push({level:"red", message:`THESIS WEAKENED // ${r.ticker} exit recommended. Thesis ${r.thesisIntegrity.score}/100.`});
     if(r.thesisIntegrity && r.thesisIntegrity.score >= 75 && r.approxPnLPercent !== null && r.approxPnLPercent < 0) alerts.push({level:"green", message:`THESIS INTACT // ${r.ticker} red P/L but thesis still strong at ${r.thesisIntegrity.score}/100.`});
     if(r.targetConfidence && r.targetConfidence.holdScore < 50 && r.approxPnLPercent !== null && r.approxPnLPercent > 0) alerts.push({level:"green", message:`EXIT INTELLIGENCE // ${r.ticker} protect profits. Hold score ${r.targetConfidence.holdScore}/100.`});
     if(r.wheelAssignment && r.wheelAssignment.risk === "HIGH") alerts.push({level:"red", message:`WHEEL ALERT // ${r.ticker} ${r.wheelAssignment.outlook}.`});
@@ -3115,6 +3115,7 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
     ticker:position.ticker,
     type,
     strike,
+    _analysisData:ai,
     breakeven: position.breakeven || strike,
     expiration:position.expiration || "Not set",
     dte:dte === null ? "N/A" : dte,
@@ -3289,7 +3290,7 @@ function getConfidenceClarity(a){
   else if(thesisScore >= 75) thesisLabel = "THESIS INTACT";
   else if(thesisScore >= 60) thesisLabel = "THESIS HOLDING";
   else if(thesisScore >= 40) thesisLabel = "THESIS WEAKENING";
-  else thesisLabel = "THESIS BROKEN";
+  else thesisLabel = "THESIS WEAKENED";
 
   return {
     entryQuality, entryLabel, setupQuality, setupGrade:a.grade || "N/A",
@@ -5534,171 +5535,169 @@ function renderDurationOptimizerCard(a){
 function getPositionIntelligenceEngine(position, result){
   const type = result.type || position.type;
   const isLongOption = type === "CALL" || type === "PUT";
-  const thesis = result.thesisIntegrity || {score:50,label:"N/A",action:"HOLD BUT RECHECK",stopRule:"N/A"};
-  const target = result.targetConfidence || {holdScore:50,holdLabel:"HOLD / MONITOR",recommendedTarget:"N/A"};
-  const quality = result.qualityDecision?.decision || "N/A";
-  const noTrade = result.noTradeZone?.zone || "CLEAR";
+
+  // v47.7.3 SINGLE AUTHORITY RULE:
+  // Long-option positions MUST use Persistent Position Thesis / Evidence Exit.
+  if(isLongOption){
+    const a = result._analysisData;
+    if(!a){
+      return {
+        newEntryDecision:"FRESH ENTRY CONTEXT UNAVAILABLE",
+        existingPositionDecision:"HOLD / RECHECK",
+        action:"HOLD / RECHECK",
+        reason:"Persistent thesis authority could not load the analysis context.",
+        exitUrgency:"LOW",
+        holdPermission:"DO NOT USE LEGACY EXIT LOGIC",
+        positionRule:"Run Live Position Scan again. Legacy thesis-score exits are disabled.",
+        normalNoiseRead:"No evidence-based exit may be issued without analysis context.",
+        thesisScore:0,
+        thesisLabel:"EVIDENCE ENGINE REQUIRED",
+        alignment:0,
+        timeToTarget:0,
+        evidencePoints:0,
+        independentFailures:0,
+        exitGate:"BLOCKED"
+      };
+    }
+
+    const c = getPositionCommandAuthority(position.ticker, a, position);
+    const freshRead = c.thesis?.latestDecision || "N/A";
+
+    return {
+      newEntryDecision:`${freshRead} (CONTEXT ONLY)`,
+      existingPositionDecision:c.status,
+      action:c.title,
+      reason:c.reason,
+      exitUrgency:c.urgency,
+      holdPermission:c.instruction,
+      positionRule:c.nextCheckpoint,
+      normalNoiseRead:"Fresh-entry rejection cannot independently force an exit.",
+      thesisScore:Math.round(c.currentThesisScore),
+      thesisLabel:c.confirmedExit ? "EXIT EVIDENCE CONFIRMED" : "EXIT GATE BLOCKED",
+      alignment:Math.round(c.currentAlignment || 0),
+      timeToTarget:Math.round(c.currentTiming || 0),
+      evidencePoints:c.evidencePoints || 0,
+      independentFailures:c.independentFailures || 0,
+      exitGate:c.confirmedExit ? "OPEN" : "BLOCKED",
+      originalThesisScore:Math.round(c.originalThesisScore || 0),
+      originalInvalidation:c.originalInvalidation || "N/A",
+      invalidationHit:!!c.structuralInvalidationHit,
+      evidence:c.evidence || {}
+    };
+  }
+
+  // Wheel / short-option logic remains separate because assignment and
+  // premium-capture rules are materially different from bought options.
+  const thesis = result.thesisIntegrity || {score:50,label:"N/A"};
   const shortMgmt = result.shortManagement || {};
-  const pnl = typeof result.approxPnLPercent === "number" ? result.approxPnLPercent : null;
-  const dte = typeof result.dte === "number" ? result.dte : parseInt(result.dte,10);
-  const ttt = Number(result.timeTarget?.probability || 50);
   const align = Number(result.alignmentScore?.score || 50);
+  const ttt = Number(result.timeTarget?.probability || 50);
 
   let newEntryDecision = "NEW ENTRY WAIT";
-  if(quality === "APPROVED" && noTrade === "CLEAR") newEntryDecision = "NEW ENTRY APPROVED";
-  if(quality === "REJECT" || noTrade !== "CLEAR") newEntryDecision = "NEW ENTRIES REJECTED";
-
-  let existingPositionDecision = "WATCH CLOSELY";
-  let action = "WATCH CLOSELY";
-  let reason = "New entry conditions are not perfect, but the existing position needs thesis-based management.";
+  let existingPositionDecision = "LET THETA WORK";
+  let action = "LET THETA WORK";
+  let reason = "Short option remains manageable.";
   let exitUrgency = "LOW";
-  let holdPermission = "HOLD ONLY IF THESIS REMAINS VALID";
-  let positionRule = "Do not treat a new-entry rejection as an automatic sell signal.";
-  let normalNoiseRead = "Normal options movement unless invalidation or thesis breaks.";
+  let holdPermission = "HOLD WHILE STRIKE RISK IS CONTROLLED";
+  let positionRule = "For sold options, premium capture and assignment risk control the decision.";
+  let normalNoiseRead = "Monitor strike risk, assignment risk, and expiration.";
 
-  if(!isLongOption){
-    if(shortMgmt.managementDecision && shortMgmt.managementDecision.includes("TAKE")){
-      existingPositionDecision = "TAKE PROFIT";
-      action = "TAKE PROFIT";
-      reason = "Premium capture is strong enough to consider closing.";
-      exitUrgency = "MEDIUM";
-      holdPermission = "CLOSE OR HOLD ONLY IF ASSIGNMENT RISK STAYS LOW";
-      positionRule = "For sold options, premium capture and assignment risk control the decision.";
-    }else if(shortMgmt.assignmentRisk === "HIGH"){
-      existingPositionDecision = "ROLL / CLOSE / ACCEPT ASSIGNMENT";
-      action = "DEFENSIVE MANAGEMENT";
-      reason = "Assignment or call-away risk is high.";
-      exitUrgency = "HIGH";
-      holdPermission = "HOLD ONLY IF YOU ACCEPT ASSIGNMENT / CALL-AWAY";
-      positionRule = "Do not hold a short option into expiration unless you accept the outcome.";
-    }else{
-      existingPositionDecision = "LET THETA WORK";
-      action = "LET THETA WORK";
-      reason = "Short option remains manageable.";
-      holdPermission = "HOLD WHILE STRIKE RISK IS CONTROLLED";
-    }
-    return {newEntryDecision,existingPositionDecision,action,reason,exitUrgency,holdPermission,positionRule,normalNoiseRead,thesisScore:thesis.score || 50,thesisLabel:thesis.label || "N/A",alignment:align,timeToTarget:ttt};
-  }
-
-  if(thesis.score < 40){
-    existingPositionDecision = "EXIT â THESIS BROKEN";
-    action = "EXIT";
-    reason = "Thesis integrity is broken. This is different from simply rejecting a new entry.";
-    exitUrgency = "HIGH";
-    holdPermission = "DO NOT HOLD";
-    positionRule = "Exit when thesis breaks, not merely because a new scan would not enter.";
-  }else if(thesis.score < 60){
-    existingPositionDecision = "REDUCE RISK / PREPARE TO EXIT";
-    action = "REDUCE RISK";
-    reason = "Thesis is weakening, but not fully broken yet.";
+  if(shortMgmt.managementDecision && shortMgmt.managementDecision.includes("TAKE")){
+    existingPositionDecision = "TAKE PROFIT";
+    action = "TAKE PROFIT";
+    reason = "Premium capture is strong enough to consider closing.";
     exitUrgency = "MEDIUM";
-    holdPermission = "HOLD SMALL ONLY IF INVALIDATION HAS NOT BROKEN";
-    positionRule = "Do not add. Give limited room only if support/invalidation remains intact.";
-  }else if(pnl !== null && pnl >= 25 && target.holdScore < 60){
-    existingPositionDecision = "LOCK PROFITS / PROTECT GAINS";
-    action = "LOCK PROFITS";
-    reason = "Position is green but hold score is weakening.";
-    exitUrgency = "MEDIUM";
-    holdPermission = "HOLD RUNNER ONLY";
-    positionRule = "Protect profits when the hold score weakens.";
-  }else if(thesis.score >= 75){
-    existingPositionDecision = "HOLD â THESIS INTACT";
-    action = "HOLD";
-    reason = "Original thesis remains intact even if new-entry conditions are less attractive.";
-    exitUrgency = "LOW";
-    holdPermission = "HOLD WHILE THESIS SCORE STAYS ABOVE 60";
-    positionRule = "A WAIT or REJECT for new entries does not mean sell the existing position.";
-  }else{
-    existingPositionDecision = "WATCH CLOSELY";
-    action = "WATCH CLOSELY";
-    reason = "Existing position is still alive, but confidence is not strong enough to be aggressive.";
-    exitUrgency = "LOW-MEDIUM";
-    holdPermission = "HOLD ONLY WITH TIGHT DISCIPLINE";
-  }
-
-  if(newEntryDecision === "NEW ENTRIES REJECTED" && thesis.score >= 60){
-    positionRule = "Do not open a fresh trade here, but the existing position is not automatically invalidated.";
-    if(action === "WATCH CLOSELY") reason = "New entries are rejected, but thesis has not fully broken.";
-  }
-
-  if(dte <= 2 && thesis.score < 75){
-    exitUrgency = exitUrgency === "HIGH" ? "HIGH" : "MEDIUM";
-    normalNoiseRead = "Expiration is close, so normal noise can become dangerous quickly.";
-  }
-
-  if(ttt < 40 && thesis.score < 60){
-    existingPositionDecision = "EXIT / AVOID HOLDING";
-    action = "EXIT";
-    reason = "Time-to-target and thesis integrity are both weak.";
+    holdPermission = "CLOSE OR HOLD ONLY IF ASSIGNMENT RISK STAYS LOW";
+  }else if(shortMgmt.assignmentRisk === "HIGH"){
+    existingPositionDecision = "ROLL / CLOSE / ACCEPT ASSIGNMENT";
+    action = "DEFENSIVE MANAGEMENT";
+    reason = "Assignment or call-away risk is high.";
     exitUrgency = "HIGH";
-    holdPermission = "DO NOT HOLD";
+    holdPermission = "HOLD ONLY IF YOU ACCEPT ASSIGNMENT / CALL-AWAY";
   }
 
-  return {newEntryDecision,existingPositionDecision,action,reason,exitUrgency,holdPermission,positionRule,normalNoiseRead,thesisScore:thesis.score || 50,thesisLabel:thesis.label || "N/A",alignment:align,timeToTarget:ttt};
+  return {
+    newEntryDecision,existingPositionDecision,action,reason,exitUrgency,
+    holdPermission,positionRule,normalNoiseRead,
+    thesisScore:thesis.score || 50,
+    thesisLabel:thesis.label || "N/A",
+    alignment:align,timeToTarget:ttt,
+    evidencePoints:0,independentFailures:0,exitGate:"N/A"
+  };
 }
-
 function getPredatorCommandCenter(position, result){
   const type = result.type || position.type;
-  const thesis = result.thesisIntegrity || {score:50,label:"N/A",action:"N/A"};
-  const hold = result.holdDurationGuide || {botAction:"WAIT / RECHECK", holdStyle:"N/A", suggestedHold:"N/A", reviewFrequency:"N/A", maxHoldRule:"N/A", botGrade:"B"};
-  const target = result.targetConfidence || {recommendedTarget:"N/A", holdScore:50, protectionStatus:"N/A"};
-  const shortMgmt = result.shortManagement || null;
-  const wheelAssign = result.wheelAssignment || null;
-  const posIntel = result.positionIntelligence || getPositionIntelligenceEngine(position, result);
+  const isLongOption = type === "CALL" || type === "PUT";
 
-  let action = posIntel.action || "RECHECK";
-  let confidence = Math.round((Number(posIntel.thesisScore || thesis.score || 50) * 0.55) + (Number(target.holdScore || 50) * 0.25) + (Number(result.timeTarget?.probability || 50) * 0.20));
-  let reason = posIntel.reason || "System needs a cleaner read.";
-  let nextCheckpoint = posIntel.positionRule || hold.maxHoldRule || "Re-scan before making a decision.";
-  let botInstruction = posIntel.holdPermission || hold.suggestedHold || "Wait for clearer confirmation.";
+  if(isLongOption){
+    const a = result._analysisData;
+    if(!a){
+      return {
+        action:"HOLD / RECHECK",
+        confidence:50,
+        reason:"Evidence-based position authority is unavailable because analysis context is missing.",
+        nextCheckpoint:"Run Live Position Scan again. Do not use a legacy EXIT signal.",
+        botInstruction:"HOLD / RECHECK",
+        color:"yellow",
+        evidencePoints:0,
+        independentFailures:0,
+        exitGate:"BLOCKED",
+        originalInvalidation:"N/A",
+        invalidationHit:false
+      };
+    }
 
-  if(type === "CALL" || type === "PUT"){
-    if(posIntel.action === "EXIT"){
-      action = "EXIT";
-      confidence = Math.max(70, 100 - Number(posIntel.thesisScore || thesis.score || 50));
-      botInstruction = "Exit only because the position thesis is broken, not because new entries are rejected.";
-    }else if(posIntel.action === "REDUCE RISK"){
-      action = "REDUCE RISK";
-      confidence = Math.max(60, Number(posIntel.thesisScore || thesis.score || 50));
-    }else if(posIntel.action === "LOCK PROFITS"){
-      action = "LOCK PROFITS";
-      confidence = Math.max(70, Number(target.holdScore || 50));
-    }else if(posIntel.action === "HOLD"){
-      action = "HOLD";
-      confidence = Math.min(98, Math.round((Number(posIntel.thesisScore || thesis.score || 50) + Number(target.holdScore || posIntel.thesisScore || thesis.score || 50)) / 2));
-    }else{
-      action = "WATCH CLOSELY";
-      confidence = Math.round(Number(posIntel.thesisScore || thesis.score || 50));
-    }
-  }else{
-    if(shortMgmt && (shortMgmt.managementDecision || "").includes("TAKE")){
-      action = "TAKE PROFIT";
-      confidence = 85;
-      reason = "Premium capture is strong enough to consider closing.";
-      nextCheckpoint = "Close or keep only if assignment risk remains low.";
-      botInstruction = "Buy back the short option if profit capture meets your goal.";
-    }else if(wheelAssign && wheelAssign.risk === "HIGH"){
-      action = "ROLL / CLOSE / ACCEPT ASSIGNMENT";
-      confidence = 82;
-      reason = "Assignment or call-away risk is high.";
-      nextCheckpoint = "Decide whether you want assignment/call-away before expiration.";
-      botInstruction = "Manage the wheel position defensively.";
-    }else{
-      action = "LET THETA WORK";
-      confidence = wheelAssign ? Math.max(60, 100 - Number(wheelAssign.probability || 40)) : 70;
-      reason = "Premium-selling setup is still manageable.";
-      nextCheckpoint = "Watch strike distance and assignment risk.";
-      botInstruction = hold.suggestedHold || "Hold while risk stays controlled.";
-    }
+    const c = getPositionCommandAuthority(position.ticker, a, position);
+    return {
+      action:c.title,
+      confidence:Math.round(c.confidence),
+      reason:c.reason,
+      nextCheckpoint:c.nextCheckpoint,
+      botInstruction:c.instruction,
+      color:c.title === "EXIT" ? "red" : c.title === "WATCH" ? "yellow" : "green",
+      evidencePoints:c.evidencePoints || 0,
+      independentFailures:c.independentFailures || 0,
+      exitGate:c.confirmedExit ? "OPEN" : "BLOCKED",
+      originalInvalidation:c.originalInvalidation || "N/A",
+      invalidationHit:!!c.structuralInvalidationHit,
+      originalThesisScore:Math.round(c.originalThesisScore || 0),
+      currentThesisScore:Math.round(c.currentThesisScore || 0)
+    };
   }
 
-  let color = "yellow";
-  if(["HOLD","LET THETA WORK","TAKE PROFIT","LOCK PROFITS"].includes(action)) color = "green";
-  if(action.includes("EXIT") || action.includes("ROLL")) color = "red";
+  // Short-option command center keeps wheel-specific management.
+  const shortMgmt = result.shortManagement || {};
+  let action = "LET THETA WORK";
+  let confidence = 70;
+  let reason = "Short option remains manageable.";
+  let nextCheckpoint = shortMgmt.closePlan || "Monitor assignment risk and expiration.";
+  let botInstruction = "Continue monitoring the short option.";
+  let color = "green";
 
-  return {action,confidence:clampScore(confidence),reason,nextCheckpoint,botInstruction,color,grade:hold.botGrade || "B",newEntryDecision:posIntel.newEntryDecision,existingPositionDecision:posIntel.existingPositionDecision,exitUrgency:posIntel.exitUrgency};
+  if(shortMgmt.managementDecision && shortMgmt.managementDecision.includes("TAKE")){
+    action = "TAKE PROFIT";
+    confidence = 82;
+    reason = "Premium capture is strong enough to consider closing.";
+    botInstruction = "Consider buying back the option and freeing capital.";
+  }else if(shortMgmt.assignmentRisk === "HIGH"){
+    action = "DEFENSIVE MANAGEMENT";
+    confidence = 85;
+    reason = "Assignment or call-away risk is high.";
+    botInstruction = "Roll, close, or deliberately accept assignment/call-away.";
+    color = "red";
+  }else if(shortMgmt.assignmentRisk === "MEDIUM"){
+    action = "WATCH";
+    confidence = 68;
+    reason = "Strike risk is close enough to require monitoring.";
+    color = "yellow";
+  }
+
+  return {
+    action,confidence,reason,nextCheckpoint,botInstruction,color,
+    evidencePoints:0,independentFailures:0,exitGate:"N/A",
+    originalInvalidation:"N/A",invalidationHit:false
+  };
 }
-
 function setPredatorViewMode(){
   const mode = document.getElementById("predatorViewMode")?.value || "simple";
   localStorage.setItem("signal_predator_view_mode", mode);
@@ -5878,7 +5877,7 @@ function getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte
   else if(score >= 75){ label = "STRONG HOLD"; action = "HOLD / MONITOR"; color = "green"; }
   else if(score >= 60){ label = "CAUTION"; action = "HOLD ONLY IF RISK IS ACCEPTABLE"; color = "yellow"; }
   else if(score >= 40){ label = "WEAK THESIS"; action = "REDUCE RISK / CONSIDER EXIT"; color = "yellow"; }
-  else { label = "THESIS BROKEN"; action = "EXIT RECOMMENDED"; color = "red"; }
+  else { label = "THESIS WEAKENED"; action = "EXIT RECOMMENDED"; color = "red"; }
 
   let stopRule = "Do not exit just because the option is red. Exit when thesis integrity breaks.";
   if(score < 60) stopRule = "Thesis is weakening. Do not give this trade much more room.";
@@ -5925,7 +5924,7 @@ function analyzePosition(position, livePrice, ai, priceSource){
   const targetConfidence = getTargetConfidenceEngine(position, approxPnLPercent, dte, timeTarget, ai, status);
   const thesisIntegrity = getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte, timeTarget, status);
   const holdDurationGuide = getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent, dte, thesisIntegrity, targetConfidence);
-  const baseResult = {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence,thesisIntegrity,holdDurationGuide};
+  const baseResult = {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,_analysisData:ai,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence,thesisIntegrity,holdDurationGuide};
   baseResult.positionIntelligence = getPositionIntelligenceEngine(position, baseResult);
   baseResult.predatorCommand = getPredatorCommandCenter(position, baseResult);
   return baseResult;
@@ -5956,23 +5955,36 @@ function renderPositionCards(results){
   return results.map(r=>`
     <div class="card ${r.cardClass}">
       <div class="section-title">Predator Command Center</div>
-      ${(()=>{ const cmd = r.predatorCommand || getPredatorCommandCenter({type:r.type}, r); return `
+      ${(()=>{ const cmd = r.predatorCommand || getPredatorCommandCenter({ticker:r.ticker,type:r.type}, r); return `
         <div class="command-box">
-          <div class="command-action ${cmd.color}">${cmd.action}</div>
+          <div class="command-action ${cmd.color}">${escapeHtml(cmd.action)}</div>
           <div class="metric"><b>Position Command Confidence:</b> ${cmd.confidence}/100</div>
-          <div class="metric"><b>Instruction:</b> ${cmd.botInstruction}</div>
-          <div class="metric"><b>Reason:</b> ${cmd.reason}</div>
-          <div class="metric"><b>Next Checkpoint:</b> ${cmd.nextCheckpoint}</div>
+          <div class="metric"><b>Instruction:</b> ${escapeHtml(cmd.botInstruction)}</div>
+          <div class="metric"><b>Reason:</b> ${escapeHtml(cmd.reason)}</div>
+          <div class="metric"><b>Next Checkpoint:</b> ${escapeHtml(cmd.nextCheckpoint)}</div>
+          ${(r.type === "CALL" || r.type === "PUT") ? `
+          <div class="divider"></div>
+          <div class="section-title">Exit Evidence Summary</div>
+          <div class="metric"><b>EXIT Gate:</b> <span class="${cmd.exitGate === "OPEN" ? "red" : "green"}">${cmd.exitGate}</span></div>
+          <div class="metric"><b>Independent Failures:</b> ${cmd.independentFailures}</div>
+          <div class="metric"><b>Evidence Points:</b> ${cmd.evidencePoints}</div>
+          <div class="metric"><b>Original Invalidation:</b> ${cmd.originalInvalidation === "N/A" ? "N/A" : "$"+cmd.originalInvalidation}</div>
+          <div class="metric"><b>Invalidation Hit:</b> ${cmd.invalidationHit ? "YES" : "NO"}</div>
+          ` : ""}
         </div>`; })()}
       ${r.positionIntelligence ? `
       <div class="divider"></div>
       <div class="section-title">Position Intelligence</div>
-      <div class="metric"><b>New Entry Read:</b> <span class="${signalClass(r.positionIntelligence.newEntryDecision)}">${r.positionIntelligence.newEntryDecision}</span></div>
-      <div class="metric"><b>Existing Position:</b> <span class="${signalClass(r.positionIntelligence.existingPositionDecision)}">${r.positionIntelligence.existingPositionDecision}</span></div>
-      <div class="metric"><b>Exit Urgency:</b> <span class="${signalClass(r.positionIntelligence.exitUrgency)}">${r.positionIntelligence.exitUrgency}</span></div>
-      <div class="metric"><b>Thesis Score:</b> ${r.positionIntelligence.thesisScore}/100 â ${r.positionIntelligence.thesisLabel}</div>
-      <div class="metric"><b>Position Rule:</b> ${r.positionIntelligence.positionRule}</div>
-      <div class="metric"><b>Noise Read:</b> ${r.positionIntelligence.normalNoiseRead}</div>
+      <div class="metric"><b>Fresh Entry Read:</b> <span class="${signalClass(r.positionIntelligence.newEntryDecision)}">${escapeHtml(r.positionIntelligence.newEntryDecision)}</span></div>
+      <div class="metric"><b>Existing Position:</b> <span class="${signalClass(r.positionIntelligence.existingPositionDecision)}">${escapeHtml(r.positionIntelligence.existingPositionDecision)}</span></div>
+      <div class="metric"><b>Exit Urgency:</b> <span class="${signalClass(r.positionIntelligence.exitUrgency)}">${escapeHtml(r.positionIntelligence.exitUrgency)}</span></div>
+      ${(r.type === "CALL" || r.type === "PUT") ? `
+      <div class="metric"><b>Original Thesis:</b> ${r.positionIntelligence.originalThesisScore || "N/A"}/100</div>
+      <div class="metric"><b>Current Thesis:</b> ${r.positionIntelligence.thesisScore}/100</div>
+      <div class="metric"><b>EXIT Gate:</b> <span class="${r.positionIntelligence.exitGate === "OPEN" ? "red" : "green"}">${r.positionIntelligence.exitGate}</span></div>
+      ` : `<div class="metric"><b>Thesis Score:</b> ${r.positionIntelligence.thesisScore}/100 â ${escapeHtml(r.positionIntelligence.thesisLabel)}</div>`}
+      <div class="metric"><b>Position Rule:</b> ${escapeHtml(r.positionIntelligence.positionRule)}</div>
+      <div class="metric"><b>Noise Read:</b> ${escapeHtml(r.positionIntelligence.normalNoiseRead)}</div>
       ` : ""}
       <div class="advanced-panel">
       <div class="divider"></div>
@@ -6955,6 +6967,11 @@ function quickRecheckPositions(){
           copy.reason = "Quick Recheck: hold downgraded because expiration is now very close.";
         }
       }
+    }
+    if((copy.type === "CALL" || copy.type === "PUT") && copy._analysisData){
+      const saved = savedPositions.find(p=>normalizeTicker(p.ticker)===normalizeTicker(copy.ticker)) || {ticker:copy.ticker,type:copy.type};
+      copy.positionIntelligence = getPositionIntelligenceEngine(saved, copy);
+      copy.predatorCommand = getPredatorCommandCenter(saved, copy);
     }
     copy.priceSource = String(copy.priceSource || "Cached") + " / Quick Recheck";
     return copy;
