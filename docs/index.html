@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.6.1 Management Baseline Storage Fix</title>
+  <title>Signal Predator AI v47.7.7 Post-Baseline Evidence Tracking</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.6.1 // management baseline storage fix // safe persistence // no duplicate onboarding</div>
+  <div class="subtitle">v47.7.7 // post-baseline evidence tracking // new deterioration only // hard invalidation preserved</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-6-1.json";
+  a.download = "signal-predator-backup-v47-7-7.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3955,17 +3955,7 @@ function getPositionCommandAuthority(ticker, a, position={}){
   // EXIT may never survive if the canonical evidence fields do not support it.
   const canonicalExitSupported =
     !!p.confirmedExit &&
-    !!p.exitGateIntegrity &&
-    (
-      !!p.structuralInvalidationHit ||
-      (
-        !!p.baselineReliable &&
-        (
-          Number(p.independentFailures || 0) >= 3 ||
-          (Number(p.independentFailures || 0) >= 2 && !!p.structureFailed)
-        )
-      )
-    );
+    !!p.exitGateIntegrity;
 
   const authorityConflict =
     p.command === "EXIT" && !canonicalExitSupported;
@@ -4116,6 +4106,64 @@ function establishLegacyManagementBaseline(ticker){
   }catch(err){
     alert("Could not establish management baseline: " + (err?.message || err));
   }
+}
+
+
+function getBaselineFailureStateFromSnapshot(thesis){
+  const ids = [];
+  let points = 0;
+
+  const trend = safeNum(thesis?.originalTrend, 0);
+  const momentum = safeNum(thesis?.originalMomentum, 0);
+  const conviction = safeNum(thesis?.originalConviction, 0);
+  const alignment = safeNum(thesis?.originalAlignment, 0);
+  const market = safeNum(thesis?.originalMarket, 0);
+  const structureFailed = thesis?.originalStructureValid === false;
+
+  // Mirror the absolute-state portion of the live evidence matrix.
+  if(structureFailed) points += 2; // weakened structure at baseline
+
+  if(trend > 0){
+    if(trend < 45){ ids.push("trend"); points += 2; }
+    else if(trend < 60){ points += 1; }
+  }
+
+  if(momentum > 0){
+    if(momentum < 40){ ids.push("momentum"); points += 2; }
+    else if(momentum < 55){ points += 1; }
+  }
+
+  if(conviction < 45){ ids.push("conviction"); points += 2; }
+  else if(conviction < 60){ points += 1; }
+
+  if(alignment > 0){
+    if(alignment < 45){ ids.push("alignment"); points += 2; }
+    else if(alignment < 60){ points += 1; }
+  }
+
+  if(market > 0){
+    if(market < 40){ ids.push("market"); points += 1; }
+    else if(market < 55){ points += 1; }
+  }
+
+  return {
+    failureIds:[...new Set(ids)].sort(),
+    evidencePoints:points,
+    structureFailed
+  };
+}
+
+function diffFailureSets(baselineIds=[], currentIds=[]){
+  const b = new Set(baselineIds || []);
+  const c = new Set(currentIds || []);
+
+  return {
+    baselineCount:b.size,
+    currentCount:c.size,
+    newFailures:[...c].filter(x => !b.has(x)),
+    resolvedFailures:[...b].filter(x => !c.has(x)),
+    persistentFailures:[...c].filter(x => b.has(x))
+  };
 }
 
 function getPersistentPositionRead(ticker, a, position={}){
@@ -4290,18 +4338,60 @@ function getPersistentPositionRead(ticker, a, position={}){
   // 3) 2 hard failures + weakened structure.
   const invalidationEvidence = evidence.find(x=>x.id === "original_invalidation");
 
-  // Canonical evidence fields. Every UI and command layer must use these same values.
+  // Canonical evidence fields. Every UI and command layer uses these same values.
   const independentFailures = hardFailures.length;
   const evidencePoints = weightedFailure;
+  const currentFailureIds = hardFailures.map(x => x.id).filter(Boolean);
+
+  // v47.7.7 POST-BASELINE DELTA AUTHORITY
+  // A MANAGEMENT_BASELINE starts the clock from the moment it was established.
+  // Weaknesses already present at that baseline are context only; they do not
+  // become "new" EXIT evidence until conditions deteriorate beyond the baseline.
+  const baselineFailureState =
+    baselineProvenance === "MANAGEMENT_BASELINE"
+      ? getBaselineFailureStateFromSnapshot(thesis)
+      : {failureIds:[], evidencePoints:0, structureFailed:false};
+
+  const failureDelta =
+    baselineProvenance === "MANAGEMENT_BASELINE"
+      ? diffFailureSets(baselineFailureState.failureIds, currentFailureIds)
+      : {
+          baselineCount:0,
+          currentCount:currentFailureIds.length,
+          newFailures:[...currentFailureIds],
+          resolvedFailures:[],
+          persistentFailures:[]
+        };
+
+  const newFailureCount = failureDelta.newFailures.length;
+  const resolvedFailureCount = failureDelta.resolvedFailures.length;
+  const postBaselineEvidencePoints =
+    baselineProvenance === "MANAGEMENT_BASELINE"
+      ? Math.max(0, evidencePoints - safeNum(baselineFailureState.evidencePoints, 0))
+      : evidencePoints;
+
+  const newStructureFailure =
+    baselineProvenance === "MANAGEMENT_BASELINE"
+      ? (structureFailed && !baselineFailureState.structureFailed)
+      : structureFailed;
 
   const rawExitThreshold =
     structuralInvalidationHit ||
-    independentFailures >= 3 ||
-    (independentFailures >= 2 && structureFailed);
+    (
+      baselineProvenance === "MANAGEMENT_BASELINE"
+        ? (
+            newFailureCount >= 3 ||
+            (newFailureCount >= 2 && newStructureFailure)
+          )
+        : (
+            independentFailures >= 3 ||
+            (independentFailures >= 2 && structureFailed)
+          )
+    );
 
-  // Fail closed when the original entry thesis is not trustworthy.
-  // A reconstructed/legacy baseline may WATCH or REDUCE, but cannot create
-  // a hard EXIT unless an actual saved structural invalidation was breached.
+  // Reconstructed/legacy baselines still fail closed.
+  // Verified management baselines can authorize EXIT only from NEW deterioration
+  // or a genuine structural invalidation hit.
   const confirmedExit =
     structuralInvalidationHit ||
     (baselineReliable && rawExitThreshold);
@@ -4309,10 +4399,7 @@ function getPersistentPositionRead(ticker, a, position={}){
   const exitGateIntegrity =
     confirmedExit === (
       structuralInvalidationHit ||
-      (baselineReliable && (
-        independentFailures >= 3 ||
-        (independentFailures >= 2 && structureFailed)
-      ))
+      (baselineReliable && rawExitThreshold)
     );
 
   let command = "HOLD";
@@ -4333,12 +4420,39 @@ function getPersistentPositionRead(ticker, a, position={}){
       reason = `${hardFailures.length} independent thesis factors have failed together.`;
       checkpoint = "Exit because multiple independent thesis conditions failed, not because the fresh-entry gate changed.";
     }
+  }else if(
+    baselineProvenance === "MANAGEMENT_BASELINE" &&
+    !structuralInvalidationHit &&
+    newFailureCount === 0 &&
+    postBaselineEvidencePoints === 0
+  ){
+    command = "HOLD WITH CAUTION";
+    color = "yellow";
+    urgency = "LOW";
+    reason = resolvedFailureCount > 0
+      ? "No new deterioration has appeared since the management baseline, and at least one prior failure has improved."
+      : "No new deterioration has appeared since the verified management baseline was established.";
+    checkpoint = "Continue monitoring. Pre-existing baseline weaknesses do not create new EXIT authority.";
+
+  }else if(
+    baselineProvenance === "MANAGEMENT_BASELINE" &&
+    !structuralInvalidationHit &&
+    !rawExitThreshold &&
+    (newFailureCount > 0 || postBaselineEvidencePoints > 0)
+  ){
+    command = "WATCH / REDUCE RISK";
+    color = "yellow";
+    urgency = "MEDIUM";
+    reason = `${newFailureCount} new thesis factor(s) have failed since the management baseline; EXIT evidence is not yet sufficient.`;
+    checkpoint = "Watch for additional new failures, a newly broken structure, or a hard structural invalidation.";
+
   }else if(!baselineReliable && rawExitThreshold){
     command = "WATCH";
     color = "yellow";
     urgency = "MEDIUM";
     reason = "Current conditions are weak, but the original entry-time thesis was not recorded. Predator will not treat a reconstructed snapshot as the original thesis.";
     checkpoint = "Do not use a reconstructed baseline as an EXIT authority. Establish a management baseline if you want Predator to track this legacy position from today forward.";
+
   }else if(independentFailures >= 2 || evidencePoints >= 4){
     command = "REDUCE";
     color = "yellow";
@@ -4403,6 +4517,16 @@ function getPersistentPositionRead(ticker, a, position={}){
     structuralInvalidationHit,structureFailed,freshEntryRejected,
     confirmedExit,rawExitThreshold,exitGateIntegrity,
     independentFailures,evidencePoints,
+    baselineFailureCount:failureDelta.baselineCount,
+    currentFailureCount:failureDelta.currentCount,
+    newFailureCount,
+    resolvedFailureCount,
+    newFailureIds:failureDelta.newFailures,
+    resolvedFailureIds:failureDelta.resolvedFailures,
+    persistentFailureIds:failureDelta.persistentFailures,
+    baselineEvidencePoints:safeNum(baselineFailureState.evidencePoints, 0),
+    postBaselineEvidencePoints,
+    newStructureFailure,
     baselineReliable,baselineProvenance,
     originalInvalidation:Number.isFinite(originalInvalidation) ? originalInvalidation.toFixed(2) : "N/A",
     originalTrigger:Number.isFinite(originalTrigger) ? originalTrigger.toFixed(2) : "N/A",
@@ -5719,6 +5843,13 @@ function getPositionIntelligenceEngine(position, result){
       timeToTarget:Math.round(c.currentTiming || 0),
       evidencePoints:Number(c.evidencePoints || 0),
       independentFailures:Number(c.independentFailures || 0),
+      baselineFailureCount:Number(c.baselineFailureCount || 0),
+      currentFailureCount:Number(c.currentFailureCount || 0),
+      newFailureCount:Number(c.newFailureCount || 0),
+      resolvedFailureCount:Number(c.resolvedFailureCount || 0),
+      postBaselineEvidencePoints:Number(c.postBaselineEvidencePoints || 0),
+      newFailureIds:Array.isArray(c.newFailureIds) ? c.newFailureIds : [],
+      resolvedFailureIds:Array.isArray(c.resolvedFailureIds) ? c.resolvedFailureIds : [],
       exitGate:c.canonicalExitSupported ? "OPEN" : "BLOCKED",
       baselineReliable:!!c.baselineReliable,
       baselineProvenance:c.baselineProvenance || "UNKNOWN",
@@ -5807,6 +5938,13 @@ function getPredatorCommandCenter(position, result){
       color:c.title === "EXIT" ? "red" : c.title === "WATCH" ? "yellow" : "green",
       evidencePoints:Number(c.evidencePoints || 0),
       independentFailures:Number(c.independentFailures || 0),
+      baselineFailureCount:Number(c.baselineFailureCount || 0),
+      currentFailureCount:Number(c.currentFailureCount || 0),
+      newFailureCount:Number(c.newFailureCount || 0),
+      resolvedFailureCount:Number(c.resolvedFailureCount || 0),
+      postBaselineEvidencePoints:Number(c.postBaselineEvidencePoints || 0),
+      newFailureIds:Array.isArray(c.newFailureIds) ? c.newFailureIds : [],
+      resolvedFailureIds:Array.isArray(c.resolvedFailureIds) ? c.resolvedFailureIds : [],
       exitGate:c.canonicalExitSupported ? "OPEN" : "BLOCKED",
       baselineReliable:!!c.baselineReliable,
       baselineProvenance:c.baselineProvenance || "UNKNOWN",
@@ -6127,6 +6265,16 @@ function renderPositionCards(results){
           <div class="metric"><b>EXIT Gate:</b> <span class="${cmd.exitGate === "OPEN" ? "red" : "green"}">${cmd.exitGate}</span></div>
           <div class="metric"><b>Independent Failures:</b> ${cmd.independentFailures}</div>
           <div class="metric"><b>Evidence Points:</b> ${cmd.evidencePoints}</div>
+          ${
+            cmd.baselineDisplayType === "MANAGEMENT"
+              ? `<div class="metric"><b>Baseline Failures:</b> ${cmd.baselineFailureCount}</div>
+                 <div class="metric"><b>Current Failures:</b> ${cmd.currentFailureCount}</div>
+                 <div class="metric"><b>New Failures Since Baseline:</b> ${cmd.newFailureCount}</div>
+                 <div class="metric"><b>Resolved Failures:</b> ${cmd.resolvedFailureCount}</div>
+                 <div class="metric"><b>Post-Baseline Evidence Points:</b> ${cmd.postBaselineEvidencePoints}</div>
+                 <div class="metric"><b>Deterioration Since Baseline:</b> <span class="${cmd.newFailureCount > 0 || cmd.postBaselineEvidencePoints > 0 ? "yellow" : "green"}">${cmd.newFailureCount > 0 || cmd.postBaselineEvidencePoints > 0 ? "YES" : "NONE"}</span></div>`
+              : ""
+          }
           <div class="metric"><b>Baseline Integrity:</b> <span class="${cmd.baselineReliable ? "green" : "yellow"}">${
             cmd.baselineDisplayType === "MANAGEMENT"
               ? "VERIFIED MANAGEMENT BASELINE"
@@ -6145,7 +6293,7 @@ function renderPositionCards(results){
               : cmd.baselineDisplayType === "MANAGEMENT"
                 ? `<div class="metric"><b>Entry Thesis:</b> NOT RECORDED</div>
                    <div class="metric"><b>Management Baseline:</b> ${cmd.originalThesisScore}/100</div>
-                   <div class="metric muted">This verified snapshot is the reference point for future position-management scans. It is not labeled as the original entry thesis.</div>`
+                   <div class="metric muted">This verified snapshot is the reference point for future position-management scans. Pre-existing weaknesses are baseline context; only new deterioration or a hard invalidation can create fresh EXIT authority.</div>`
                 : `<div class="metric"><b>Entry Thesis:</b> ${cmd.originalThesisScore}/100</div>`
           }
           <div class="metric"><b>Authority Conflict:</b> <span class="${cmd.authorityConflict ? "red" : "green"}">${cmd.authorityConflict ? "YES - FAIL CLOSED" : "NO"}</span></div>
