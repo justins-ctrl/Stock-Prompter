@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.1 Persistent Thesis Command Center Fix</title>
+  <title>Signal Predator AI v47.7.2 Evidence-Based Exit Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.1 // command center persistent-thesis authority // encoding cleanup</div>
+  <div class="subtitle">v47.7.2 // evidence-based exits // no score-only exits // exit evidence matrix</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-1.json";
+  a.download = "signal-predator-backup-v47-7-2.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3877,7 +3877,11 @@ function savePositionThesisSnapshot(ticker, a, position={}){
       originalTrigger:existing.originalTrigger || swing.trigger || "N/A",
       originalMonthlyThesis:existing.originalMonthlyThesis || swing.monthlyThesis || "N/A",
       originalEntryMode:existing.originalEntryMode || swing.entryMode || d.entryStatus || "N/A",
-      originalStructureValid:
+            originalAlignment:safeNum(existing.originalAlignment, safeNum(a.alignmentScore?.score, 0)),
+      originalMomentum:safeNum(existing.originalMomentum, safeNum(a.momentumScore?.score, safeNum(a.momentumStrength, 0))),
+      originalTrend:safeNum(existing.originalTrend, safeNum(a.trendScore?.score, safeNum(a.trendAlignment?.score, safeNum(a.alignmentScore?.score, 0)))),
+      originalMarket:safeNum(existing.originalMarket, safeNum(a.marketConditionScore?.score, safeNum(a.marketRegimeScore, 0))),
+originalStructureValid:
         typeof existing.originalStructureValid === "boolean"
           ? existing.originalStructureValid
           : !!swing.structureValid,
@@ -3887,6 +3891,10 @@ function savePositionThesisSnapshot(ticker, a, position={}){
       latestPrice:price,
       latestInvalidation:swing.invalidation || d.invalidation || "N/A",
       latestTrigger:swing.trigger || "N/A",
+      latestAlignment:safeNum(a.alignmentScore?.score, 0),
+      latestMomentum:safeNum(a.momentumScore?.score, safeNum(a.momentumStrength, 0)),
+      latestTrend:safeNum(a.trendScore?.score, safeNum(a.trendAlignment?.score, safeNum(a.alignmentScore?.score, 0))),
+      latestMarket:safeNum(a.marketConditionScore?.score, safeNum(a.marketRegimeScore, 0)),
       latestStructureValid:!!swing.structureValid,
       latestMonthlyThesis:swing.monthlyThesis || "N/A",
       latestDecision:d.decision
@@ -3943,9 +3951,9 @@ function getPositionCommandAuthority(ticker, a, position={}){
     instruction = "Do not panic-exit. Reassess if the original invalidation is hit or additional thesis components fail.";
   }else if(p.command === "EXIT"){
     title = "EXIT";
-    status = "EXIT - THESIS CONFIRMED BROKEN";
+    status = "EXIT - EVIDENCE CONFIRMED";
     confidence = Math.max(70, Math.round((100 - p.currentThesisScore + 100 - p.currentConviction) / 2));
-    instruction = "Exit because the persistent thesis failed, not merely because a new entry would be rejected.";
+    instruction = "Exit only when the evidence matrix confirms structural or multi-factor thesis failure.";
   }else if(p.command === "HOLD WITH CAUTION"){
     title = "HOLD";
     status = "HOLD WITH CAUTION";
@@ -4012,7 +4020,7 @@ function renderPersistentCommandCenter(ticker, a, position={}){
       ${c.changes.map(x=>`<div class="metric">${escapeHtml(x)}</div>`).join("")}
 
       <div class="divider"></div>
-      <div class="metric muted">v47.7.1 authority rule: this Command Center now follows the persistent position thesis. A fresh WAIT / NO TRADE cannot override an existing position by itself.</div>
+      <div class="metric muted">v47.7.1 authority rule: this Command Center follows the persistent position thesis and evidence matrix. A fresh WAIT / NO TRADE cannot override an existing position by itself.</div>
     </div>`;
 }
 
@@ -4029,16 +4037,25 @@ function getPersistentPositionRead(ticker, a, position={}){
 
   const direction = position.direction || thesis?.direction || d.direction || "N/A";
   const currentPrice = safeNum(a.price, 0);
+
   const currentThesisScore = safeNum(
     a.thesisIntegrity?.score,
     safeNum(a.alignmentScore?.score, safeNum(d.confidence, 0))
   );
   const currentConviction = safeNum(getPredatorConvictionEngine(a)?.conviction, 0);
   const currentTiming = safeNum(a.timeTarget?.probability, 0);
+  const currentAlignment = safeNum(a.alignmentScore?.score, 0);
+  const currentMomentum = safeNum(a.momentumScore?.score, safeNum(a.momentumStrength, 0));
+  const currentTrend = safeNum(a.trendScore?.score, safeNum(a.trendAlignment?.score, currentAlignment));
+  const currentMarket = safeNum(a.marketConditionScore?.score, safeNum(a.marketRegimeScore, 0));
 
   const originalThesisScore = safeNum(thesis?.originalThesisScore, currentThesisScore);
   const originalConviction = safeNum(thesis?.originalConviction, currentConviction);
   const originalTiming = safeNum(thesis?.originalTiming, currentTiming);
+  const originalAlignment = safeNum(thesis?.originalAlignment, currentAlignment);
+  const originalMomentum = safeNum(thesis?.originalMomentum, currentMomentum);
+  const originalTrend = safeNum(thesis?.originalTrend, currentTrend);
+  const originalMarket = safeNum(thesis?.originalMarket, currentMarket);
 
   const originalInvalidation = parseFloat(thesis?.originalInvalidation);
   const originalTrigger = parseFloat(thesis?.originalTrigger);
@@ -4052,22 +4069,125 @@ function getPersistentPositionRead(ticker, a, position={}){
   const thesisDrop = originalThesisScore - currentThesisScore;
   const convictionDrop = originalConviction - currentConviction;
   const timingDrop = originalTiming - currentTiming;
+  const alignmentDrop = originalAlignment - currentAlignment;
+  const momentumDrop = originalMomentum - currentMomentum;
+  const trendDrop = originalTrend - currentTrend;
+  const marketDrop = originalMarket - currentMarket;
+
   const structureFailed = !swing.structureValid;
-  const currentNewEntryRejected = d.decision !== "BUY";
+  const freshEntryRejected = d.decision !== "BUY";
 
-  const severeThesisFailure = currentThesisScore < 45;
-  const multiFactorFailure =
-    currentThesisScore < 55 &&
-    currentConviction < 55 &&
-    (structureFailed || thesisDrop >= 20);
+  // -------------------------------------------------------
+  // Evidence-Based Exit Matrix
+  // IMPORTANT: thesis score alone can NEVER force EXIT.
+  // -------------------------------------------------------
+  const evidence = [];
 
-  const confirmedExit = structuralInvalidationHit || severeThesisFailure || multiFactorFailure;
+  function addEvidence(id, label, state, severity, detail){
+    evidence.push({id,label,state,severity,detail});
+  }
+
+  addEvidence(
+    "original_invalidation",
+    "Original structural invalidation",
+    structuralInvalidationHit ? "FAILED" : "INTACT",
+    structuralInvalidationHit ? 3 : 0,
+    Number.isFinite(originalInvalidation)
+      ? `Original invalidation is $${originalInvalidation.toFixed(2)}; current price is ${currentPrice > 0 ? "$"+currentPrice.toFixed(2) : "N/A"}.`
+      : "No valid saved original invalidation is available."
+  );
+
+  addEvidence(
+    "structure",
+    "Higher-timeframe structure",
+    structureFailed ? "WEAKENED" : "INTACT",
+    structureFailed ? 2 : 0,
+    structureFailed
+      ? "Current structural swing validation is no longer intact."
+      : "Current structural swing validation remains intact."
+  );
+
+  addEvidence(
+    "trend",
+    "Trend integrity",
+    (currentTrend > 0 && (currentTrend < 45 || trendDrop >= 20)) ? "FAILED" :
+      (currentTrend > 0 && (currentTrend < 60 || trendDrop >= 10)) ? "WEAKENED" : "INTACT",
+    (currentTrend > 0 && (currentTrend < 45 || trendDrop >= 20)) ? 2 :
+      (currentTrend > 0 && (currentTrend < 60 || trendDrop >= 10)) ? 1 : 0,
+    `Trend now ${Math.round(currentTrend)}/100; change from entry ${Math.round(-trendDrop)} points.`
+  );
+
+  addEvidence(
+    "momentum",
+    "Momentum integrity",
+    (currentMomentum > 0 && (currentMomentum < 40 || momentumDrop >= 25)) ? "FAILED" :
+      (currentMomentum > 0 && (currentMomentum < 55 || momentumDrop >= 12)) ? "WEAKENED" : "INTACT",
+    (currentMomentum > 0 && (currentMomentum < 40 || momentumDrop >= 25)) ? 2 :
+      (currentMomentum > 0 && (currentMomentum < 55 || momentumDrop >= 12)) ? 1 : 0,
+    `Momentum now ${Math.round(currentMomentum)}/100; change from entry ${Math.round(-momentumDrop)} points.`
+  );
+
+  addEvidence(
+    "conviction",
+    "Thesis conviction",
+    (currentConviction < 45 || convictionDrop >= 25) ? "FAILED" :
+      (currentConviction < 60 || convictionDrop >= 12) ? "WEAKENED" : "INTACT",
+    (currentConviction < 45 || convictionDrop >= 25) ? 2 :
+      (currentConviction < 60 || convictionDrop >= 12) ? 1 : 0,
+    `Conviction now ${Math.round(currentConviction)}/100; change from entry ${Math.round(-convictionDrop)} points.`
+  );
+
+  addEvidence(
+    "alignment",
+    "Directional alignment",
+    (currentAlignment > 0 && (currentAlignment < 45 || alignmentDrop >= 25)) ? "FAILED" :
+      (currentAlignment > 0 && (currentAlignment < 60 || alignmentDrop >= 12)) ? "WEAKENED" : "INTACT",
+    (currentAlignment > 0 && (currentAlignment < 45 || alignmentDrop >= 25)) ? 2 :
+      (currentAlignment > 0 && (currentAlignment < 60 || alignmentDrop >= 12)) ? 1 : 0,
+    `Alignment now ${Math.round(currentAlignment)}/100; change from entry ${Math.round(-alignmentDrop)} points.`
+  );
+
+  addEvidence(
+    "market",
+    "Market/regime support",
+    (currentMarket > 0 && (currentMarket < 40 || marketDrop >= 25)) ? "FAILED" :
+      (currentMarket > 0 && (currentMarket < 55 || marketDrop >= 12)) ? "WEAKENED" : "INTACT",
+    (currentMarket > 0 && (currentMarket < 40 || marketDrop >= 25)) ? 1 :
+      (currentMarket > 0 && (currentMarket < 55 || marketDrop >= 12)) ? 1 : 0,
+    currentMarket > 0
+      ? `Market/regime score now ${Math.round(currentMarket)}/100; change from entry ${Math.round(-marketDrop)} points.`
+      : "No explicit market/regime score available."
+  );
+
+  addEvidence(
+    "fresh_entry",
+    "Fresh-entry gate",
+    freshEntryRejected ? "REJECTED" : "APPROVED",
+    0,
+    freshEntryRejected
+      ? `Fresh entry read is ${d.decision}; this is context only and cannot independently force an exit.`
+      : "Fresh entry read remains BUY."
+  );
+
+  const hardFailures = evidence.filter(x=>x.severity >= 2 && x.state === "FAILED");
+  const weightedFailure = evidence.reduce((sum,x)=>sum + x.severity, 0);
+  const weakenedCount = evidence.filter(x=>x.state === "WEAKENED").length;
+
+  // Exit authority:
+  // 1) original invalidation breach, OR
+  // 2) at least 3 independent hard failures, OR
+  // 3) 2 hard failures + weakened structure.
+  const invalidationEvidence = evidence.find(x=>x.id === "original_invalidation");
+  const confirmedExit =
+    structuralInvalidationHit ||
+    hardFailures.length >= 3 ||
+    (hardFailures.length >= 2 && structureFailed);
 
   let command = "HOLD";
   let color = "green";
   let urgency = "NORMAL";
   let reason = "The original position thesis remains intact.";
-  let checkpoint = "Continue monitoring the original invalidation and higher-timeframe thesis.";
+  let checkpoint = "Continue monitoring the saved invalidation and thesis evidence.";
 
   if(confirmedExit){
     command = "EXIT";
@@ -4075,43 +4195,41 @@ function getPersistentPositionRead(ticker, a, position={}){
     urgency = "HIGH";
 
     if(structuralInvalidationHit){
-      reason = "The original structural invalidation has been breached.";
-      checkpoint = "The position thesis is invalidated. Exit rather than waiting for the option premium to recover.";
-    }else if(severeThesisFailure){
-      reason = "The current thesis score has deteriorated to a severe-failure level.";
-      checkpoint = "Exit because the broader thesis has materially failed, not merely because a fresh entry would be rejected.";
+      reason = "The saved original structural invalidation has been breached.";
+      checkpoint = "Exit because the original thesis is structurally invalidated.";
     }else{
-      reason = "Multiple independent thesis components have failed together.";
-      checkpoint = "Exit because thesis, conviction, and/or structure have deteriorated together.";
+      reason = `${hardFailures.length} independent thesis factors have failed together.`;
+      checkpoint = "Exit because multiple independent thesis conditions failed, not because the fresh-entry gate changed.";
     }
-  }else if(currentThesisScore < 60 || currentConviction < 60 || structureFailed){
-    command = "WATCH / REDUCE RISK";
+  }else if(hardFailures.length >= 2 || weightedFailure >= 4){
+    command = "REDUCE";
     color = "yellow";
     urgency = "MEDIUM";
-    reason = "The position thesis has weakened, but the original structural invalidation has not been confirmed.";
-    checkpoint = "Do not automatically exit. Recheck if structure deteriorates further or the original invalidation is hit.";
-  }else if(currentNewEntryRejected){
+    reason = "Several thesis factors have materially deteriorated, but EXIT evidence is not yet sufficient.";
+    checkpoint = "Reduce risk and recheck if another independent thesis factor fails or the original invalidation is hit.";
+  }else if(hardFailures.length === 1 || weakenedCount >= 2 || structureFailed){
+    command = "WATCH";
+    color = "yellow";
+    urgency = "MEDIUM";
+    reason = "The thesis has weakened, but the evidence does not justify an exit.";
+    checkpoint = "Hold with closer monitoring. Exit only if the evidence matrix reaches the exit threshold.";
+  }else if(freshEntryRejected){
     command = "HOLD";
     color = "green";
     urgency = "NORMAL";
-    reason = "A fresh entry may no longer be attractive, but that alone does not invalidate an existing position.";
-    checkpoint = "Manage the position from its original thesis and invalidation, not from today's entry gate.";
+    reason = "A fresh entry is no longer approved, but the existing trade thesis has not failed.";
+    checkpoint = "Continue managing from the saved thesis; do not use a new-entry rejection as an exit signal.";
   }
 
   const changes = [];
-  if(thesisDrop >= 10) changes.push(`Thesis weakened by ${Math.round(thesisDrop)} points.`);
-  else if(thesisDrop <= -10) changes.push(`Thesis improved by ${Math.round(Math.abs(thesisDrop))} points.`);
+  if(thesisDrop >= 10) changes.push(`Thesis score weakened by ${Math.round(thesisDrop)} points.`);
+  else if(thesisDrop <= -10) changes.push(`Thesis score improved by ${Math.round(Math.abs(thesisDrop))} points.`);
   else changes.push("Thesis score is broadly stable.");
 
-  if(convictionDrop >= 10) changes.push(`Conviction weakened by ${Math.round(convictionDrop)} points.`);
-  else if(convictionDrop <= -10) changes.push(`Conviction improved by ${Math.round(Math.abs(convictionDrop))} points.`);
-
-  if(timingDrop >= 10) changes.push(`Timing weakened by ${Math.round(timingDrop)} points.`);
-  else if(timingDrop <= -10) changes.push(`Timing improved by ${Math.round(Math.abs(timingDrop))} points.`);
-
   changes.push(`Original invalidation ${Number.isFinite(originalInvalidation) ? "$"+originalInvalidation.toFixed(2) : "N/A"}: ${structuralInvalidationHit ? "HIT" : "NOT HIT"}.`);
-  changes.push(`Current structure: ${swing.structureValid ? "INTACT" : "WEAKENED"}.`);
-  changes.push(`Fresh-entry gate: ${d.decision}.`);
+  changes.push(`Hard thesis failures: ${hardFailures.length}.`);
+  changes.push(`Weakened thesis factors: ${weakenedCount}.`);
+  changes.push(`Fresh-entry gate: ${d.decision} (context only).`);
 
   const refreshed = {
     ...(thesis || {}),
@@ -4119,6 +4237,10 @@ function getPersistentPositionRead(ticker, a, position={}){
     latestThesisScore:currentThesisScore,
     latestConviction:currentConviction,
     latestTiming:currentTiming,
+    latestAlignment:currentAlignment,
+    latestMomentum:currentMomentum,
+    latestTrend:currentTrend,
+    latestMarket:currentMarket,
     latestPrice:currentPrice,
     latestInvalidation:swing.invalidation || d.invalidation || "N/A",
     latestTrigger:swing.trigger || "N/A",
@@ -4136,23 +4258,36 @@ function getPersistentPositionRead(ticker, a, position={}){
   return {
     thesis:refreshed,
     command,color,urgency,reason,checkpoint,
-    currentThesisScore,currentConviction,currentTiming,
-    originalThesisScore,originalConviction,originalTiming,
-    thesisDrop,convictionDrop,timingDrop,
-    structuralInvalidationHit,structureFailed,currentNewEntryRejected,
+    currentThesisScore,currentConviction,currentTiming,currentAlignment,currentMomentum,currentTrend,currentMarket,
+    originalThesisScore,originalConviction,originalTiming,originalAlignment,originalMomentum,originalTrend,originalMarket,
+    thesisDrop,convictionDrop,timingDrop,alignmentDrop,momentumDrop,trendDrop,marketDrop,
+    structuralInvalidationHit,structureFailed,freshEntryRejected,
     confirmedExit,
     originalInvalidation:Number.isFinite(originalInvalidation) ? originalInvalidation.toFixed(2) : "N/A",
     originalTrigger:Number.isFinite(originalTrigger) ? originalTrigger.toFixed(2) : "N/A",
+    evidence,
+    hardFailures,
+    weightedFailure,
+    weakenedCount,
     changes
   };
 }
-
 function renderPersistentPositionRead(ticker, a, position={}){
   const p = getPersistentPositionRead(ticker, a, position);
+
+  const evidenceHtml = p.evidence.map(e=>{
+    const cls = e.state === "FAILED" ? "red" : e.state === "WEAKENED" || e.state === "REJECTED" ? "yellow" : "green";
+    return `
+      <div class="card" style="padding:10px;margin-top:8px;">
+        <div class="metric"><b>${escapeHtml(e.label)}:</b> <span class="${cls}">${escapeHtml(e.state)}</span></div>
+        <div class="metric muted">${escapeHtml(e.detail)}</div>
+      </div>`;
+  }).join("");
 
   return `
     <div class="card">
       <div class="section-title">Persistent Position Thesis</div>
+
       <div class="metric"><b>Position Command:</b> <span class="${p.color}">${escapeHtml(p.command)}</span></div>
       <div class="metric"><b>Urgency:</b> ${escapeHtml(p.urgency)}</div>
       <div class="metric"><b>Why:</b> ${escapeHtml(p.reason)}</div>
@@ -4164,25 +4299,24 @@ function renderPersistentPositionRead(ticker, a, position={}){
       <div class="metric"><b>Current Thesis Score:</b> ${Math.round(p.currentThesisScore)}/100</div>
       <div class="metric"><b>Original Conviction:</b> ${Math.round(p.originalConviction)}/100</div>
       <div class="metric"><b>Current Conviction:</b> ${Math.round(p.currentConviction)}/100</div>
-      <div class="metric"><b>Original Timing:</b> ${Math.round(p.originalTiming)}/100</div>
-      <div class="metric"><b>Current Timing:</b> ${Math.round(p.currentTiming)}/100</div>
-
-      <div class="divider"></div>
-      <div class="section-title">Structural Exit Gate</div>
       <div class="metric"><b>Original Invalidation:</b> ${p.originalInvalidation === "N/A" ? "N/A" : "$"+p.originalInvalidation}</div>
       <div class="metric"><b>Invalidation Hit:</b> ${p.structuralInvalidationHit ? "YES" : "NO"}</div>
-      <div class="metric"><b>Current Structure:</b> ${p.structureFailed ? "WEAKENED" : "INTACT"}</div>
-      <div class="metric"><b>Fresh Entry Read:</b> ${escapeHtml(p.thesis.latestDecision || "N/A")}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Exit Evidence Matrix</div>
+      <div class="metric"><b>Hard Failures:</b> ${p.hardFailures.length}</div>
+      <div class="metric"><b>Weakened Factors:</b> ${p.weakenedCount}</div>
+      <div class="metric"><b>Exit Threshold Met:</b> ${p.confirmedExit ? "YES" : "NO"}</div>
+      ${evidenceHtml}
 
       <div class="divider"></div>
       <div class="section-title">What Changed</div>
       ${p.changes.map(x=>`<div class="metric">${escapeHtml(x)}</div>`).join("")}
 
       <div class="divider"></div>
-      <div class="metric muted">v47.7 rule: A fresh NO TRADE / WAIT does not automatically force an existing position to exit. EXIT requires the original invalidation or a confirmed multi-factor thesis failure.</div>
+      <div class="metric muted">v47.7.2 rule: score-only exits are prohibited. EXIT requires the original invalidation or enough independent failed thesis factors to satisfy the evidence matrix.</div>
     </div>`;
 }
-
 function getPositionManagementCoach(a, position={}){
   a = ensureEngineDefaults(a);
 
