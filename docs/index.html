@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.3 Clean Command Authority Fix</title>
+  <title>Signal Predator AI v47.7.4 Exit-Gate Integrity Fix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.3 // evidence-based exits // no score-only exits // exit evidence matrix</div>
+  <div class="subtitle">v47.7.4 // exit-gate integrity // canonical evidence counts // fail-closed authority</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-3.json";
+  a.download = "signal-predator-backup-v47-7-4.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3862,6 +3862,10 @@ function savePositionThesisSnapshot(ticker, a, position={}){
       ticker:symbol,
       createdAt:existing.createdAt || now,
       updatedAt:now,
+      baselineProvenance:
+        existing.baselineProvenance ||
+        position._baselineProvenance ||
+        "ENTRY_SNAPSHOT",
       direction:position.direction || existing.direction || d.direction || "N/A",
       status:"OPEN",
       entryUnderlying:safeNum(position.entryUnderlying, safeNum(existing.entryUnderlying, price)),
@@ -3933,14 +3937,41 @@ function removePositionThesisSnapshot(ticker){
 function getPositionCommandAuthority(ticker, a, position={}){
   const p = getPersistentPositionRead(ticker, a, position);
 
-  let title = p.command;
-  let status = p.command;
-  let confidence = 70;
-  let instruction = p.checkpoint;
-  let reason = p.reason;
-  let nextCheckpoint = p.checkpoint;
+  // v47.7.4 COMMAND INTEGRITY LOCK:
+  // EXIT may never survive if the canonical evidence fields do not support it.
+  const canonicalExitSupported =
+    !!p.confirmedExit &&
+    !!p.exitGateIntegrity &&
+    (
+      !!p.structuralInvalidationHit ||
+      (
+        !!p.baselineReliable &&
+        (
+          Number(p.independentFailures || 0) >= 3 ||
+          (Number(p.independentFailures || 0) >= 2 && !!p.structureFailed)
+        )
+      )
+    );
 
-  if(p.command === "HOLD"){
+  const authorityConflict =
+    p.command === "EXIT" && !canonicalExitSupported;
+
+  let title = authorityConflict ? "HOLD / DATA CONFLICT" : p.command;
+  let status = authorityConflict ? "HOLD - EXIT GATE CONFLICT" : p.command;
+  let confidence = authorityConflict ? 50 : 70;
+  let instruction = authorityConflict
+    ? "Do not exit from this scan. The command and canonical evidence gate disagree."
+    : p.checkpoint;
+  let reason = authorityConflict
+    ? "Signal Predator detected an internal exit-authority conflict and failed closed."
+    : p.reason;
+  let nextCheckpoint = authorityConflict
+    ? "Re-run Live Position Scan. EXIT remains blocked until the displayed evidence and command authority agree."
+    : p.checkpoint;
+
+  if(authorityConflict){
+    // Fail closed. Do not allow later p.command branches to re-promote EXIT.
+  }else if(p.command === "HOLD"){
     title = "HOLD";
     status = "HOLD - THESIS INTACT";
     confidence = Math.max(65, Math.round((p.currentThesisScore + p.currentConviction) / 2));
@@ -3980,7 +4011,9 @@ function getPositionCommandAuthority(ticker, a, position={}){
     confidence,
     instruction,
     reason,
-    nextCheckpoint
+    nextCheckpoint,
+    canonicalExitSupported,
+    authorityConflict
   };
 }
 
@@ -4031,10 +4064,25 @@ function getPersistentPositionRead(ticker, a, position={}){
   const d = getSimplePredatorDecision(a);
   const swing = d.swingValidation || getSwingValidationEngine(a);
   let thesis = getPositionThesisSnapshot(ticker);
+  const hadExistingThesis = !!thesis;
 
   if(!thesis){
-    thesis = savePositionThesisSnapshot(ticker, a, position);
+    thesis = savePositionThesisSnapshot(ticker, a, {
+      ...position,
+      _baselineProvenance:"RECONSTRUCTED_AT_FIRST_POSITION_SCAN"
+    });
   }
+
+  // v47.7.4 baseline integrity:
+  // Older positions that did not save an entry-time Predator thesis must not
+  // receive a hard EXIT from a baseline reconstructed after the fact.
+  const baselineProvenance =
+    thesis?.baselineProvenance ||
+    (hadExistingThesis ? "LEGACY_UNKNOWN" : "RECONSTRUCTED_AT_FIRST_POSITION_SCAN");
+
+  const baselineReliable =
+    baselineProvenance === "ENTRY_SNAPSHOT" ||
+    baselineProvenance === "MANUAL_ENTRY_SNAPSHOT";
 
   const direction = position.direction || thesis?.direction || d.direction || "N/A";
   const currentPrice = safeNum(a.price, 0);
@@ -4179,10 +4227,31 @@ function getPersistentPositionRead(ticker, a, position={}){
   // 2) at least 3 independent hard failures, OR
   // 3) 2 hard failures + weakened structure.
   const invalidationEvidence = evidence.find(x=>x.id === "original_invalidation");
+
+  // Canonical evidence fields. Every UI and command layer must use these same values.
+  const independentFailures = hardFailures.length;
+  const evidencePoints = weightedFailure;
+
+  const rawExitThreshold =
+    structuralInvalidationHit ||
+    independentFailures >= 3 ||
+    (independentFailures >= 2 && structureFailed);
+
+  // Fail closed when the original entry thesis is not trustworthy.
+  // A reconstructed/legacy baseline may WATCH or REDUCE, but cannot create
+  // a hard EXIT unless an actual saved structural invalidation was breached.
   const confirmedExit =
     structuralInvalidationHit ||
-    hardFailures.length >= 3 ||
-    (hardFailures.length >= 2 && structureFailed);
+    (baselineReliable && rawExitThreshold);
+
+  const exitGateIntegrity =
+    confirmedExit === (
+      structuralInvalidationHit ||
+      (baselineReliable && (
+        independentFailures >= 3 ||
+        (independentFailures >= 2 && structureFailed)
+      ))
+    );
 
   let command = "HOLD";
   let color = "green";
@@ -4202,13 +4271,19 @@ function getPersistentPositionRead(ticker, a, position={}){
       reason = `${hardFailures.length} independent thesis factors have failed together.`;
       checkpoint = "Exit because multiple independent thesis conditions failed, not because the fresh-entry gate changed.";
     }
-  }else if(hardFailures.length >= 2 || weightedFailure >= 4){
+  }else if(!baselineReliable && rawExitThreshold){
+    command = "WATCH";
+    color = "yellow";
+    urgency = "MEDIUM";
+    reason = "Current conditions are weak, but the original entry-time thesis was not saved reliably enough to authorize a hard EXIT.";
+    checkpoint = "Do not use a reconstructed baseline as an EXIT authority. Manage manually and establish a valid thesis baseline for future scans.";
+  }else if(independentFailures >= 2 || evidencePoints >= 4){
     command = "REDUCE";
     color = "yellow";
     urgency = "MEDIUM";
     reason = "Several thesis factors have materially deteriorated, but EXIT evidence is not yet sufficient.";
     checkpoint = "Reduce risk and recheck if another independent thesis factor fails or the original invalidation is hit.";
-  }else if(hardFailures.length === 1 || weakenedCount >= 2 || structureFailed){
+  }else if(independentFailures === 1 || weakenedCount >= 2 || structureFailed){
     command = "WATCH";
     color = "yellow";
     urgency = "MEDIUM";
@@ -4235,6 +4310,7 @@ function getPersistentPositionRead(ticker, a, position={}){
   const refreshed = {
     ...(thesis || {}),
     updatedAt:new Date().toISOString(),
+    baselineProvenance,
     latestThesisScore:currentThesisScore,
     latestConviction:currentConviction,
     latestTiming:currentTiming,
@@ -4263,7 +4339,9 @@ function getPersistentPositionRead(ticker, a, position={}){
     originalThesisScore,originalConviction,originalTiming,originalAlignment,originalMomentum,originalTrend,originalMarket,
     thesisDrop,convictionDrop,timingDrop,alignmentDrop,momentumDrop,trendDrop,marketDrop,
     structuralInvalidationHit,structureFailed,freshEntryRejected,
-    confirmedExit,
+    confirmedExit,rawExitThreshold,exitGateIntegrity,
+    independentFailures,evidencePoints,
+    baselineReliable,baselineProvenance,
     originalInvalidation:Number.isFinite(originalInvalidation) ? originalInvalidation.toFixed(2) : "N/A",
     originalTrigger:Number.isFinite(originalTrigger) ? originalTrigger.toFixed(2) : "N/A",
     evidence,
@@ -4663,7 +4741,8 @@ function saveCurrentAnalysisAsPositionThesis(){
     entryUnderlying,
     optionEntryPrice,
     optionCurrentPrice,
-    contracts
+    contracts,
+    _baselineProvenance:"MANUAL_ENTRY_SNAPSHOT"
   });
 
   alert(`${ticker} persistent thesis saved.`);
@@ -5576,9 +5655,12 @@ function getPositionIntelligenceEngine(position, result){
       thesisLabel:c.confirmedExit ? "EXIT EVIDENCE CONFIRMED" : "EXIT GATE BLOCKED",
       alignment:Math.round(c.currentAlignment || 0),
       timeToTarget:Math.round(c.currentTiming || 0),
-      evidencePoints:c.evidencePoints || 0,
-      independentFailures:c.independentFailures || 0,
-      exitGate:c.confirmedExit ? "OPEN" : "BLOCKED",
+      evidencePoints:Number(c.evidencePoints || 0),
+      independentFailures:Number(c.independentFailures || 0),
+      exitGate:c.canonicalExitSupported ? "OPEN" : "BLOCKED",
+      baselineReliable:!!c.baselineReliable,
+      baselineProvenance:c.baselineProvenance || "UNKNOWN",
+      authorityConflict:!!c.authorityConflict,
       originalThesisScore:Math.round(c.originalThesisScore || 0),
       originalInvalidation:c.originalInvalidation || "N/A",
       invalidationHit:!!c.structuralInvalidationHit,
@@ -5655,9 +5737,12 @@ function getPredatorCommandCenter(position, result){
       nextCheckpoint:c.nextCheckpoint,
       botInstruction:c.instruction,
       color:c.title === "EXIT" ? "red" : c.title === "WATCH" ? "yellow" : "green",
-      evidencePoints:c.evidencePoints || 0,
-      independentFailures:c.independentFailures || 0,
-      exitGate:c.confirmedExit ? "OPEN" : "BLOCKED",
+      evidencePoints:Number(c.evidencePoints || 0),
+      independentFailures:Number(c.independentFailures || 0),
+      exitGate:c.canonicalExitSupported ? "OPEN" : "BLOCKED",
+      baselineReliable:!!c.baselineReliable,
+      baselineProvenance:c.baselineProvenance || "UNKNOWN",
+      authorityConflict:!!c.authorityConflict,
       originalInvalidation:c.originalInvalidation || "N/A",
       invalidationHit:!!c.structuralInvalidationHit,
       originalThesisScore:Math.round(c.originalThesisScore || 0),
@@ -5968,6 +6053,9 @@ function renderPositionCards(results){
           <div class="metric"><b>EXIT Gate:</b> <span class="${cmd.exitGate === "OPEN" ? "red" : "green"}">${cmd.exitGate}</span></div>
           <div class="metric"><b>Independent Failures:</b> ${cmd.independentFailures}</div>
           <div class="metric"><b>Evidence Points:</b> ${cmd.evidencePoints}</div>
+          <div class="metric"><b>Baseline Integrity:</b> <span class="${cmd.baselineReliable ? "green" : "yellow"}">${cmd.baselineReliable ? "VERIFIED" : "LEGACY / RECONSTRUCTED"}</span></div>
+          <div class="metric"><b>Baseline Source:</b> ${escapeHtml(cmd.baselineProvenance || "UNKNOWN")}</div>
+          <div class="metric"><b>Authority Conflict:</b> <span class="${cmd.authorityConflict ? "red" : "green"}">${cmd.authorityConflict ? "YES - FAIL CLOSED" : "NO"}</span></div>
           <div class="metric"><b>Original Invalidation:</b> ${cmd.originalInvalidation === "N/A" ? "N/A" : "$"+cmd.originalInvalidation}</div>
           <div class="metric"><b>Invalidation Hit:</b> ${cmd.invalidationHit ? "YES" : "NO"}</div>
           ` : ""}
@@ -5982,6 +6070,7 @@ function renderPositionCards(results){
       <div class="metric"><b>Original Thesis:</b> ${r.positionIntelligence.originalThesisScore || "N/A"}/100</div>
       <div class="metric"><b>Current Thesis:</b> ${r.positionIntelligence.thesisScore}/100</div>
       <div class="metric"><b>EXIT Gate:</b> <span class="${r.positionIntelligence.exitGate === "OPEN" ? "red" : "green"}">${r.positionIntelligence.exitGate}</span></div>
+      <div class="metric"><b>Baseline Integrity:</b> <span class="${r.positionIntelligence.baselineReliable ? "green" : "yellow"}">${r.positionIntelligence.baselineReliable ? "VERIFIED" : "LEGACY / RECONSTRUCTED"}</span></div>
       ` : `<div class="metric"><b>Thesis Score:</b> ${r.positionIntelligence.thesisScore}/100 â ${escapeHtml(r.positionIntelligence.thesisLabel)}</div>`}
       <div class="metric"><b>Position Rule:</b> ${escapeHtml(r.positionIntelligence.positionRule)}</div>
       <div class="metric"><b>Noise Read:</b> ${escapeHtml(r.positionIntelligence.normalNoiseRead)}</div>
