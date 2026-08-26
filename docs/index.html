@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.6 Management Baseline Button Fix</title>
+  <title>Signal Predator AI v47.7.6.1 Management Baseline Storage Fix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.6 // management baseline button fix // safe persistence // no duplicate onboarding</div>
+  <div class="subtitle">v47.7.6.1 // management baseline storage fix // safe persistence // no duplicate onboarding</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-6.json";
+  a.download = "signal-predator-backup-v47-7-6-1.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3928,14 +3928,13 @@ function clearPositionThesisSnapshot(ticker){
   const symbol = normalizeTicker(ticker);
   if(!symbol) return false;
   try{
-    const all = getStore(POSITION_THESIS_KEY, {});
-    if(!all || typeof all !== "object") return false;
-    if(Object.prototype.hasOwnProperty.call(all, symbol)){
-      delete all[symbol];
-      setStore(POSITION_THESIS_KEY, all);
-    }
-    return true;
-  }catch(e){ return false; }
+    // Use the same canonical store/helper already used everywhere else.
+    removePositionThesisSnapshot(symbol);
+    return getPositionThesisSnapshot(symbol) === null;
+  }catch(e){
+    console.error("clearPositionThesisSnapshot failed", e);
+    return false;
+  }
 }
 
 
