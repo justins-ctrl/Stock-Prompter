@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.6 Live Contract Grader</title>
+  <title>Signal Predator AI v47.7 Persistent Position Thesis Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.6 // live contract grader // spread-liquidity-IV execution quality</div>
+  <div class="subtitle">v47.7 // persistent position thesis // structural exit discipline // change tracking</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-6.json";
+  a.download = "signal-predator-backup-v47-7.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3829,11 +3829,270 @@ function getSwingValidationEngine(a){
   return {validation,entryMode,reason,blocker,readiness,structureValid,triggerConfirmed,distanceToTriggerPct,distanceToInvalidationPct,trigger:Number.isFinite(trigger)?trigger.toFixed(2):"N/A",invalidation:Number.isFinite(invalidation)?invalidation.toFixed(2):"N/A",buyWindow:policy.buyWindow,monthlyThesis:eliteMonthlyThesis?"ELITE":strongMonthlyThesis?"STRONG":"WEAK"};
 }
 
-function getPositionManagementCoach(a, position={}){
+const PREDATOR_POSITION_THESIS_KEY = "signal_predator_position_theses_v47_7";
+
+function getPositionThesisStore(){
+  const store = getStore(PREDATOR_POSITION_THESIS_KEY, {});
+  return store && typeof store === "object" ? store : {};
+}
+
+function savePositionThesisSnapshot(ticker, a, position={}){
+  try{
+    const symbol = normalizeTicker(ticker);
+    if(!symbol) return null;
+
+    a = ensureEngineDefaults(a);
+    const d = getSimplePredatorDecision(a);
+    const swing = d.swingValidation || getSwingValidationEngine(a);
+
+    const store = getPositionThesisStore();
+    const existing = store[symbol] || {};
+    const now = new Date().toISOString();
+
+    const thesisScore = safeNum(
+      a.thesisIntegrity?.score,
+      safeNum(a.alignmentScore?.score, safeNum(d.confidence, 0))
+    );
+    const conviction = safeNum(getPredatorConvictionEngine(a)?.conviction, 0);
+    const timing = safeNum(a.timeTarget?.probability, 0);
+    const price = safeNum(a.price, 0);
+
+    const snapshot = {
+      ticker:symbol,
+      createdAt:existing.createdAt || now,
+      updatedAt:now,
+      direction:position.direction || existing.direction || d.direction || "N/A",
+      status:"OPEN",
+      entryUnderlying:safeNum(position.entryUnderlying, safeNum(existing.entryUnderlying, price)),
+      optionEntryPrice:safeNum(position.optionEntryPrice, safeNum(existing.optionEntryPrice, 0)),
+      optionCurrentPrice:safeNum(position.optionCurrentPrice, safeNum(existing.optionCurrentPrice, 0)),
+      contracts:Math.max(1, Math.floor(safeNum(position.contracts, safeNum(existing.contracts, 1)))),
+      originalDecision:existing.originalDecision || d.decision,
+      originalConfidence:safeNum(existing.originalConfidence, safeNum(d.confidence, 0)),
+      originalThesisScore:safeNum(existing.originalThesisScore, thesisScore),
+      originalConviction:safeNum(existing.originalConviction, conviction),
+      originalTiming:safeNum(existing.originalTiming, timing),
+      originalPrice:safeNum(existing.originalPrice, price),
+      originalInvalidation:existing.originalInvalidation || swing.invalidation || d.invalidation || "N/A",
+      originalTrigger:existing.originalTrigger || swing.trigger || "N/A",
+      originalMonthlyThesis:existing.originalMonthlyThesis || swing.monthlyThesis || "N/A",
+      originalEntryMode:existing.originalEntryMode || swing.entryMode || d.entryStatus || "N/A",
+      originalStructureValid:
+        typeof existing.originalStructureValid === "boolean"
+          ? existing.originalStructureValid
+          : !!swing.structureValid,
+      latestThesisScore:thesisScore,
+      latestConviction:conviction,
+      latestTiming:timing,
+      latestPrice:price,
+      latestInvalidation:swing.invalidation || d.invalidation || "N/A",
+      latestTrigger:swing.trigger || "N/A",
+      latestStructureValid:!!swing.structureValid,
+      latestMonthlyThesis:swing.monthlyThesis || "N/A",
+      latestDecision:d.decision
+    };
+
+    store[symbol] = snapshot;
+    setStore(PREDATOR_POSITION_THESIS_KEY, store);
+    return snapshot;
+  }catch(e){
+    console.warn("Could not save persistent thesis snapshot:", e);
+    return null;
+  }
+}
+
+function getPositionThesisSnapshot(ticker){
+  try{
+    const symbol = normalizeTicker(ticker);
+    const store = getPositionThesisStore();
+    return store[symbol] || null;
+  }catch(e){
+    return null;
+  }
+}
+
+function removePositionThesisSnapshot(ticker){
+  try{
+    const symbol = normalizeTicker(ticker);
+    const store = getPositionThesisStore();
+    delete store[symbol];
+    setStore(PREDATOR_POSITION_THESIS_KEY, store);
+  }catch(e){}
+}
+
+function getPersistentPositionRead(ticker, a, position={}){
   a = ensureEngineDefaults(a);
 
   const d = getSimplePredatorDecision(a);
   const swing = d.swingValidation || getSwingValidationEngine(a);
+  let thesis = getPositionThesisSnapshot(ticker);
+
+  if(!thesis){
+    thesis = savePositionThesisSnapshot(ticker, a, position);
+  }
+
+  const direction = position.direction || thesis?.direction || d.direction || "N/A";
+  const currentPrice = safeNum(a.price, 0);
+  const currentThesisScore = safeNum(
+    a.thesisIntegrity?.score,
+    safeNum(a.alignmentScore?.score, safeNum(d.confidence, 0))
+  );
+  const currentConviction = safeNum(getPredatorConvictionEngine(a)?.conviction, 0);
+  const currentTiming = safeNum(a.timeTarget?.probability, 0);
+
+  const originalThesisScore = safeNum(thesis?.originalThesisScore, currentThesisScore);
+  const originalConviction = safeNum(thesis?.originalConviction, currentConviction);
+  const originalTiming = safeNum(thesis?.originalTiming, currentTiming);
+
+  const originalInvalidation = parseFloat(thesis?.originalInvalidation);
+  const originalTrigger = parseFloat(thesis?.originalTrigger);
+
+  let structuralInvalidationHit = false;
+  if(Number.isFinite(originalInvalidation) && currentPrice > 0){
+    if(direction === "BUY CALL") structuralInvalidationHit = currentPrice <= originalInvalidation;
+    if(direction === "BUY PUT") structuralInvalidationHit = currentPrice >= originalInvalidation;
+  }
+
+  const thesisDrop = originalThesisScore - currentThesisScore;
+  const convictionDrop = originalConviction - currentConviction;
+  const timingDrop = originalTiming - currentTiming;
+  const structureFailed = !swing.structureValid;
+  const currentNewEntryRejected = d.decision !== "BUY";
+
+  const severeThesisFailure = currentThesisScore < 45;
+  const multiFactorFailure =
+    currentThesisScore < 55 &&
+    currentConviction < 55 &&
+    (structureFailed || thesisDrop >= 20);
+
+  const confirmedExit = structuralInvalidationHit || severeThesisFailure || multiFactorFailure;
+
+  let command = "HOLD";
+  let color = "green";
+  let urgency = "NORMAL";
+  let reason = "The original position thesis remains intact.";
+  let checkpoint = "Continue monitoring the original invalidation and higher-timeframe thesis.";
+
+  if(confirmedExit){
+    command = "EXIT";
+    color = "red";
+    urgency = "HIGH";
+
+    if(structuralInvalidationHit){
+      reason = "The original structural invalidation has been breached.";
+      checkpoint = "The position thesis is invalidated. Exit rather than waiting for the option premium to recover.";
+    }else if(severeThesisFailure){
+      reason = "The current thesis score has deteriorated to a severe-failure level.";
+      checkpoint = "Exit because the broader thesis has materially failed, not merely because a fresh entry would be rejected.";
+    }else{
+      reason = "Multiple independent thesis components have failed together.";
+      checkpoint = "Exit because thesis, conviction, and/or structure have deteriorated together.";
+    }
+  }else if(currentThesisScore < 60 || currentConviction < 60 || structureFailed){
+    command = "WATCH / REDUCE RISK";
+    color = "yellow";
+    urgency = "MEDIUM";
+    reason = "The position thesis has weakened, but the original structural invalidation has not been confirmed.";
+    checkpoint = "Do not automatically exit. Recheck if structure deteriorates further or the original invalidation is hit.";
+  }else if(currentNewEntryRejected){
+    command = "HOLD";
+    color = "green";
+    urgency = "NORMAL";
+    reason = "A fresh entry may no longer be attractive, but that alone does not invalidate an existing position.";
+    checkpoint = "Manage the position from its original thesis and invalidation, not from today's entry gate.";
+  }
+
+  const changes = [];
+  if(thesisDrop >= 10) changes.push(`Thesis weakened by ${Math.round(thesisDrop)} points.`);
+  else if(thesisDrop <= -10) changes.push(`Thesis improved by ${Math.round(Math.abs(thesisDrop))} points.`);
+  else changes.push("Thesis score is broadly stable.");
+
+  if(convictionDrop >= 10) changes.push(`Conviction weakened by ${Math.round(convictionDrop)} points.`);
+  else if(convictionDrop <= -10) changes.push(`Conviction improved by ${Math.round(Math.abs(convictionDrop))} points.`);
+
+  if(timingDrop >= 10) changes.push(`Timing weakened by ${Math.round(timingDrop)} points.`);
+  else if(timingDrop <= -10) changes.push(`Timing improved by ${Math.round(Math.abs(timingDrop))} points.`);
+
+  changes.push(`Original invalidation ${Number.isFinite(originalInvalidation) ? "$"+originalInvalidation.toFixed(2) : "N/A"}: ${structuralInvalidationHit ? "HIT" : "NOT HIT"}.`);
+  changes.push(`Current structure: ${swing.structureValid ? "INTACT" : "WEAKENED"}.`);
+  changes.push(`Fresh-entry gate: ${d.decision}.`);
+
+  const refreshed = {
+    ...(thesis || {}),
+    updatedAt:new Date().toISOString(),
+    latestThesisScore:currentThesisScore,
+    latestConviction:currentConviction,
+    latestTiming:currentTiming,
+    latestPrice:currentPrice,
+    latestInvalidation:swing.invalidation || d.invalidation || "N/A",
+    latestTrigger:swing.trigger || "N/A",
+    latestStructureValid:!!swing.structureValid,
+    latestMonthlyThesis:swing.monthlyThesis || "N/A",
+    latestDecision:d.decision
+  };
+
+  try{
+    const store = getPositionThesisStore();
+    store[normalizeTicker(ticker)] = refreshed;
+    setStore(PREDATOR_POSITION_THESIS_KEY, store);
+  }catch(e){}
+
+  return {
+    thesis:refreshed,
+    command,color,urgency,reason,checkpoint,
+    currentThesisScore,currentConviction,currentTiming,
+    originalThesisScore,originalConviction,originalTiming,
+    thesisDrop,convictionDrop,timingDrop,
+    structuralInvalidationHit,structureFailed,currentNewEntryRejected,
+    confirmedExit,
+    originalInvalidation:Number.isFinite(originalInvalidation) ? originalInvalidation.toFixed(2) : "N/A",
+    originalTrigger:Number.isFinite(originalTrigger) ? originalTrigger.toFixed(2) : "N/A",
+    changes
+  };
+}
+
+function renderPersistentPositionRead(ticker, a, position={}){
+  const p = getPersistentPositionRead(ticker, a, position);
+
+  return `
+    <div class="card">
+      <div class="section-title">Persistent Position Thesis</div>
+      <div class="metric"><b>Position Command:</b> <span class="${p.color}">${escapeHtml(p.command)}</span></div>
+      <div class="metric"><b>Urgency:</b> ${escapeHtml(p.urgency)}</div>
+      <div class="metric"><b>Why:</b> ${escapeHtml(p.reason)}</div>
+      <div class="metric"><b>Next Checkpoint:</b> ${escapeHtml(p.checkpoint)}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Original Thesis vs Now</div>
+      <div class="metric"><b>Original Thesis Score:</b> ${Math.round(p.originalThesisScore)}/100</div>
+      <div class="metric"><b>Current Thesis Score:</b> ${Math.round(p.currentThesisScore)}/100</div>
+      <div class="metric"><b>Original Conviction:</b> ${Math.round(p.originalConviction)}/100</div>
+      <div class="metric"><b>Current Conviction:</b> ${Math.round(p.currentConviction)}/100</div>
+      <div class="metric"><b>Original Timing:</b> ${Math.round(p.originalTiming)}/100</div>
+      <div class="metric"><b>Current Timing:</b> ${Math.round(p.currentTiming)}/100</div>
+
+      <div class="divider"></div>
+      <div class="section-title">Structural Exit Gate</div>
+      <div class="metric"><b>Original Invalidation:</b> ${p.originalInvalidation === "N/A" ? "N/A" : "$"+p.originalInvalidation}</div>
+      <div class="metric"><b>Invalidation Hit:</b> ${p.structuralInvalidationHit ? "YES" : "NO"}</div>
+      <div class="metric"><b>Current Structure:</b> ${p.structureFailed ? "WEAKENED" : "INTACT"}</div>
+      <div class="metric"><b>Fresh Entry Read:</b> ${escapeHtml(p.thesis.latestDecision || "N/A")}</div>
+
+      <div class="divider"></div>
+      <div class="section-title">What Changed</div>
+      ${p.changes.map(x=>`<div class="metric">${escapeHtml(x)}</div>`).join("")}
+
+      <div class="divider"></div>
+      <div class="metric muted">v47.7 rule: A fresh NO TRADE / WAIT does not automatically force an existing position to exit. EXIT requires the original invalidation or a confirmed multi-factor thesis failure.</div>
+    </div>`;
+}
+
+function getPositionManagementCoach(a, position={}){
+  a = ensureEngineDefaults(a);
+
+  const ticker = normalizeTicker(position.ticker || position.symbol || "");
+  const d = getSimplePredatorDecision(a);
+  const persistent = ticker ? getPersistentPositionRead(ticker, a, position) : null;
 
   const direction = position.direction || d.direction || "N/A";
   const entryUnderlying = safeNum(position.entryUnderlying, 0);
@@ -3841,9 +4100,6 @@ function getPositionManagementCoach(a, position={}){
   const optionEntry = safeNum(position.optionEntryPrice, 0);
   const optionCurrent = safeNum(position.optionCurrentPrice, 0);
   const contracts = Math.max(1, Math.floor(safeNum(position.contracts, 1)));
-
-  const invalidation = parseFloat(swing.invalidation || d.invalidation || "NaN");
-  const trigger = parseFloat(swing.trigger || "NaN");
 
   let optionPnlPct = null;
   if(optionEntry > 0 && optionCurrent > 0){
@@ -3856,102 +4112,61 @@ function getPositionManagementCoach(a, position={}){
     underlyingPnlPct = direction === "BUY PUT" ? -raw : raw;
   }
 
-  let structureBroken = false;
-  if(Number.isFinite(invalidation) && currentUnderlying > 0){
-    if(direction === "BUY CALL") structureBroken = currentUnderlying <= invalidation;
-    if(direction === "BUY PUT") structureBroken = currentUnderlying >= invalidation;
-  }
+  let action = persistent?.command || "HOLD";
+  let color = persistent?.color || "green";
+  let urgency = persistent?.urgency || "NORMAL";
+  let reason = persistent?.reason || "The original position thesis remains intact.";
+  let managementRule = persistent?.checkpoint || "Continue managing from the original thesis and invalidation.";
 
-  const thesisScore = safeNum(
-    a.thesisIntegrity?.score,
-    safeNum(a.alignmentScore?.score, 0)
-  );
-
-  const timing = safeNum(a.timeTarget?.probability, 0);
-  const conviction = safeNum(getPredatorConvictionEngine(a)?.conviction, 0);
-
-  let action = "HOLD";
-  let color = "green";
-  let urgency = "NORMAL";
-  let reason = "The underlying structure and thesis remain intact.";
-  let managementRule = "Continue holding while structure and thesis remain valid.";
-
-  if(structureBroken){
-    action = "EXIT";
-    color = "red";
-    urgency = "HIGH";
-    reason = "The underlying has crossed the structural invalidation level.";
-    managementRule = "Exit rather than relying on the option premium to recover after the thesis breaks.";
-  }else if(thesisScore < 55 || conviction < 55){
-    action = "EXIT / REDUCE";
-    color = "red";
-    urgency = "HIGH";
-    reason = "The original thesis has weakened materially.";
-    managementRule = "Reduce or exit because the trade logic is no longer strong enough.";
-  }else if(optionPnlPct !== null && optionPnlPct >= 80){
-    action = "TAKE PROFIT";
-    color = "green";
-    urgency = "HIGH";
-    reason = "The option has produced a large gain relative to the original premium.";
-    managementRule = "Consider taking substantial profit and only leave a runner if the structure remains exceptionally strong.";
-  }else if(optionPnlPct !== null && optionPnlPct >= 45){
-    action = "LOCK PROFIT / REDUCE";
-    color = "yellow";
-    urgency = "MEDIUM";
-    reason = "The option has a meaningful gain worth protecting.";
-    managementRule = "Consider taking partial profit or tightening the management plan while keeping exposure to the thesis.";
-  }else if(optionPnlPct !== null && optionPnlPct <= -35 && thesisScore < 70){
-    action = "EXIT / REDUCE";
-    color = "red";
-    urgency = "HIGH";
-    reason = "The option drawdown is large and the thesis is no longer strong enough to justify giving it more room.";
-    managementRule = "Do not hold purely because the contract has time remaining.";
-  }else if(optionPnlPct !== null && optionPnlPct <= -25 && thesisScore >= 75 && !structureBroken){
-    action = "HOLD WITH CAUTION";
-    color = "yellow";
-    urgency = "MEDIUM";
-    reason = "The option is down, but the underlying thesis remains strong and structure has not invalidated.";
-    managementRule = "Avoid panic-selling solely because of option P/L; monitor the underlying invalidation and thesis score.";
-  }else if(thesisScore >= 80 && conviction >= 80 && timing >= 65){
-    action = "HOLD";
-    color = "green";
-    urgency = "NORMAL";
-    reason = "Structure, conviction, and timing still support the trade.";
-    managementRule = "Continue holding unless the invalidation breaks or the thesis meaningfully deteriorates.";
-  }
-
-  let nextCheckpoint = "Recheck after a meaningful stock move, major news event, or thesis-score change.";
-  if(Number.isFinite(trigger)){
-    nextCheckpoint += ` Preferred trigger reference: $${trigger.toFixed(2)}.`;
+  if(!(persistent?.confirmedExit)){
+    if(optionPnlPct !== null && optionPnlPct >= 80){
+      action = "TAKE PROFIT";
+      color = "green";
+      urgency = "HIGH";
+      reason = "The option has produced a large gain relative to the original premium.";
+      managementRule = "Consider taking substantial profit; only leave a runner if the persistent thesis remains strong.";
+    }else if(optionPnlPct !== null && optionPnlPct >= 45){
+      action = "LOCK PROFIT / REDUCE";
+      color = "yellow";
+      urgency = "MEDIUM";
+      reason = "The option has a meaningful gain worth protecting.";
+      managementRule = "Consider partial profit while continuing to respect the original thesis and invalidation.";
+    }else if(optionPnlPct !== null && optionPnlPct <= -35 && persistent?.currentThesisScore < 55){
+      action = "EXIT / REDUCE";
+      color = "red";
+      urgency = "HIGH";
+      reason = "Large option drawdown is occurring alongside substantial thesis deterioration.";
+      managementRule = "Reduce or exit because both contract performance and thesis quality have weakened.";
+    }else if(optionPnlPct !== null && optionPnlPct <= -25 && persistent?.currentThesisScore >= 65){
+      action = "HOLD WITH CAUTION";
+      color = "yellow";
+      urgency = "MEDIUM";
+      reason = "The option is down, but the persistent underlying thesis has not broken.";
+      managementRule = "Do not panic-sell solely on option P/L; respect the original structural invalidation.";
+    }
   }
 
   return {
-    action,
-    color,
-    urgency,
-    reason,
-    managementRule,
-    nextCheckpoint,
-    direction,
-    contracts,
+    action,color,urgency,reason,managementRule,
+    nextCheckpoint:persistent?.checkpoint || "Recheck after a meaningful stock move, major news event, or thesis change.",
+    direction,contracts,
     entryUnderlying:entryUnderlying || null,
     currentUnderlying:currentUnderlying || null,
     optionEntry:optionEntry || null,
     optionCurrent:optionCurrent || null,
     optionPnlPct,
     underlyingPnlPct,
-    thesisScore,
-    conviction,
-    timing,
-    invalidation:Number.isFinite(invalidation) ? invalidation.toFixed(2) : "N/A",
-    trigger:Number.isFinite(trigger) ? trigger.toFixed(2) : "N/A",
-    structureBroken
+    thesisScore:persistent?.currentThesisScore || 0,
+    conviction:persistent?.currentConviction || 0,
+    timing:persistent?.currentTiming || 0,
+    invalidation:persistent?.originalInvalidation || "N/A",
+    trigger:persistent?.originalTrigger || "N/A",
+    structureBroken:!!persistent?.structuralInvalidationHit,
+    persistent
   };
 }
-
 function renderPositionManagementCoach(a, position={}){
   const p = getPositionManagementCoach(a, position);
-
   const fmtPct = v => v === null ? "N/A" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
 
   return `
@@ -3962,12 +4177,12 @@ function renderPositionManagementCoach(a, position={}){
       <div class="metric"><b>Why:</b> ${escapeHtml(p.reason)}</div>
 
       <div class="divider"></div>
-      <div class="section-title">Position Health</div>
-      <div class="metric"><b>Thesis Score:</b> ${Math.round(p.thesisScore)}/100</div>
-      <div class="metric"><b>Conviction:</b> ${Math.round(p.conviction)}/100</div>
-      <div class="metric"><b>Timing:</b> ${Math.round(p.timing)}/100</div>
-      <div class="metric"><b>Structure Broken:</b> ${p.structureBroken ? "YES" : "NO"}</div>
-      <div class="metric"><b>Structural Invalidation:</b> ${p.invalidation === "N/A" ? "N/A" : "$"+p.invalidation}</div>
+      <div class="section-title">Persistent Thesis Health</div>
+      <div class="metric"><b>Thesis Score Now:</b> ${Math.round(p.thesisScore)}/100</div>
+      <div class="metric"><b>Conviction Now:</b> ${Math.round(p.conviction)}/100</div>
+      <div class="metric"><b>Timing Now:</b> ${Math.round(p.timing)}/100</div>
+      <div class="metric"><b>Original Invalidation:</b> ${p.invalidation === "N/A" ? "N/A" : "$"+p.invalidation}</div>
+      <div class="metric"><b>Original Invalidation Hit:</b> ${p.structureBroken ? "YES" : "NO"}</div>
 
       <div class="divider"></div>
       <div class="section-title">Profit / Loss Context</div>
@@ -3977,10 +4192,9 @@ function renderPositionManagementCoach(a, position={}){
       <div class="divider"></div>
       <div class="metric"><b>Management Rule:</b> ${escapeHtml(p.managementRule)}</div>
       <div class="metric"><b>Next Checkpoint:</b> ${escapeHtml(p.nextCheckpoint)}</div>
-      <div class="metric muted">This coach uses the stock's structure and thesis first, then option P/L as supporting context. Manual execution remains required.</div>
+      <div class="metric muted">The position is managed from its saved original thesis. A fresh entry rejection alone does not force an exit.</div>
     </div>`;
 }
-
 function getContractGrader(a, contract={}){
   a = ensureEngineDefaults(a);
   const d = getSimplePredatorDecision(a);
@@ -4194,6 +4408,34 @@ function readManualContractInputs(){
     theta:safeNum(document.getElementById("cgTheta")?.value,0),
     sharePrice:safeNum(document.getElementById("cgSharePrice")?.value,0)
   };
+}
+
+function saveCurrentAnalysisAsPositionThesis(){
+  const last = getLastAnalysis();
+  if(!last?.analysisData || !last?.ticker){
+    alert("Run Predator Analysis first.");
+    return;
+  }
+
+  const a = ensureEngineDefaults(last.analysisData);
+  const ticker = normalizeTicker(last.ticker);
+  const d = getSimplePredatorDecision(a);
+
+  const entryUnderlying = safeNum(document.getElementById("positionEntryUnderlying")?.value, safeNum(a.price, 0));
+  const optionEntryPrice = safeNum(document.getElementById("positionOptionEntry")?.value, 0);
+  const optionCurrentPrice = safeNum(document.getElementById("positionOptionCurrent")?.value, 0);
+  const contracts = Math.max(1, Math.floor(safeNum(document.getElementById("positionContracts")?.value, 1)));
+
+  savePositionThesisSnapshot(ticker, a, {
+    ticker,
+    direction:d.direction,
+    entryUnderlying,
+    optionEntryPrice,
+    optionCurrentPrice,
+    contracts
+  });
+
+  alert(`${ticker} persistent thesis saved.`);
 }
 
 function gradeCurrentContract(){
@@ -4531,7 +4773,7 @@ function renderSimplePredatorDecision(a){
     </div>
 
     <div class="divider"></div>
-    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div><div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Adaptive Contract Coach below to compare profiles, then enter Robinhood's live contract stats into the Contract Grader before placing the trade. After entry, use Live Position Scan for HOLD / TAKE PROFIT / REDUCE / EXIT guidance.</div>
+    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div><div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Adaptive Contract Coach below to compare profiles, then enter Robinhood's live contract stats into the Contract Grader before placing the trade. After entry, save the position thesis once, then use Live Position Scan for HOLD / WATCH / TAKE PROFIT / REDUCE / EXIT guidance based on that original thesis.</div>
     ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
     <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
   </div>`;
