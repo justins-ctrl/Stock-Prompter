@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.7 Post-Baseline Evidence Tracking</title>
+  <title>Signal Predator AI v47.7.8 Contract Grader Repair</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.7 // post-baseline evidence tracking // new deterioration only // hard invalidation preserved</div>
+  <div class="subtitle">v47.7.8 // contract grader repair // expiration-date input // cached-analysis authority</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -648,7 +648,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.0",
+    version: "v47.7.8",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-7.json";
+  a.download = "signal-predator-backup-v47-7-8.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -4889,10 +4889,87 @@ function renderContractGrader(a, contract={}){
     </div>`;
 }
 
+function getContractExpirationDTE(expiration){
+  if(!expiration) return null;
+  try{
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const exp = new Date(expiration + "T00:00:00");
+    if(Number.isNaN(exp.getTime())) return null;
+
+    return Math.ceil((exp - today) / 86400000);
+  }catch(e){
+    return null;
+  }
+}
+
+function formatContractExpiration(expiration){
+  if(!expiration) return "Not selected";
+  try{
+    const exp = new Date(expiration + "T00:00:00");
+    if(Number.isNaN(exp.getTime())) return expiration;
+    return exp.toLocaleDateString([], {
+      month:"short",
+      day:"numeric",
+      year:"numeric"
+    });
+  }catch(e){
+    return expiration;
+  }
+}
+
+function updateContractDtePreview(){
+  const expiration = document.getElementById("cgExpiration")?.value || "";
+  const hiddenDte = document.getElementById("cgDte");
+  const preview = document.getElementById("cgDtePreview");
+
+  const dte = getContractExpirationDTE(expiration);
+
+  if(hiddenDte){
+    hiddenDte.value = dte === null ? "" : String(dte);
+  }
+
+  if(!preview) return;
+
+  if(!expiration){
+    preview.innerHTML = "<b>DTE:</b> Select the Robinhood expiration date above.";
+    preview.className = "metric muted";
+    return;
+  }
+
+  if(dte === null){
+    preview.innerHTML = "<b>DTE:</b> Could not read that expiration date.";
+    preview.className = "metric red";
+    return;
+  }
+
+  if(dte < 0){
+    preview.innerHTML = `<b>Expiration:</b> ${escapeHtml(formatContractExpiration(expiration))} â¢ <span class="red">PAST DATE</span>`;
+    preview.className = "metric";
+    return;
+  }
+
+  const fit =
+    dte >= 45 && dte <= 75 ? "MONTHLY TARGET WINDOW" :
+    dte >= 30 && dte < 45 ? "SHORTER THAN TARGET" :
+    dte > 75 ? "LONGER THAN TARGET" :
+    "SHORT-DATED";
+
+  preview.innerHTML =
+    `<b>Expiration:</b> ${escapeHtml(formatContractExpiration(expiration))} â¢ ` +
+    `<b>${dte} DTE</b> â¢ ${escapeHtml(fit)}`;
+  preview.className = dte >= 45 && dte <= 75 ? "metric green" : "metric yellow";
+}
+
 function readManualContractInputs(){
+  const expiration = document.getElementById("cgExpiration")?.value || "";
+  const dte = getContractExpirationDTE(expiration);
+
   return {
     strike:safeNum(document.getElementById("cgStrike")?.value,0),
-    dte:safeNum(document.getElementById("cgDte")?.value,0),
+    expiration,
+    dte:dte === null ? 0 : dte,
     bid:safeNum(document.getElementById("cgBid")?.value,0),
     ask:safeNum(document.getElementById("cgAsk")?.value,0),
     mark:safeNum(document.getElementById("cgMark")?.value,0),
@@ -4935,16 +5012,76 @@ function saveCurrentAnalysisAsPositionThesis(){
 }
 
 function gradeCurrentContract(){
-  const last = getLastAnalysis();
   const output = document.getElementById("contractGradeOutput");
-  if(!last?.analysisData){
-    if(output) output.innerHTML = "<div class='card'>Run Predator Analysis first, then grade the option contract.</div>";
+  const last = getLastAnalysis();
+
+  if(!last?.analysisData || !last?.ticker){
+    if(output){
+      output.innerHTML = `
+        <div class="card weak-alert">
+          <div class="section-title">Contract Grader</div>
+          <div class="metric">Run Predator Analysis first, then grade the Robinhood contract.</div>
+          <div class="metric muted">No additional Alpha Vantage request is required after a completed analysis.</div>
+        </div>`;
+    }
     return;
   }
-  const a = ensureEngineDefaults(last.analysisData);
+
+  const currentTicker = normalizeTicker(document.getElementById("ticker")?.value || "");
+  const lastTicker = normalizeTicker(last.ticker);
+
+  if(currentTicker && currentTicker !== lastTicker){
+    if(output){
+      output.innerHTML = `
+        <div class="card weak-alert">
+          <div class="section-title">Ticker Mismatch</div>
+          <div class="metric">The latest completed Predator analysis is for <b>${escapeHtml(lastTicker)}</b>, but the ticker box currently says <b>${escapeHtml(currentTicker)}</b>.</div>
+          <div class="metric muted">Run Predator Analysis for ${escapeHtml(currentTicker)} before grading its contract.</div>
+        </div>`;
+    }
+    return;
+  }
+
   const contract = readManualContractInputs();
+
+  if(!contract.expiration){
+    if(output){
+      output.innerHTML = `
+        <div class="card weak-alert">
+          <div class="section-title">Expiration Date Needed</div>
+          <div class="metric">Select the exact Robinhood expiration date first.</div>
+          <div class="metric muted">Predator will calculate DTE automatically.</div>
+        </div>`;
+    }
+    return;
+  }
+
+  if(contract.dte < 0){
+    if(output){
+      output.innerHTML = `
+        <div class="card weak-alert">
+          <div class="section-title">Invalid Expiration</div>
+          <div class="metric red">That option expiration date has already passed.</div>
+        </div>`;
+    }
+    return;
+  }
+
+  const a = ensureEngineDefaults(last.analysisData);
   contract.direction = getSimplePredatorDecision(a).direction;
-  if(output) output.innerHTML = renderContractGrader(a, contract);
+
+  if(output){
+    output.innerHTML = `
+      <div class="card">
+        <div class="section-title">Contract Input Read</div>
+        <div class="metric"><b>Ticker:</b> ${escapeHtml(lastTicker)}</div>
+        <div class="metric"><b>Expiration:</b> ${escapeHtml(formatContractExpiration(contract.expiration))}</div>
+        <div class="metric"><b>Calculated DTE:</b> ${contract.dte}</div>
+        <div class="metric green"><b>Analysis Source:</b> Cached completed Predator analysis â no new API request.</div>
+      </div>
+      ${renderContractGrader(a, contract)}
+    `;
+  }
 }
 
 function getContractSelectionCoach(a){
@@ -6459,11 +6596,13 @@ function renderFull(ticker, a){
   ${renderContractSelectionCoach(a)}
   <div class="card">
     <div class="section-title">Grade a Robinhood Contract</div>
-    <div class="metric muted">Enter the values shown on Robinhood's contract detail screen. No extra Alpha Vantage request is used.</div>
+    <div class="metric muted">Enter the values shown on Robinhood's contract detail screen. Select the exact expiration date and Predator will calculate DTE automatically. No extra Alpha Vantage request is used.</div>
     <div class="grid-2">
       <input id="cgStrike" type="number" step="0.01" inputmode="decimal" placeholder="Strike">
-      <input id="cgDte" type="number" step="1" inputmode="numeric" placeholder="DTE">
+      <input id="cgExpiration" type="date" onchange="updateContractDtePreview()" aria-label="Option expiration date">
     </div>
+    <input id="cgDte" type="hidden" value="">
+    <div id="cgDtePreview" class="metric muted"><b>DTE:</b> Select the Robinhood expiration date above.</div>
     <div class="grid-2">
       <input id="cgBid" type="number" step="0.01" inputmode="decimal" placeholder="Bid">
       <input id="cgAsk" type="number" step="0.01" inputmode="decimal" placeholder="Ask">
@@ -6912,6 +7051,14 @@ function saveLastAnalysis(ticker, analysisHtml, compactHtml, analysisData){
     analysisData
   });
 }
+
+function getLastAnalysis(){
+  const last = getStore("signal_predator_last_analysis", null);
+  if(!last || typeof last !== "object") return null;
+  if(!last.ticker || !last.analysisData) return null;
+  return last;
+}
+
 
 function recheckLastAnalysis(){
   const output = document.getElementById("output");
