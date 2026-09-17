@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.9 Position Identity + Universal Wheel Analysis</title>
+  <title>Signal Predator AI v47.7.10 Exit Safety Lock + Baseline Audit Trail</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.9 // position identity // universal wheel analysis // concise API warnings</div>
+  <div class="subtitle">v47.7.10 // exit safety lock // baseline audit trail // confirmation required</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -648,7 +648,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.7.9",
+    version: "v47.7.10",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-9.json";
+  a.download = "signal-predator-backup-v47-7-10.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -4173,6 +4173,47 @@ function renderPersistentCommandCenter(ticker, a, position={}){
 }
 
 
+
+function buildBaselineAuditSnapshot(a){
+  a=ensureEngineDefaults(a);
+  const d=getSimplePredatorDecision(a), swing=d.swingValidation||getSwingValidationEngine(a);
+  const alignment=safeNum(a.alignmentScore?.score,0);
+  const c={
+    thesisScore:safeNum(a.thesisIntegrity?.score,safeNum(alignment,safeNum(d.confidence,0))),
+    conviction:safeNum(getPredatorConvictionEngine(a)?.conviction,0),
+    alignment,
+    momentum:safeNum(a.momentumScore?.score,safeNum(a.momentumStrength,0)),
+    trend:safeNum(a.trendScore?.score,safeNum(a.trendAlignment?.score,alignment)),
+    market:safeNum(a.marketConditionScore?.score,safeNum(a.marketRegimeScore,0)),
+    structureValid:!!swing.structureValid
+  };
+  const ids=[]; let points=0;
+  if(!c.structureValid) points+=2;
+  if(c.trend>0){if(c.trend<45){ids.push("trend");points+=2;}else if(c.trend<60)points+=1;}
+  if(c.momentum>0){if(c.momentum<40){ids.push("momentum");points+=2;}else if(c.momentum<55)points+=1;}
+  if(c.conviction<45){ids.push("conviction");points+=2;}else if(c.conviction<60)points+=1;
+  if(c.alignment>0){if(c.alignment<45){ids.push("alignment");points+=2;}else if(c.alignment<60)points+=1;}
+  if(c.market>0){if(c.market<40){ids.push("market");points+=1;}else if(c.market<55)points+=1;}
+  return {capturedAt:new Date().toISOString(),price:safeNum(a.price,0),components:c,failureIds:[...new Set(ids)].sort(),evidencePoints:points};
+}
+function getExitConfirmationStore(){const v=getStore("signal_predator_exit_confirmations_v47_7_10",{});return v&&typeof v==="object"?v:{};}
+function saveExitConfirmationStore(v){setStore("signal_predator_exit_confirmations_v47_7_10",v||{});}
+function clearExitConfirmation(ticker){const s=getExitConfirmationStore();delete s[normalizeTicker(ticker)];saveExitConfirmationStore(s);}
+function evaluateExitSafetyLock(ticker,thesis,current,structuralInvalidationHit,candidateExit){
+  const symbol=normalizeTicker(ticker);
+  if(structuralInvalidationHit){clearExitConfirmation(symbol);return {confirmed:true,state:"HARD INVALIDATION",count:0,required:0,giantCollapse:false};}
+  if(!candidateExit){clearExitConfirmation(symbol);return {confirmed:false,state:"CLEAR",count:0,required:2,giantCollapse:false};}
+  const drop=safeNum(thesis?.originalThesisScore,current.currentThesisScore)-current.currentThesisScore;
+  const signature=(current.newFailureIds||[]).slice().sort().join("|");
+  const baselineKey=String(thesis?.createdAt||"");
+  const store=getExitConfirmationStore(), prev=store[symbol];
+  let count=1;
+  if(prev&&prev.signature===signature&&prev.baselineKey===baselineKey) count=Math.min(2,safeNum(prev.count,1)+1);
+  store[symbol]={signature,count,baselineKey,firstSeen:prev?.firstSeen||new Date().toISOString(),lastSeen:new Date().toISOString(),thesisDrop:drop};
+  saveExitConfirmationStore(store);
+  return {confirmed:count>=2,state:count>=2?"CONFIRMED":"VERIFY DETERIORATION",count,required:2,giantCollapse:drop>=35};
+}
+
 function establishLegacyManagementBaseline(ticker){
   try{
     const symbol = normalizeTicker(ticker);
@@ -4203,6 +4244,13 @@ function establishLegacyManagementBaseline(ticker){
       ...saved,
       _baselineProvenance:"MANAGEMENT_BASELINE"
     });
+    if(snapshot){
+      const store=getPositionThesisStore();
+      const audit=buildBaselineAuditSnapshot(row._analysisData);
+      store[symbol]={...store[symbol],managementBaselineAudit:audit,baselineFailureIds:[...(audit.failureIds||[])],baselineEvidencePoints:safeNum(audit.evidencePoints,0),baselinePrice:safeNum(audit.price,0),baselineCapturedAt:audit.capturedAt};
+      setStore(PREDATOR_POSITION_THESIS_KEY,store);
+      clearExitConfirmation(symbol);
+    }
 
     const verify = getPositionThesisSnapshot(symbol);
     if(!snapshot || !verify || verify.baselineProvenance !== "MANAGEMENT_BASELINE"){
@@ -4459,7 +4507,9 @@ function getPersistentPositionRead(ticker, a, position={}){
   // become "new" EXIT evidence until conditions deteriorate beyond the baseline.
   const baselineFailureState =
     baselineProvenance === "MANAGEMENT_BASELINE"
-      ? getBaselineFailureStateFromSnapshot(thesis)
+      ? (Array.isArray(thesis?.baselineFailureIds)
+          ? {failureIds:[...thesis.baselineFailureIds],evidencePoints:safeNum(thesis?.baselineEvidencePoints,0),structureFailed:thesis?.managementBaselineAudit?.components?.structureValid===false}
+          : getBaselineFailureStateFromSnapshot(thesis))
       : {failureIds:[], evidencePoints:0, structureFailed:false};
 
   const failureDelta =
@@ -4499,18 +4549,13 @@ function getPersistentPositionRead(ticker, a, position={}){
           )
     );
 
-  // Reconstructed/legacy baselines still fail closed.
-  // Verified management baselines can authorize EXIT only from NEW deterioration
-  // or a genuine structural invalidation hit.
-  const confirmedExit =
-    structuralInvalidationHit ||
-    (baselineReliable && rawExitThreshold);
-
-  const exitGateIntegrity =
-    confirmedExit === (
-      structuralInvalidationHit ||
-      (baselineReliable && rawExitThreshold)
-    );
+  // v47.7.10 EXIT SAFETY LOCK:
+  // hard invalidation is immediate; derived multi-factor EXIT needs a second
+  // independent scan with the same failure signature.
+  const exitCandidate=!structuralInvalidationHit&&baselineReliable&&rawExitThreshold;
+  const exitSafety=evaluateExitSafetyLock(ticker,thesis,{currentThesisScore,newFailureIds:failureDelta.newFailures},structuralInvalidationHit,exitCandidate);
+  const confirmedExit=structuralInvalidationHit||(exitCandidate&&exitSafety.confirmed);
+  const exitGateIntegrity=confirmedExit===(structuralInvalidationHit||(exitCandidate&&exitSafety.confirmed));
 
   let command = "HOLD";
   let color = "green";
@@ -4518,7 +4563,15 @@ function getPersistentPositionRead(ticker, a, position={}){
   let reason = "The original position thesis remains intact.";
   let checkpoint = "Continue monitoring the saved invalidation and thesis evidence.";
 
-  if(confirmedExit){
+  if(exitCandidate&&!exitSafety.confirmed){
+    command="WATCH / VERIFY";
+    color="yellow";
+    urgency="MEDIUM";
+    reason=exitSafety.giantCollapse
+      ? `Large thesis change detected (${Math.round(thesisDrop)} points). Hard invalidation remains intact, so EXIT requires confirmation.`
+      : `${newFailureCount} new thesis factor(s) meet the EXIT threshold, but hard invalidation remains intact. EXIT requires confirmation.`;
+    checkpoint="Run a later independent Live Position Scan. Do not reset the management baseline. EXIT stays blocked unless deterioration confirms or the saved hard invalidation is breached.";
+  }else if(confirmedExit){
     command = "EXIT";
     color = "red";
     urgency = "HIGH";
@@ -4625,7 +4678,7 @@ function getPersistentPositionRead(ticker, a, position={}){
     originalThesisScore,originalConviction,originalTiming,originalAlignment,originalMomentum,originalTrend,originalMarket,
     thesisDrop,convictionDrop,timingDrop,alignmentDrop,momentumDrop,trendDrop,marketDrop,
     structuralInvalidationHit,structureFailed,freshEntryRejected,
-    confirmedExit,rawExitThreshold,exitGateIntegrity,
+    confirmedExit,rawExitThreshold,exitGateIntegrity,exitCandidate,exitSafety,
     independentFailures,evidencePoints,
     baselineFailureCount:failureDelta.baselineCount,
     currentFailureCount:failureDelta.currentCount,
@@ -4637,6 +4690,9 @@ function getPersistentPositionRead(ticker, a, position={}){
     baselineEvidencePoints:safeNum(baselineFailureState.evidencePoints, 0),
     postBaselineEvidencePoints,
     newStructureFailure,
+    baselineAudit:thesis?.managementBaselineAudit||null,
+    baselineCapturedAt:thesis?.baselineCapturedAt||thesis?.managementBaselineAudit?.capturedAt||thesis?.createdAt||"N/A",
+    baselinePrice:safeNum(thesis?.baselinePrice,safeNum(thesis?.managementBaselineAudit?.price,safeNum(thesis?.originalPrice,0))),
     baselineReliable,baselineProvenance,
     originalInvalidation:Number.isFinite(originalInvalidation) ? originalInvalidation.toFixed(2) : "N/A",
     originalTrigger:Number.isFinite(originalTrigger) ? originalTrigger.toFixed(2) : "N/A",
@@ -6525,7 +6581,9 @@ function renderPositionCards(results){
                  <div class="metric"><b>New Failures Since Baseline:</b> ${cmd.newFailureCount}</div>
                  <div class="metric"><b>Resolved Failures:</b> ${cmd.resolvedFailureCount}</div>
                  <div class="metric"><b>Post-Baseline Evidence Points:</b> ${cmd.postBaselineEvidencePoints}</div>
-                 <div class="metric"><b>Deterioration Since Baseline:</b> <span class="${cmd.newFailureCount > 0 || cmd.postBaselineEvidencePoints > 0 ? "yellow" : "green"}">${cmd.newFailureCount > 0 || cmd.postBaselineEvidencePoints > 0 ? "YES" : "NONE"}</span></div>`
+                 <div class="metric"><b>Deterioration Since Baseline:</b> <span class="${cmd.newFailureCount > 0 || cmd.postBaselineEvidencePoints > 0 ? "yellow" : "green"}">${cmd.newFailureCount > 0 || cmd.postBaselineEvidencePoints > 0 ? "YES" : "NONE"}</span></div>
+                 <div class="metric"><b>Exit Safety Lock:</b> <span class="${cmd.confirmedExit ? "red" : cmd.exitCandidate ? "yellow" : "green"}">${escapeHtml(cmd.exitSafety?.state||"CLEAR")}</span></div>
+                 <div class="metric"><b>Confirmation:</b> ${cmd.exitCandidate ? `${cmd.exitSafety?.count||0}/${cmd.exitSafety?.required||2} scans` : "Not required"}</div>`
               : ""
           }
           <div class="metric"><b>Baseline Integrity:</b> <span class="${cmd.baselineReliable ? "green" : "yellow"}">${
@@ -6546,7 +6604,19 @@ function renderPositionCards(results){
               : cmd.baselineDisplayType === "MANAGEMENT"
                 ? `<div class="metric"><b>Entry Thesis:</b> NOT RECORDED</div>
                    <div class="metric"><b>Management Baseline:</b> ${cmd.originalThesisScore}/100</div>
-                   <div class="metric muted">This verified snapshot is the reference point for future position-management scans. Pre-existing weaknesses are baseline context; only new deterioration or a hard invalidation can create fresh EXIT authority.</div>`
+                   <div class="metric"><b>Baseline Captured:</b> ${escapeHtml(cmd.baselineCapturedAt||"N/A")}</div>
+                   <div class="metric"><b>Baseline Price:</b> ${cmd.baselinePrice>0?"$"+Number(cmd.baselinePrice).toFixed(2):"N/A"}</div>
+                   ${cmd.baselineAudit?.components ? `
+                     <div class="divider"></div><div class="section-title">Baseline Audit Trail</div>
+                     <div class="metric"><b>Trend:</b> ${Math.round(cmd.baselineAudit.components.trend)}/100 â ${Math.round(cmd.currentTrend)}/100</div>
+                     <div class="metric"><b>Momentum:</b> ${Math.round(cmd.baselineAudit.components.momentum)}/100 â ${Math.round(cmd.currentMomentum)}/100</div>
+                     <div class="metric"><b>Conviction:</b> ${Math.round(cmd.baselineAudit.components.conviction)}/100 â ${Math.round(cmd.currentConviction)}/100</div>
+                     <div class="metric"><b>Alignment:</b> ${Math.round(cmd.baselineAudit.components.alignment)}/100 â ${Math.round(cmd.currentAlignment)}/100</div>
+                     <div class="metric"><b>Market:</b> ${Math.round(cmd.baselineAudit.components.market)}/100 â ${Math.round(cmd.currentMarket)}/100</div>
+                     <div class="metric"><b>Baseline Failure IDs:</b> ${escapeHtml((cmd.baselineAudit.failureIds||[]).join(", ")||"NONE")}</div>
+                     <div class="metric"><b>New Failure IDs:</b> ${escapeHtml((cmd.newFailureIds||[]).join(", ")||"NONE")}</div>
+                   ` : `<div class="metric yellow"><b>Audit Trail:</b> This baseline predates v47.7.10 component capture. The new EXIT confirmation lock still applies.</div>`}
+                   <div class="metric muted">This verified snapshot remains fixed. Do not reset it to make a later scan look better or worse.</div>`
                 : `<div class="metric"><b>Entry Thesis:</b> ${cmd.originalThesisScore}/100</div>`
           }
           <div class="metric"><b>Authority Conflict:</b> <span class="${cmd.authorityConflict ? "red" : "green"}">${cmd.authorityConflict ? "YES - FAIL CLOSED" : "NO"}</span></div>
