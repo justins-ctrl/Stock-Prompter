@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.10.1 Canonical Exit Authority Hotfix</title>
+  <title>Signal Predator AI v47.7.11 Entry Thesis Link</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.10.1 // immutable scan confirmation // canonical position authority // fail-closed audit</div>
+  <div class="subtitle">v47.7.11 // entry thesis link // BUY snapshot archive // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -648,7 +648,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.7.10.1",
+    version: "v47.7.11",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-10-1.json";
+  a.download = "signal-predator-backup-v47-7-11.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -1482,6 +1482,8 @@ function renderPositions(){
       <div class="metric"><b>${p.ticker}</b> ${p.strike} ${p.type}</div>
       <div class="metric">BE ${p.breakeven}${p.expiration ? " â¢ Exp " + p.expiration : ""}</div>
       <div class="metric muted">Saved: ${p.entryDate ? new Date(p.entryDate).toLocaleDateString() : "N/A"}</div>
+      <div class="metric"><b>Entry Thesis:</b> ${p.entryThesisLinked ? "<span class='green'>LINKED TO PREDATOR BUY</span>" : "<span class='yellow'>NOT LINKED</span>"}</div>
+      ${!p.entryThesisLinked && findRecentApprovedBuyAnalysis(p.ticker,72) ? `<button class="small-btn" style="margin-top:8px;" onclick="relinkPositionToRecentBuyThesis('${p.ticker}')">Link Recent Predator BUY Thesis</button>` : ""}
       <div class="row" style="margin-top:10px;">
         <button class="small-btn" onclick="closeSavedPosition(${index}, 'WIN')">Mark Win</button>
         <button class="small-btn danger" onclick="closeSavedPosition(${index}, 'LOSS')">Mark Loss</button>
@@ -1500,9 +1502,26 @@ function addPosition(){
   const entryPremium = parseFloat(document.getElementById("posEntryPremium").value || "0");
   const expiration = document.getElementById("posExpiration").value;
   if(!ticker || Number.isNaN(strike) || Number.isNaN(breakeven)){ alert("Enter ticker, strike, and breakeven."); return; }
-  savedPositions.push({ticker,type,strike,breakeven,entryPremium,expiration,entryDate:new Date().toISOString(),entrySignal:'MANUAL SAVE',entryTTT:null,entryDTE:getDTE(expiration),notes:''});
+  const newPosition={ticker,type,strike,breakeven,entryPremium,expiration,entryDate:new Date().toISOString(),entrySignal:'MANUAL SAVE',entryTTT:null,entryDTE:getDTE(expiration),notes:''};
+  const recentBuy=findRecentApprovedBuyAnalysis(ticker,72);
+  if(recentBuy){
+    newPosition.entrySignal="PREDATOR BUY";
+    newPosition.entryAnalysisCapturedAt=recentBuy.capturedAt;
+    newPosition.entryUnderlying=safeNum(recentBuy.price,0);
+    const linked=attachEntryThesisFromBuy(newPosition,recentBuy);
+    if(linked){
+      newPosition.entryThesisLinked=true;
+      newPosition.entryThesisSource=linked.entryThesisSource;
+    }
+  }
+  savedPositions.push(newPosition);
   setStore("ai_options_positions", savedPositions);
   renderPositions();
+  if(recentBuy && newPosition.entryThesisLinked){
+    alert(`${ticker} saved with its original Predator BUY thesis linked. Future position scans will compare against that entry thesis.`);
+  }else{
+    alert(`${ticker} saved, but no recent Predator BUY thesis was found. Predator will NOT invent an entry thesis. Use management-baseline mode only for a true legacy position.`);
+  }
   ["posTicker","posStrike","posBreakeven","posEntryPremium","posExpiration"].forEach(id=>document.getElementById(id).value="");
   renderRiskControlSummary();
 }
@@ -4266,6 +4285,29 @@ function evaluateExitSafetyLock(ticker,thesis,current,structuralInvalidationHit,
   return {confirmed:count>=2,state:count>=2?"CONFIRMED":"VERIFY DETERIORATION",count,required:2,giantCollapse:drop>=35,scanId};
 }
 
+
+function relinkPositionToRecentBuyThesis(ticker){
+  try{
+    const symbol=normalizeTicker(ticker);
+    const saved=savedPositions.find(p=>normalizeTicker(p.ticker)===symbol);
+    if(!saved){alert("Saved position not found.");return;}
+    const buy=findRecentApprovedBuyAnalysis(symbol,72);
+    if(!buy){
+      alert("No archived Predator BUY for "+symbol+" was found in the last 72 hours. Do not fabricate an entry thesis.");
+      return;
+    }
+    const linked=attachEntryThesisFromBuy(saved,buy);
+    if(!linked){alert("Predator could not safely link the archived BUY thesis.");return;}
+    saved.entrySignal="PREDATOR BUY";
+    saved.entryThesisLinked=true;
+    saved.entryAnalysisCapturedAt=buy.capturedAt;
+    saved.entryUnderlying=safeNum(buy.price,0);
+    setStore("ai_options_positions",savedPositions);
+    alert(symbol+" is now linked to its archived Predator BUY thesis from "+new Date(buy.capturedAt).toLocaleString()+".");
+    livePositionScan();
+  }catch(err){alert("Could not link BUY thesis: "+(err?.message||err));}
+}
+
 function establishLegacyManagementBaseline(ticker){
   try{
     const symbol = normalizeTicker(ticker);
@@ -4400,7 +4442,8 @@ function getPersistentPositionRead(ticker, a, position={}, scanContext={}){
 
   const baselineReliable =
     !!thesis &&
-    (baselineProvenance === "ENTRY_SNAPSHOT" ||
+    (baselineProvenance === "ENTRY_THESIS" ||
+     baselineProvenance === "ENTRY_SNAPSHOT" ||
      baselineProvenance === "MANUAL_ENTRY_SNAPSHOT" ||
      baselineProvenance === "MANAGEMENT_BASELINE");
 
@@ -4558,7 +4601,7 @@ function getPersistentPositionRead(ticker, a, position={}, scanContext={}){
   // Weaknesses already present at that baseline are context only; they do not
   // become "new" EXIT evidence until conditions deteriorate beyond the baseline.
   const baselineFailureState =
-    baselineProvenance === "MANAGEMENT_BASELINE"
+    (baselineProvenance === "MANAGEMENT_BASELINE" || baselineProvenance === "ENTRY_THESIS")
       ? (Array.isArray(thesis?.baselineFailureIds)
           ? {failureIds:[...thesis.baselineFailureIds],evidencePoints:safeNum(thesis?.baselineEvidencePoints,0),structureFailed:thesis?.managementBaselineAudit?.components?.structureValid===false}
           : getBaselineFailureStateFromSnapshot(thesis))
@@ -4743,6 +4786,10 @@ function getPersistentPositionRead(ticker, a, position={}, scanContext={}){
     postBaselineEvidencePoints,
     newStructureFailure,
     baselineAudit:thesis?.managementBaselineAudit||null,
+    entryThesisRecorded:!!thesis?.entryThesisRecorded || baselineProvenance==="ENTRY_THESIS",
+    entryThesisCapturedAt:thesis?.entryThesisCapturedAt||null,
+    entryThesisSource:thesis?.entryThesisSource||null,
+    entryInvalidation:thesis?.entryInvalidation ?? null,
     baselineCapturedAt:thesis?.baselineCapturedAt||thesis?.managementBaselineAudit?.capturedAt||thesis?.createdAt||"N/A",
     baselinePrice:safeNum(thesis?.baselinePrice,safeNum(thesis?.managementBaselineAudit?.price,safeNum(thesis?.originalPrice,0))),
     baselineReliable,baselineProvenance,
@@ -6317,6 +6364,10 @@ function getPredatorCommandCenter(position, result, canonicalAuthority=null){
       exitCandidate:!!c.exitCandidate,
       exitSafety:c.exitSafety || {state:"CLEAR",count:0,required:2},
       baselineAudit:c.baselineAudit || null,
+      entryThesisRecorded:!!c.entryThesisRecorded,
+      entryThesisCapturedAt:c.entryThesisCapturedAt||null,
+      entryThesisSource:c.entryThesisSource||null,
+      entryInvalidation:c.entryInvalidation ?? null,
       baselineCapturedAt:c.baselineCapturedAt || "N/A",
       baselinePrice:safeNum(c.baselinePrice,0),
       currentTrend:safeNum(c.currentTrend,0),
@@ -6675,16 +6726,22 @@ function renderPositionCards(results){
                  <div class="metric muted">One-time onboarding: once verified, Predator will not silently replace this management baseline.</div>`
               : cmd.baselineDisplayType === "MANAGEMENT"
                 ? `<div class="metric"><b>Entry Thesis:</b> NOT RECORDED</div>
-                   <div class="metric"><b>Management Baseline:</b> ${cmd.originalThesisScore}/100</div>
+                   <div class="metric"><b>${cmd.entryThesisRecorded ? "Entry Thesis" : "Management Baseline"}:</b> ${cmd.originalThesisScore}/100</div>
+                   ${cmd.entryThesisRecorded ? `
+                     <div class="metric green"><b>Entry Thesis Link:</b> VERIFIED PREDATOR BUY</div>
+                     <div class="metric"><b>Entry Thesis Source:</b> ${escapeHtml(cmd.entryThesisSource||"Predator BUY")}</div>
+                     <div class="metric"><b>Entry Thesis Captured:</b> ${escapeHtml(cmd.entryThesisCapturedAt||cmd.baselineCapturedAt||"N/A")}</div>
+                     <div class="metric"><b>Entry Invalidation:</b> ${Number.isFinite(Number(cmd.entryInvalidation)) ? "$"+Number(cmd.entryInvalidation).toFixed(2) : "N/A"}</div>
+                   ` : ""}
                    <div class="metric"><b>Baseline Captured:</b> ${escapeHtml(cmd.baselineCapturedAt||"N/A")}</div>
                    <div class="metric"><b>Baseline Price:</b> ${cmd.baselinePrice>0?"$"+Number(cmd.baselinePrice).toFixed(2):"N/A"}</div>
                    ${cmd.baselineAudit?.components ? `
                      <div class="divider"></div><div class="section-title">Baseline Audit Trail</div>
-                     <div class="metric"><b>Trend:</b> ${Math.round(cmd.baselineAudit.components.trend)}/100 â ${Math.round(cmd.currentTrend)}/100</div>
-                     <div class="metric"><b>Momentum:</b> ${Math.round(cmd.baselineAudit.components.momentum)}/100 â ${Math.round(cmd.currentMomentum)}/100</div>
-                     <div class="metric"><b>Conviction:</b> ${Math.round(cmd.baselineAudit.components.conviction)}/100 â ${Math.round(cmd.currentConviction)}/100</div>
-                     <div class="metric"><b>Alignment:</b> ${Math.round(cmd.baselineAudit.components.alignment)}/100 â ${Math.round(cmd.currentAlignment)}/100</div>
-                     <div class="metric"><b>Market:</b> ${Math.round(cmd.baselineAudit.components.market)}/100 â ${Math.round(cmd.currentMarket)}/100</div>
+                     <div class="metric"><b>Trend:</b> ${Math.round(cmd.baselineAudit.components.trend)}/100 &rarr; ${Math.round(cmd.currentTrend)}/100</div>
+                     <div class="metric"><b>Momentum:</b> ${Math.round(cmd.baselineAudit.components.momentum)}/100 &rarr; ${Math.round(cmd.currentMomentum)}/100</div>
+                     <div class="metric"><b>Conviction:</b> ${Math.round(cmd.baselineAudit.components.conviction)}/100 &rarr; ${Math.round(cmd.currentConviction)}/100</div>
+                     <div class="metric"><b>Alignment:</b> ${Math.round(cmd.baselineAudit.components.alignment)}/100 &rarr; ${Math.round(cmd.currentAlignment)}/100</div>
+                     <div class="metric"><b>Market:</b> ${Math.round(cmd.baselineAudit.components.market)}/100 &rarr; ${Math.round(cmd.currentMarket)}/100</div>
                      <div class="metric"><b>Baseline Failure IDs:</b> ${escapeHtml((cmd.baselineAudit.failureIds||[]).join(", ")||"NONE")}</div>
                      <div class="metric"><b>New Failure IDs:</b> ${escapeHtml((cmd.newFailureIds||[]).join(", ")||"NONE")}</div>
                    ` : `<div class="metric yellow"><b>Audit Trail:</b> This baseline predates v47.7.10 component capture. The new EXIT confirmation lock still applies.</div>`}
@@ -7301,14 +7358,98 @@ function renderFreshDataNotice(cacheItem){
     </div>`;
 }
 
+
+const PREDATOR_BUY_ARCHIVE_KEY = "signal_predator_buy_analysis_archive_v47_7_11";
+
+function getBuyAnalysisArchive(){
+  const v=getStore(PREDATOR_BUY_ARCHIVE_KEY,{});
+  return v&&typeof v==="object"?v:{};
+}
+function archiveApprovedBuyAnalysis(ticker, analysisData, source="Predator Analysis"){
+  try{
+    const symbol=normalizeTicker(ticker);
+    if(!symbol||!analysisData) return null;
+    const a=ensureEngineDefaults(analysisData);
+    const d=getSimplePredatorDecision(a);
+    if(d.decision!=="BUY") return null;
+
+    const archive=getBuyAnalysisArchive();
+    const audit=buildBaselineAuditSnapshot(a);
+    const item={
+      ticker:symbol,
+      capturedAt:new Date().toISOString(),
+      source,
+      decision:"BUY",
+      direction:d.direction||"N/A",
+      confidence:safeNum(d.confidence,0),
+      expiration:d.expiration||"N/A",
+      price:safeNum(a.price,0),
+      invalidation:d.swingValidation?.invalidation ?? getSwingValidationEngine(a)?.invalidation ?? null,
+      analysisData:a,
+      audit
+    };
+    const rows=Array.isArray(archive[symbol])?archive[symbol]:[];
+    rows.unshift(item);
+    archive[symbol]=rows.slice(0,8);
+    setStore(PREDATOR_BUY_ARCHIVE_KEY,archive);
+    return item;
+  }catch(e){console.warn("BUY archive skipped:",e);return null;}
+}
+function findRecentApprovedBuyAnalysis(ticker, maxAgeHours=72){
+  const symbol=normalizeTicker(ticker);
+  const rows=getBuyAnalysisArchive()[symbol]||[];
+  const maxAge=maxAgeHours*60*60*1000;
+  return rows.find(x=>{
+    const age=Date.now()-new Date(x?.capturedAt||0).getTime();
+    return x?.decision==="BUY"&&x?.analysisData&&Number.isFinite(age)&&age>=0&&age<=maxAge;
+  })||null;
+}
+function attachEntryThesisFromBuy(position,buy){
+  if(!position||!buy?.analysisData) return null;
+  const symbol=normalizeTicker(position.ticker);
+  const cleared=clearPositionThesisSnapshot(symbol);
+  if(!cleared) return null;
+  const snapshot=savePositionThesisSnapshot(symbol,buy.analysisData,{
+    ...position,
+    entryUnderlying:safeNum(buy.price,safeNum(position.entryUnderlying,0)),
+    _baselineProvenance:"ENTRY_THESIS"
+  });
+  if(!snapshot) return null;
+
+  const store=getPositionThesisStore();
+  const audit=buy.audit||buildBaselineAuditSnapshot(buy.analysisData);
+  store[symbol]={
+    ...store[symbol],
+    baselineProvenance:"ENTRY_THESIS",
+    entryThesisRecorded:true,
+    entryThesisCapturedAt:buy.capturedAt,
+    entryThesisSource:buy.source||"Predator BUY",
+    entryDecision:"BUY",
+    entryDirection:buy.direction||"N/A",
+    entryConfidence:safeNum(buy.confidence,0),
+    entryExpirationGuidance:buy.expiration||"N/A",
+    entryInvalidation:buy.invalidation,
+    managementBaselineAudit:audit,
+    baselineFailureIds:[...(audit.failureIds||[])],
+    baselineEvidencePoints:safeNum(audit.evidencePoints,0),
+    baselinePrice:safeNum(buy.price,0),
+    baselineCapturedAt:buy.capturedAt
+  };
+  setStore(PREDATOR_POSITION_THESIS_KEY,store);
+  clearExitConfirmation(symbol);
+  return store[symbol];
+}
+
 function saveLastAnalysis(ticker, analysisHtml, compactHtml, analysisData){
+  const savedAt=new Date().toISOString();
   setStore("signal_predator_last_analysis", {
     ticker,
-    savedAt: new Date().toISOString(),
+    savedAt,
     analysisHtml,
     compactHtml,
     analysisData
   });
+  archiveApprovedBuyAnalysis(ticker,analysisData,"Individual Predator Analysis");
 }
 
 function getLastAnalysis(){
@@ -7447,6 +7588,7 @@ async function scanList(list, title){
     };
 
     if(finalDecision.decision === "BUY"){
+      archiveApprovedBuyAnalysis(ticker,a,`${title} BUY Scan`);
       buys.push(row);
     }else if(finalDecision.decision === "WAIT"){
       waits.push(row);
