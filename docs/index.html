@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.10 Exit Safety Lock + Baseline Audit Trail</title>
+  <title>Signal Predator AI v47.7.10.1 Canonical Exit Authority Hotfix</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.10 // exit safety lock // baseline audit trail // confirmation required</div>
+  <div class="subtitle">v47.7.10.1 // immutable scan confirmation // canonical position authority // fail-closed audit</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -648,7 +648,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.7.10",
+    version: "v47.7.10.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -665,7 +665,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-10.json";
+  a.download = "signal-predator-backup-v47-7-10-1.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3150,8 +3150,16 @@ function analyzeShortOptionPosition(position, livePrice, ai, priceSource){
       finalRunner:"Expire or close near full premium capture"
     }
   };
-  result.positionIntelligence = getPositionIntelligenceEngine(position, result);
-  result.predatorCommand = getPredatorCommandCenter(position, result);
+  result._scanContext = scanContext;
+  if(result.type === "CALL" || result.type === "PUT"){
+    const canonicalAuthority = getPositionCommandAuthority(position.ticker, result._analysisData, position, scanContext);
+    result._canonicalPositionAuthority = canonicalAuthority;
+    result.positionIntelligence = getPositionIntelligenceEngine(position, result, canonicalAuthority);
+    result.predatorCommand = getPredatorCommandCenter(position, result, canonicalAuthority);
+  }else{
+    result.positionIntelligence = getPositionIntelligenceEngine(position, result);
+    result.predatorCommand = getPredatorCommandCenter(position, result);
+  }
   return result;
 }
 
@@ -4058,8 +4066,8 @@ function removePositionThesisSnapshot(ticker){
 }
 
 
-function getPositionCommandAuthority(ticker, a, position={}){
-  const p = getPersistentPositionRead(ticker, a, position);
+function getPositionCommandAuthority(ticker, a, position={}, scanContext={}){
+  const p = getPersistentPositionRead(ticker, a, position, scanContext);
 
   // v47.7.4 COMMAND INTEGRITY LOCK:
   // EXIT may never survive if the canonical evidence fields do not support it.
@@ -4090,6 +4098,11 @@ function getPositionCommandAuthority(ticker, a, position={}){
     status = "HOLD - THESIS INTACT";
     confidence = Math.max(65, Math.round((p.currentThesisScore + p.currentConviction) / 2));
     instruction = "Keep managing the position from the original thesis and structural invalidation.";
+  }else if(p.command === "WATCH / VERIFY"){
+    title = "WATCH / VERIFY";
+    status = "WATCH / VERIFY";
+    confidence = 65;
+    instruction = p.checkpoint;
   }else if(p.command === "WATCH / REDUCE RISK"){
     title = "WATCH";
     status = "WATCH - THESIS WEAKENING";
@@ -4196,22 +4209,61 @@ function buildBaselineAuditSnapshot(a){
   if(c.market>0){if(c.market<40){ids.push("market");points+=1;}else if(c.market<55)points+=1;}
   return {capturedAt:new Date().toISOString(),price:safeNum(a.price,0),components:c,failureIds:[...new Set(ids)].sort(),evidencePoints:points};
 }
-function getExitConfirmationStore(){const v=getStore("signal_predator_exit_confirmations_v47_7_10",{});return v&&typeof v==="object"?v:{};}
-function saveExitConfirmationStore(v){setStore("signal_predator_exit_confirmations_v47_7_10",v||{});}
+function getExitConfirmationStore(){const v=getStore("signal_predator_exit_confirmations_v47_7_10_1",{});return v&&typeof v==="object"?v:{};}
+function saveExitConfirmationStore(v){setStore("signal_predator_exit_confirmations_v47_7_10_1",v||{});}
 function clearExitConfirmation(ticker){const s=getExitConfirmationStore();delete s[normalizeTicker(ticker)];saveExitConfirmationStore(s);}
-function evaluateExitSafetyLock(ticker,thesis,current,structuralInvalidationHit,candidateExit){
+
+function makeLivePositionScanId(){
+  return "LPS-" + new Date().toISOString() + "-" + Math.random().toString(36).slice(2,10);
+}
+
+function evaluateExitSafetyLock(ticker,thesis,current,structuralInvalidationHit,candidateExit,scanContext={}){
   const symbol=normalizeTicker(ticker);
-  if(structuralInvalidationHit){clearExitConfirmation(symbol);return {confirmed:true,state:"HARD INVALIDATION",count:0,required:0,giantCollapse:false};}
-  if(!candidateExit){clearExitConfirmation(symbol);return {confirmed:false,state:"CLEAR",count:0,required:2,giantCollapse:false};}
+  if(structuralInvalidationHit){
+    clearExitConfirmation(symbol);
+    return {confirmed:true,state:"HARD INVALIDATION",count:0,required:0,giantCollapse:false,scanId:scanContext.scanId||"HARD"};
+  }
+  if(!candidateExit){
+    clearExitConfirmation(symbol);
+    return {confirmed:false,state:"CLEAR",count:0,required:2,giantCollapse:false,scanId:scanContext.scanId||"NONE"};
+  }
+
+  const scanId=String(scanContext.scanId||"");
+  const isIndependentLiveScan=scanContext.mode==="LIVE" && !!scanId;
   const drop=safeNum(thesis?.originalThesisScore,current.currentThesisScore)-current.currentThesisScore;
   const signature=(current.newFailureIds||[]).slice().sort().join("|");
   const baselineKey=String(thesis?.createdAt||"");
   const store=getExitConfirmationStore(), prev=store[symbol];
+
+  // Cached render / Quick Recheck / duplicate function evaluation must be pure.
+  // They may read the current confirmation state but may NEVER advance it.
+  if(!isIndependentLiveScan){
+    const same=!!prev&&prev.signature===signature&&prev.baselineKey===baselineKey;
+    const count=same?safeNum(prev.count,0):0;
+    return {confirmed:count>=2,state:count>=2?"CONFIRMED":count===1?"VERIFY DETERIORATION":"AWAIT LIVE CONFIRMATION",count,required:2,giantCollapse:drop>=35,scanId:scanId||"CACHE"};
+  }
+
+  // The same actual Live Position Scan can be evaluated/rendered many times.
+  // It counts once, identified by immutable scanId.
+  if(prev&&prev.signature===signature&&prev.baselineKey===baselineKey&&prev.lastCountedScanId===scanId){
+    const count=safeNum(prev.count,1);
+    return {confirmed:count>=2,state:count>=2?"CONFIRMED":"VERIFY DETERIORATION",count,required:2,giantCollapse:drop>=35,scanId};
+  }
+
   let count=1;
-  if(prev&&prev.signature===signature&&prev.baselineKey===baselineKey) count=Math.min(2,safeNum(prev.count,1)+1);
-  store[symbol]={signature,count,baselineKey,firstSeen:prev?.firstSeen||new Date().toISOString(),lastSeen:new Date().toISOString(),thesisDrop:drop};
+  if(prev&&prev.signature===signature&&prev.baselineKey===baselineKey&&prev.lastCountedScanId!==scanId){
+    count=Math.min(2,safeNum(prev.count,1)+1);
+  }
+
+  store[symbol]={
+    signature,count,baselineKey,
+    firstSeen:prev?.firstSeen||new Date().toISOString(),
+    lastSeen:new Date().toISOString(),
+    lastCountedScanId:scanId,
+    thesisDrop:drop
+  };
   saveExitConfirmationStore(store);
-  return {confirmed:count>=2,state:count>=2?"CONFIRMED":"VERIFY DETERIORATION",count,required:2,giantCollapse:drop>=35};
+  return {confirmed:count>=2,state:count>=2?"CONFIRMED":"VERIFY DETERIORATION",count,required:2,giantCollapse:drop>=35,scanId};
 }
 
 function establishLegacyManagementBaseline(ticker){
@@ -4324,7 +4376,7 @@ function diffFailureSets(baselineIds=[], currentIds=[]){
   };
 }
 
-function getPersistentPositionRead(ticker, a, position={}){
+function getPersistentPositionRead(ticker, a, position={}, scanContext={}){
   a = ensureEngineDefaults(a);
 
   const d = getSimplePredatorDecision(a);
@@ -4553,7 +4605,7 @@ function getPersistentPositionRead(ticker, a, position={}){
   // hard invalidation is immediate; derived multi-factor EXIT needs a second
   // independent scan with the same failure signature.
   const exitCandidate=!structuralInvalidationHit&&baselineReliable&&rawExitThreshold;
-  const exitSafety=evaluateExitSafetyLock(ticker,thesis,{currentThesisScore,newFailureIds:failureDelta.newFailures},structuralInvalidationHit,exitCandidate);
+  const exitSafety=evaluateExitSafetyLock(ticker,thesis,{currentThesisScore,newFailureIds:failureDelta.newFailures},structuralInvalidationHit,exitCandidate,scanContext);
   const confirmedExit=structuralInvalidationHit||(exitCandidate&&exitSafety.confirmed);
   const exitGateIntegrity=confirmedExit===(structuralInvalidationHit||(exitCandidate&&exitSafety.confirmed));
 
@@ -6100,7 +6152,7 @@ function renderDurationOptimizerCard(a){
 }
 
 
-function getPositionIntelligenceEngine(position, result){
+function getPositionIntelligenceEngine(position, result, canonicalAuthority=null){
   const type = result.type || position.type;
   const isLongOption = type === "CALL" || type === "PUT";
 
@@ -6128,7 +6180,7 @@ function getPositionIntelligenceEngine(position, result){
       };
     }
 
-    const c = getPositionCommandAuthority(position.ticker, a, position);
+    const c = canonicalAuthority || getPositionCommandAuthority(position.ticker, a, position, result._scanContext || {});
     const freshRead = c.thesis?.latestDecision || "N/A";
 
     return {
@@ -6209,7 +6261,7 @@ function getPositionIntelligenceEngine(position, result){
     evidencePoints:0,independentFailures:0,exitGate:"N/A"
   };
 }
-function getPredatorCommandCenter(position, result){
+function getPredatorCommandCenter(position, result, canonicalAuthority=null){
   const type = result.type || position.type;
   const isLongOption = type === "CALL" || type === "PUT";
 
@@ -6231,14 +6283,14 @@ function getPredatorCommandCenter(position, result){
       };
     }
 
-    const c = getPositionCommandAuthority(position.ticker, a, position);
+    const c = canonicalAuthority || getPositionCommandAuthority(position.ticker, a, position, result._scanContext || {});
     return {
       action:c.title,
       confidence:Math.round(c.confidence),
       reason:c.reason,
       nextCheckpoint:c.nextCheckpoint,
       botInstruction:c.instruction,
-      color:c.title === "EXIT" ? "red" : c.title === "WATCH" ? "yellow" : "green",
+      color:c.title === "EXIT" ? "red" : c.title.includes("WATCH") || c.title.includes("VERIFY") ? "yellow" : "green",
       evidencePoints:Number(c.evidencePoints || 0),
       independentFailures:Number(c.independentFailures || 0),
       baselineFailureCount:Number(c.baselineFailureCount || 0),
@@ -6261,7 +6313,17 @@ function getPredatorCommandCenter(position, result){
       originalInvalidation:c.originalInvalidation || "N/A",
       invalidationHit:!!c.structuralInvalidationHit,
       originalThesisScore:Math.round(c.originalThesisScore || 0),
-      currentThesisScore:Math.round(c.currentThesisScore || 0)
+      currentThesisScore:Math.round(c.currentThesisScore || 0),
+      exitCandidate:!!c.exitCandidate,
+      exitSafety:c.exitSafety || {state:"CLEAR",count:0,required:2},
+      baselineAudit:c.baselineAudit || null,
+      baselineCapturedAt:c.baselineCapturedAt || "N/A",
+      baselinePrice:safeNum(c.baselinePrice,0),
+      currentTrend:safeNum(c.currentTrend,0),
+      currentMomentum:safeNum(c.currentMomentum,0),
+      currentConviction:safeNum(c.currentConviction,0),
+      currentAlignment:safeNum(c.currentAlignment,0),
+      currentMarket:safeNum(c.currentMarket,0)
     };
   }
 
@@ -6331,12 +6393,12 @@ function getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent,
 
   if(type === "CALL" || type === "PUT"){
     if(thesisScore < 40){
-      holdStyle = "EXIT NOW";
-      suggestedHold = "Do not keep holding.";
-      botAction = "EXIT";
-      reason = "Thesis integrity is broken.";
-      reviewFrequency = "No further holding recommended.";
-      maxHoldRule = "Protect capital.";
+      holdStyle = "RECHECK POSITION AUTHORITY";
+      suggestedHold = "Use the canonical Predator Command Center for the exit decision.";
+      botAction = "FOLLOW CANONICAL POSITION AUTHORITY";
+      reason = "Low thesis score is context only; score alone cannot authorize EXIT.";
+      reviewFrequency = "Use Live Position Scan for evidence-based management.";
+      maxHoldRule = "Only the canonical evidence matrix / saved invalidation can authorize EXIT.";
     }else if(rec.includes("Weekly") || rec.includes("Bi")){
       holdStyle = "DAY TRADE / SHORT SWING";
       suggestedHold = "Intraday to 1-3 trading days.";
@@ -6365,10 +6427,10 @@ function getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent,
     }
 
     if(quality === "REJECT"){
-      holdStyle = "EXIT / WAIT";
-      suggestedHold = "Do not hold unless a fresh scan improves.";
-      botAction = "EXIT OR DO NOT ENTER";
-      reason = "Quality engine rejected the trade.";
+      holdStyle = "NO NEW ENTRY / RECHECK POSITION";
+      suggestedHold = "Fresh-entry rejection does not independently control an existing position.";
+      botAction = "FOLLOW CANONICAL POSITION AUTHORITY";
+      reason = "Quality rejection blocks a fresh entry but cannot independently authorize an existing-position EXIT.";
     }
 
     if(thesisScore >= 75 && approxPnLPercent !== null && approxPnLPercent < 0){
@@ -6491,7 +6553,7 @@ function getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte
   };
 }
 
-function analyzePosition(position, livePrice, ai, priceSource){
+function analyzePosition(position, livePrice, ai, priceSource, scanContext={}){
   if(position.type === "SELL_CALL" || position.type === "SELL_PUT"){
     return analyzeShortOptionPosition(position, livePrice, ai, priceSource);
   }
@@ -6525,8 +6587,16 @@ function analyzePosition(position, livePrice, ai, priceSource){
   const thesisIntegrity = getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte, timeTarget, status);
   const holdDurationGuide = getPositionHoldDurationGuide(position, livePrice, ai, approxPnLPercent, dte, thesisIntegrity, targetConfidence);
   const baseResult = {ticker:position.ticker,type,strike,breakeven,expiration:position.expiration || "Not set",dte:dte === null ? "N/A" : dte,timeRisk,expirationFit,livePrice:price.toFixed(2),status,reason,approxPnLPercent,cardClass,priceSource,_analysisData:ai,timeTarget,trapWarning:ai.trapWarning,predictiveEngine:ai.predictiveEngine,profitScaling,incomeMode:ai.incomeMode,nextDay:ai.nextDay,qualityDecision:ai.qualityDecision,alignmentScore:ai.alignmentScore,marketRegimeFilter:ai.marketRegimeFilter,noTradeZone:ai.noTradeZone,confirmationHold:ai.confirmationHold,tradeManagement,targetConfidence,thesisIntegrity,holdDurationGuide};
-  baseResult.positionIntelligence = getPositionIntelligenceEngine(position, baseResult);
-  baseResult.predatorCommand = getPredatorCommandCenter(position, baseResult);
+  baseResult._scanContext = scanContext;
+  if(baseResult.type === "CALL" || baseResult.type === "PUT"){
+    const canonicalAuthority = getPositionCommandAuthority(position.ticker, baseResult._analysisData, position, scanContext);
+    baseResult._canonicalPositionAuthority = canonicalAuthority;
+    baseResult.positionIntelligence = getPositionIntelligenceEngine(position, baseResult, canonicalAuthority);
+    baseResult.predatorCommand = getPredatorCommandCenter(position, baseResult, canonicalAuthority);
+  }else{
+    baseResult.positionIntelligence = getPositionIntelligenceEngine(position, baseResult);
+    baseResult.predatorCommand = getPredatorCommandCenter(position, baseResult);
+  }
   return baseResult;
 }
 
@@ -6561,7 +6631,9 @@ function renderPositionCards(results){
         <div class="metric"><b>Expiration:</b> ${escapeHtml(r.expiration || "Not set")}</div>
         <div class="metric"><b>Breakeven:</b> ${r.breakeven === "N/A" || r.breakeven == null ? "N/A" : "$" + escapeHtml(r.breakeven)}</div>
       </div>
-      ${(()=>{ const cmd = r.predatorCommand || getPredatorCommandCenter({ticker:r.ticker,type:r.type}, r); return `
+      ${(()=>{ const cmd = r.predatorCommand || {
+        action:"HOLD / RECHECK",confidence:50,botInstruction:"Canonical position authority is unavailable. Do not act on an EXIT signal.",reason:"Rendering is fail-closed because this result has no precomputed authority object.",nextCheckpoint:"Run a new Live Position Scan.",color:"yellow",exitGate:"BLOCKED",independentFailures:0,evidencePoints:0,baselineDisplayType:"LEGACY",baselineFailureCount:0,currentFailureCount:0,newFailureCount:0,resolvedFailureCount:0,postBaselineEvidencePoints:0,newFailureIds:[],resolvedFailureIds:[],exitCandidate:false,exitSafety:{state:"AUTHORITY UNAVAILABLE",count:0,required:2},baselineReliable:false,baselineProvenance:"UNKNOWN",authorityConflict:true,originalInvalidation:"N/A",invalidationHit:false,originalThesisScore:0,currentThesisScore:0
+      }; return `
         <div class="command-box">
           <div class="command-action ${cmd.color}">${escapeHtml(cmd.action)}</div>
           <div class="metric"><b>Position Command Confidence:</b> ${cmd.confidence}/100</div>
@@ -6582,7 +6654,7 @@ function renderPositionCards(results){
                  <div class="metric"><b>Resolved Failures:</b> ${cmd.resolvedFailureCount}</div>
                  <div class="metric"><b>Post-Baseline Evidence Points:</b> ${cmd.postBaselineEvidencePoints}</div>
                  <div class="metric"><b>Deterioration Since Baseline:</b> <span class="${cmd.newFailureCount > 0 || cmd.postBaselineEvidencePoints > 0 ? "yellow" : "green"}">${cmd.newFailureCount > 0 || cmd.postBaselineEvidencePoints > 0 ? "YES" : "NONE"}</span></div>
-                 <div class="metric"><b>Exit Safety Lock:</b> <span class="${cmd.confirmedExit ? "red" : cmd.exitCandidate ? "yellow" : "green"}">${escapeHtml(cmd.exitSafety?.state||"CLEAR")}</span></div>
+                 <div class="metric"><b>Exit Safety Lock:</b> <span class="${cmd.exitGate === "OPEN" ? "red" : cmd.exitCandidate ? "yellow" : "green"}">${escapeHtml(cmd.exitSafety?.state||"CLEAR")}</span></div>
                  <div class="metric"><b>Confirmation:</b> ${cmd.exitCandidate ? `${cmd.exitSafety?.count||0}/${cmd.exitSafety?.required||2} scans` : "Not required"}</div>`
               : ""
           }
@@ -7594,7 +7666,9 @@ async function scanMyPositions(){
   if(!savedPositions.length){ output.innerHTML = "<div class='card'>No saved positions yet.</div>"; clearActiveAlertsPanel(); return; }
   renderThinkingCard(["TRACKING SAVED POSITIONS...","RECALCULATING TARGET ODDS...","CHECKING FOR STRIKE ALERTS..."]);
   let results = [];
-  let cache = { scannedAt: new Date().toISOString(), results: [] };
+  const liveScanId = makeLivePositionScanId();
+  const liveScanContext = {scanId:liveScanId,mode:"LIVE"};
+  let cache = { scannedAt: new Date().toISOString(), scanId:liveScanId, results: [] };
 
   for(let i=0; i<savedPositions.length; i++){
     const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
@@ -7609,7 +7683,7 @@ async function scanMyPositions(){
       results.push(item); cache.results.push(item); continue;
     }
     const ai = analyze(closes, pricePack.price);
-    const monitor = analyzePosition(p, pricePack.price, ai, pricePack.source);
+    const monitor = analyzePosition(p, pricePack.price, ai, pricePack.source, liveScanContext);
     results.push(monitor); cache.results.push(monitor);
     await new Promise(r => setTimeout(r, 5000));
   }
@@ -7648,8 +7722,11 @@ function quickRecheckPositions(){
     }
     if((copy.type === "CALL" || copy.type === "PUT") && copy._analysisData){
       const saved = savedPositions.find(p=>normalizeTicker(p.ticker)===normalizeTicker(copy.ticker)) || {ticker:copy.ticker,type:copy.type};
-      copy.positionIntelligence = getPositionIntelligenceEngine(saved, copy);
-      copy.predatorCommand = getPredatorCommandCenter(saved, copy);
+      copy._scanContext = {scanId:String(cache.scanId || cache.scannedAt || "CACHE"),mode:"CACHE"};
+      const canonicalAuthority = getPositionCommandAuthority(saved.ticker, copy._analysisData, saved, copy._scanContext);
+      copy._canonicalPositionAuthority = canonicalAuthority;
+      copy.positionIntelligence = getPositionIntelligenceEngine(saved, copy, canonicalAuthority);
+      copy.predatorCommand = getPredatorCommandCenter(saved, copy, canonicalAuthority);
     }
     copy.priceSource = String(copy.priceSource || "Cached") + " / Quick Recheck";
     return copy;
