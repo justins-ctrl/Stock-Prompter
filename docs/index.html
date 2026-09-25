@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.12 BUY Signal Integrity</title>
+  <title>Signal Predator AI v47.7.12.1 BUY Signal Integrity</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.12 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
+  <div class="subtitle">v47.7.12.1 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -540,7 +540,8 @@ body.advanced-on .scan-support{display:block}
 const APP_CONFIG = Object.freeze({
   apiTimeoutMs: 18000,
   maxBackupItems: 250,
-  alphaVantageKeyStorageKey: "signal_predator_alpha_vantage_key"
+  alphaVantageKeyStorageKey: "signal_predator_alpha_vantage_key",
+  embeddedAlphaVantageKey: "OHCJWFQEFSXI8IJ3"
 });
 
 function getAlphaVantageKey(){
@@ -548,7 +549,7 @@ function getAlphaVantageKey(){
     const storageKey = APP_CONFIG.alphaVantageKeyStorageKey;
     let savedKey = String(localStorage.getItem(storageKey) || "").trim();
 
-    return savedKey;
+    return savedKey || String(APP_CONFIG.embeddedAlphaVantageKey || "").trim();
   }catch(e){
     return "";
   }
@@ -597,7 +598,7 @@ function renderApiKeyStatus(){
   if(!box) return;
   const key = getAlphaVantageKey();
   box.textContent = key
-    ? `API Key: ${maskApiKey(key)} (stored only in this browser)`
+    ? `API Key: ${maskApiKey(key)} (available)`
     : "API Key: NOT SAVED - enter your Alpha Vantage key below.";
 }
 const DEFAULT_WATCHLIST = ["SPY","NVDA","TSLA","QQQ","AAPL","AMD","META","NFLX","AMZN","COIN"];
@@ -640,7 +641,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.7.12",
+    version: "v47.7.12.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -3992,7 +3993,7 @@ function getSwingValidationEngine(a){
     validation = "WAIT";
     entryMode = eliteMonthlyThesis ? "ELITE SETUP â TRIGGER REQUIRED" : "GOOD SETUP â TRIGGER REQUIRED";
     blocker = "PRICE CONFIRMATION";
-    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.12 no longer waives the entry trigger. Wait for price confirmation.`;
+    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.12.1 no longer waives the entry trigger. Wait for price confirmation.`;
   }else if(quality !== "APPROVED"){
     validation = "WAIT";
     entryMode = "QUALITY CONFIRMATION REQUIRED";
@@ -5827,7 +5828,7 @@ function getPredatorConvictionEngine(a){
   const triggerConfidence = clampScore(session?.triggerConfidence || 50);
   const accountFit = clampScore(fit.score || 50);
 
-  // v47.7.12: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
+  // v47.7.12.1: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
   const directionalEvidence = clampScore((setup + alignment) / 2);
   let conviction = clampScore(
     directionalEvidence * .32 +
