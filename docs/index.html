@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.12.1 BUY Signal Integrity</title>
+  <title>Signal Predator AI v47.7.13 BUY Signal Integrity</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.12.1 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
+  <div class="subtitle">v47.7.13 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -641,7 +641,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.7.12.1",
+    version: "v47.7.13",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -2583,13 +2583,28 @@ function getTradeQualityDecision(tradeFilter, grade, alignmentScore, marketRegim
 }
 
 function getSupportResistance(closes){
-  const last10 = closes.slice(0,10);
-  const last20 = closes.slice(0,20);
+  const clean = (Array.isArray(closes) ? closes : []).map(Number).filter(Number.isFinite);
+  const currentClose = clean[0];
+
+  // v47.7.13: prior structure deliberately EXCLUDES the current daily close.
+  // This prevents a fresh 10-day high/low from defining itself as 0.0% room.
+  const prior10 = clean.slice(1,11);
+  const prior20 = clean.slice(1,21);
+  const fallback10 = clean.slice(0,10);
+  const fallback20 = clean.slice(0,20);
+
+  const support = prior10.length ? Math.min(...prior10) : Math.min(...fallback10);
+  const resistance = prior10.length ? Math.max(...prior10) : Math.max(...fallback10);
+  const deeperSupport = prior20.length ? Math.min(...prior20) : Math.min(...fallback20);
+  const higherResistance = prior20.length ? Math.max(...prior20) : Math.max(...fallback20);
+
   return {
-    support: Math.min(...last10),
-    resistance: Math.max(...last10),
-    deeperSupport: Math.min(...last20),
-    higherResistance: Math.max(...last20)
+    support,
+    resistance,
+    deeperSupport,
+    higherResistance,
+    currentClose:Number.isFinite(currentClose) ? currentClose : null,
+    basis:"PRIOR STRUCTURE â CURRENT CLOSE EXCLUDED"
   };
 }
 
@@ -3880,28 +3895,90 @@ function getEntryIntegrityEngine(a){
   a = ensureEngineDefaults(a);
   const direction = a.direction || "WAIT";
   const price = safeNum(a.price, 0);
-  const support = safeNum(a.supportResistance?.support, NaN);
-  const resistance = safeNum(a.supportResistance?.resistance, NaN);
+  const sr = a.supportResistance || {};
+  const support = safeNum(sr.support, NaN);
+  const resistance = safeNum(sr.resistance, NaN);
+  const deeperSupport = safeNum(sr.deeperSupport, NaN);
+  const higherResistance = safeNum(sr.higherResistance, NaN);
   const rangeLocation = safeNum(a.noTradeZone?.rangeLocation, 50);
   const quality = a.qualityDecision?.decision || "N/A";
   const chaseRisk = a.nextDay?.chaseRisk || "N/A";
   const reversalTrap = a.nextDay?.reversalTrap || "N/A";
   const overnightRisk = a.nextDay?.overnightRisk || "N/A";
 
+  let structureState = "N/A";
+  let primaryStructure = null;
+  let nextStructure = null;
   let roomPct = null;
-  if(price > 0 && direction === "BUY CALL" && Number.isFinite(resistance)) roomPct = ((resistance - price) / price) * 100;
-  if(price > 0 && direction === "BUY PUT" && Number.isFinite(support)) roomPct = ((price - support) / price) * 100;
+  let distanceToPriorStructurePct = null;
 
-  const extremeExtension = direction === "BUY CALL" ? rangeLocation >= 80 : direction === "BUY PUT" ? rangeLocation <= 20 : true;
-  const moderateExtension = direction === "BUY CALL" ? rangeLocation >= 70 : direction === "BUY PUT" ? rangeLocation <= 30 : true;
-  const insufficientRoom = roomPct !== null && roomPct <= 1.25;
-  const tightRoom = roomPct !== null && roomPct <= 2.50;
+  if(price > 0 && direction === "BUY CALL" && Number.isFinite(resistance)){
+    primaryStructure = resistance;
+    distanceToPriorStructurePct = ((resistance - price) / price) * 100;
+
+    if(price > resistance){
+      structureState = "PRIOR RESISTANCE BROKEN";
+      if(Number.isFinite(higherResistance) && higherResistance > price){
+        nextStructure = higherResistance;
+        roomPct = ((higherResistance - price) / price) * 100;
+      }else{
+        structureState = "20D RESISTANCE CLEARED";
+      }
+    }else{
+      nextStructure = resistance;
+      roomPct = Math.max(0, ((resistance - price) / price) * 100);
+      structureState = roomPct <= 0.35 ? "AT PRIOR RESISTANCE â BREAK REQUIRED" : "ROOM TO PRIOR RESISTANCE";
+    }
+  }
+
+  if(price > 0 && direction === "BUY PUT" && Number.isFinite(support)){
+    primaryStructure = support;
+    distanceToPriorStructurePct = ((price - support) / price) * 100;
+
+    if(price < support){
+      structureState = "PRIOR SUPPORT BROKEN";
+      if(Number.isFinite(deeperSupport) && deeperSupport < price){
+        nextStructure = deeperSupport;
+        roomPct = ((price - deeperSupport) / price) * 100;
+      }else{
+        structureState = "20D SUPPORT CLEARED";
+      }
+    }else{
+      nextStructure = support;
+      roomPct = Math.max(0, ((price - support) / price) * 100);
+      structureState = roomPct <= 0.35 ? "AT PRIOR SUPPORT â BREAK REQUIRED" : "ROOM TO PRIOR SUPPORT";
+    }
+  }
+
+  const structureBroken =
+    structureState === "PRIOR RESISTANCE BROKEN" ||
+    structureState === "PRIOR SUPPORT BROKEN" ||
+    structureState === "20D RESISTANCE CLEARED" ||
+    structureState === "20D SUPPORT CLEARED";
+
+  const atStructure =
+    structureState === "AT PRIOR RESISTANCE â BREAK REQUIRED" ||
+    structureState === "AT PRIOR SUPPORT â BREAK REQUIRED";
+
+  // Extension is still a risk control, but a confirmed structural break is no longer
+  // automatically rejected just because it sits at a recent extreme.
+  const rawExtremeExtension = direction === "BUY CALL" ? rangeLocation >= 80 : direction === "BUY PUT" ? rangeLocation <= 20 : true;
+  const rawModerateExtension = direction === "BUY CALL" ? rangeLocation >= 70 : direction === "BUY PUT" ? rangeLocation <= 30 : true;
+  const extremeExtension = rawExtremeExtension && !structureBroken;
+  const moderateExtension = rawModerateExtension && !structureBroken;
+
+  // If prior structure has been broken, measure room to the next deeper 20-day barrier.
+  // If the 20-day barrier is also cleared, do not invent a 0% target.
+  const insufficientRoom = roomPct !== null && roomPct <= 1.25 && !atStructure;
+  const tightRoom = roomPct !== null && roomPct <= 2.50 && !atStructure;
   const qualityFullyApproved = quality === "APPROVED";
   const highRisk = chaseRisk === "HIGH" || reversalTrap === "HIGH" || overnightRisk === "HIGH";
 
   let status = "CLEAR";
   let blocker = "NONE";
-  let reason = "Entry location has acceptable room and no major extension warning.";
+  let reason = structureBroken
+    ? "Prior structure has been broken; entry is evaluated against the next known barrier plus extension and risk controls."
+    : "Entry location has acceptable room and no major extension warning.";
 
   if(!qualityFullyApproved){
     status = "WAIT";
@@ -3909,10 +3986,16 @@ function getEntryIntegrityEngine(a){
     reason = quality === "REDUCED SIZE"
       ? "Quality engine only supports reduced-size conditions. Predator will not promote that state to a fresh BUY."
       : `Quality decision is ${quality}; fresh BUY authority requires APPROVED.`;
+  }else if(atStructure){
+    status = "WAIT";
+    blocker = "STRUCTURE BREAK REQUIRED";
+    reason = direction === "BUY CALL"
+      ? `Price is at prior resistance near $${Number(primaryStructure).toFixed(2)}. Wait for a confirmed break rather than treating resistance as 0% remaining room.`
+      : `Price is at prior support near $${Number(primaryStructure).toFixed(2)}. Wait for a confirmed break rather than treating support as 0% remaining room.`;
   }else if(insufficientRoom){
     status = "WAIT";
     blocker = "INSUFFICIENT ROOM";
-    reason = `Only about ${Math.max(0,roomPct).toFixed(1)}% remains to nearby ${direction === "BUY CALL" ? "resistance" : "support"}; the move may already be too mature for a new long option.`;
+    reason = `Only about ${Math.max(0,roomPct).toFixed(1)}% remains to the next known ${direction === "BUY CALL" ? "resistance" : "support"} barrier; the move may already be too mature for a new long option.`;
   }else if(extremeExtension || highRisk){
     status = "WAIT";
     blocker = "EXTENSION / REVERSAL RISK";
@@ -3921,13 +4004,17 @@ function getEntryIntegrityEngine(a){
     status = "CAUTION";
     blocker = "ENTRY LOCATION";
     reason = roomPct !== null
-      ? `Directional thesis is intact, but only about ${Math.max(0,roomPct).toFixed(1)}% remains to nearby ${direction === "BUY CALL" ? "resistance" : "support"}. Trigger confirmation is mandatory.`
-      : "Directional thesis is intact, but price is relatively extended inside the recent range. Trigger confirmation is mandatory.";
+      ? `Directional thesis is intact, but only about ${Math.max(0,roomPct).toFixed(1)}% remains to the next known ${direction === "BUY CALL" ? "resistance" : "support"} barrier. Trigger confirmation is mandatory.`
+      : "Directional thesis is intact, but price is relatively extended. Trigger confirmation is mandatory.";
   }
 
-  return {status,blocker,reason,roomPct,rangeLocation,qualityFullyApproved,extremeExtension,moderateExtension,insufficientRoom,tightRoom,highRisk};
+  return {
+    status,blocker,reason,roomPct,rangeLocation,qualityFullyApproved,
+    extremeExtension,moderateExtension,insufficientRoom,tightRoom,highRisk,
+    structureState,structureBroken,atStructure,primaryStructure,nextStructure,
+    distanceToPriorStructurePct
+  };
 }
-
 function getSwingValidationEngine(a){
   a = ensureEngineDefaults(a);
   const policy = getStrategyExpirationPolicy(a);
@@ -3993,7 +4080,7 @@ function getSwingValidationEngine(a){
     validation = "WAIT";
     entryMode = eliteMonthlyThesis ? "ELITE SETUP â TRIGGER REQUIRED" : "GOOD SETUP â TRIGGER REQUIRED";
     blocker = "PRICE CONFIRMATION";
-    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.12.1 no longer waives the entry trigger. Wait for price confirmation.`;
+    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13 no longer waives the entry trigger. Wait for price confirmation.`;
   }else if(quality !== "APPROVED"){
     validation = "WAIT";
     entryMode = "QUALITY CONFIRMATION REQUIRED";
@@ -5700,6 +5787,45 @@ function getEntryClassificationLabel(a){
     : {label:"WAIT - TRIGGER REQUIRED", color:"yellow"};
 }
 
+function getBuyFunnelDiagnostics(a){
+  a = ensureEngineDefaults(a);
+  const swing = getSwingValidationEngine(a);
+  const conviction = safeNum(getPredatorConvictionEngine(a)?.conviction,0);
+  const alignment = safeNum(a.alignmentScore?.score,0);
+  const timing = safeNum(a.timeTarget?.probability,0);
+  const quality = a.qualityDecision?.decision || "N/A";
+  const noTrade = a.noTradeZone?.zone || "CLEAR";
+  const market = a.marketRegimeFilter?.state || "N/A";
+  const validDirection = swing && (a.direction === "BUY CALL" || a.direction === "BUY PUT");
+  const thesisPass = swing.monthlyThesis === "STRONG" || swing.monthlyThesis === "ELITE";
+  const integrityPass = swing.entryIntegrity?.status !== "WAIT";
+
+  const gates = [
+    {name:"Directional Setup", pass:validDirection, detail:a.direction || "WAIT"},
+    {name:"Alignment", pass:alignment >= 60, detail:`${Math.round(alignment)}/100`},
+    {name:"No-Trade Zone", pass:noTrade === "CLEAR", detail:noTrade},
+    {name:"Market Regime", pass:market !== "DANGEROUS", detail:market},
+    {name:"Quality", pass:quality === "APPROVED", detail:quality},
+    {name:"Monthly Thesis", pass:thesisPass, detail:`${swing.monthlyThesis} â¢ timing ${Math.round(timing)} â¢ conviction ${Math.round(conviction)}`},
+    {name:"Structure", pass:swing.structureValid, detail:swing.entryIntegrity?.structureState || "N/A"},
+    {name:"Entry Location", pass:integrityPass, detail:swing.entryIntegrity?.status || "N/A"},
+    {name:"Price Trigger", pass:swing.triggerConfirmed, detail:swing.triggerConfirmed ? "CONFIRMED" : `WAITING FOR $${swing.trigger}`},
+    {name:"Final BUY Authority", pass:swing.validation === "BUY", detail:swing.validation}
+  ];
+
+  const remaining = gates.filter(g=>!g.pass && g.name !== "Final BUY Authority").length;
+  return {gates,remaining,swing};
+}
+
+function renderBuyFunnelDiagnostics(a){
+  const d = getBuyFunnelDiagnostics(a);
+  return `<div class="card"><div class="section-title">BUY Funnel Diagnostics</div>
+    <div class="metric"><b>Gates Remaining:</b> ${d.remaining}</div>
+    ${d.gates.map(g=>`<div class="metric"><span class="${g.pass ? "green" : "yellow"}"><b>${g.pass ? "PASS" : "BLOCK"}:</b></span> ${g.name} â ${g.detail}</div>`).join("")}
+    <div class="metric muted">A fresh BUY is reachable only when every required gate is satisfied. Strong thesis alone does not grant entry permission.</div>
+  </div>`;
+}
+
 function renderSimplePredatorDecision(a){
   const d = getSimplePredatorDecision(a);
   const directionText = d.direction === "WAIT" ? "No directional buy" : d.direction;
@@ -5722,7 +5848,8 @@ function renderSimplePredatorDecision(a){
     <div class="divider"></div>
     <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div>
     <div class="metric"><b>Entry Integrity:</b> <span class="${d.swingValidation?.entryIntegrity?.status === "CLEAR" ? "green" : d.swingValidation?.entryIntegrity?.status === "CAUTION" ? "yellow" : "red"}">${d.swingValidation?.entryIntegrity?.status || "N/A"}</span></div>
-    <div class="metric"><b>Room to Nearby Structure:</b> ${d.swingValidation?.entryIntegrity?.roomPct === null ? "N/A" : Math.max(0,d.swingValidation.entryIntegrity.roomPct).toFixed(1)+"%"}</div>
+    <div class="metric"><b>Structure State:</b> ${d.swingValidation?.entryIntegrity?.structureState || "N/A"}</div>
+    <div class="metric"><b>Room to Next Known Structure:</b> ${d.swingValidation?.entryIntegrity?.roomPct === null ? "N/A / OPEN" : Math.max(0,d.swingValidation.entryIntegrity.roomPct).toFixed(1)+"%"}</div>
     <div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Adaptive Contract Coach below to compare profiles, then enter Robinhood's live contract stats into the Contract Grader before placing the trade. After entry, save the position thesis once, then use Live Position Scan for HOLD / WATCH / TAKE PROFIT / REDUCE / EXIT guidance based on that original thesis.</div>
     ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
     <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
@@ -5828,7 +5955,7 @@ function getPredatorConvictionEngine(a){
   const triggerConfidence = clampScore(session?.triggerConfidence || 50);
   const accountFit = clampScore(fit.score || 50);
 
-  // v47.7.12.1: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
+  // v47.7.13: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
   const directionalEvidence = clampScore((setup + alignment) / 2);
   let conviction = clampScore(
     directionalEvidence * .32 +
@@ -6996,6 +7123,7 @@ function renderFull(ticker, a){
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
   ${(()=>{ const s=getSwingValidationEngine(a); return `<div class="card"><div class="section-title">Monthly Swing Validation</div><div class="metric"><b>Validation:</b> <span class="${signalClass(s.validation)}">${s.validation}</span></div><div class="metric"><b>Entry Mode:</b> ${s.entryMode}</div><div class="metric"><b>Monthly Thesis:</b> ${s.monthlyThesis}</div><div class="metric"><b>Readiness:</b> ${s.readiness}/100</div><div class="metric"><b>Blocker:</b> ${s.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${s.trigger==="N/A"?"N/A":"$"+s.trigger}</div><div class="metric"><b>Structural Invalidation:</b> ${s.invalidation==="N/A"?"N/A":"$"+s.invalidation}</div><div class="metric"><b>Trigger Confirmed:</b> ${s.triggerConfirmed?"YES":"NO"}</div><div class="metric"><b>Structure Valid:</b> ${s.structureValid?"YES":"NO"}</div><div class="metric"><b>Reason:</b> ${s.reason}</div></div>`; })()}
+  ${renderBuyFunnelDiagnostics(a)}
   <div class="scan-support">
     ${renderExpirationPolicyCard(a)}
     ${renderPredatorConvictionCard(a)}
