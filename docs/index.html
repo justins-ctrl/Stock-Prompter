@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.13 BUY Signal Integrity</title>
+  <title>Signal Predator AI v47.7.13.1 BUY Signal Integrity</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,12 +274,12 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.13 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
+  <div class="subtitle">v47.7.13.1 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
     <div class="metric">HUNT ENGINE <span class="blue">ONLINE</span></div>
-    <div class="metric muted">Stable rebuild active â¢ iPhone mode optimized â¢ Existing positions now separate HOLD logic from NEW ENTRY rejection â¢ confidence labels clarified â¢ entry readiness explains why the bot waits</div>
+    <div class="metric muted">Stable rebuild active - iPhone mode optimized - Existing positions now separate HOLD logic from NEW ENTRY rejection - confidence labels clarified - entry readiness explains why the bot waits</div>
     <div id="topAlertArea"></div>
   </div>
 
@@ -466,16 +466,16 @@ body.advanced-on .scan-support{display:block}
     <div class="section-title">v46.1 Strategy Split</div>
     <div class="metric"><span class="green"><b>Buying calls/puts:</b></span> Monthly only, 30-90 DTE. Preferred 45-75 DTE.</div>
     <div class="metric"><span class="green"><b>Selling puts/calls:</b></span> Weekly or biweekly only.</div>
-    <div class="metric"><b>User-facing decision:</b> BUY, WAIT, or PASS â with a plain-English reason and exact next step.</div>
+    <div class="metric"><b>User-facing decision:</b> BUY, WAIT, or PASS - with a plain-English reason and exact next step.</div>
     <div class="metric muted">The advanced scoring remains available below the final answer for transparency.</div>
   </div>
 
   <div class="card">
     <div class="section-title">v46 Conviction Rules</div>
-    <div class="metric"><span class="green">95â100:</span> Elite Buy only after trigger confirmation.</div>
-    <div class="metric"><span class="green">88â94:</span> Good Buy at half size after confirmation.</div>
-    <div class="metric"><span class="yellow">82â87:</span> Speculative or Wait, depending on trigger status.</div>
-    <div class="metric"><span class="yellow">72â81:</span> Watchlist only.</div>
+    <div class="metric"><span class="green">95-100:</span> Elite Buy only after trigger confirmation.</div>
+    <div class="metric"><span class="green">88-94:</span> Good Buy at half size after confirmation.</div>
+    <div class="metric"><span class="yellow">82-87:</span> Speculative or Wait, depending on trigger status.</div>
+    <div class="metric"><span class="yellow">72-81:</span> Watchlist only.</div>
     <div class="metric"><span class="red">Below 72 or rejected:</span> Pass.</div>
     <div class="metric muted">The engine sizes trades according to the saved account profile and never treats conviction as a guaranteed probability of profit.</div>
   </div>
@@ -489,7 +489,7 @@ body.advanced-on .scan-support{display:block}
       <button onclick="safeAction('Small Account Wheel Scan', scanWheelDesk)">Scan Wheel Desk</button>
     </div>
     <button class="secondary" onclick="safeAction('Best Strategy Scan', scanBestStrategyDesk)">Find Best Strategy</button>
-    <div class="scan-note">Quick desk scans use daily candles onlyânormally one request per ticker. Run the full live analysis only on the top one or two results.</div>
+    <div class="scan-note">Quick desk scans use daily candles only-normally one request per ticker. Run the full live analysis only on the top one or two results.</div>
     <div id="opportunityBoard" style="margin-top:12px;"></div>
   </div>
 
@@ -562,7 +562,7 @@ function hasAlphaVantageKey(){
 function maskApiKey(key){
   const k = String(key || "");
   if(k.length < 8) return "NOT SAVED";
-  return `${k.slice(0,4)}â¢â¢â¢â¢${k.slice(-3)}`;
+  return `${k.slice(0,4)}----${k.slice(-3)}`;
 }
 
 function saveAlphaVantageKey(){
@@ -641,7 +641,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.7.13",
+    version: "v47.7.13.1",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -934,7 +934,7 @@ function saveUnifiedAccountRiskSettings(){
   const box = document.getElementById("accountIntelligenceSummary");
   if(box){
     box.insertAdjacentHTML("afterbegin",
-      `<div class="alert-banner alert-green">ACCOUNT UPDATED â Predator is now sizing from $${Math.round(accountProfile.portfolioValue).toLocaleString()}.</div>`
+      `<div class="alert-banner alert-green">ACCOUNT UPDATED - Predator is now sizing from $${Math.round(accountProfile.portfolioValue).toLocaleString()}.</div>`
     );
   }
 }
@@ -1090,12 +1090,12 @@ function renderOpportunityBoard(rows, title, desk){
           ? `${prev.verdict} ${prev.focusScore} â ${r.verdict} ${r.focusScore}`
           : "First ranked scan";
         return `<div class="opportunity-row">
-          <div class="metric"><span class="rank-badge">${i+1}</span><b>${r.ticker}</b> â <span class="${signalClass(r.verdict)}">${r.verdict}</span></div>
+          <div class="metric"><span class="rank-badge">${i+1}</span><b>${r.ticker}</b> - <span class="${signalClass(r.verdict)}">${r.verdict}</span></div>
           <div class="metric"><b>Best Strategy:</b> ${r.strategy}</div>
           <div class="metric"><b>Focus Score:</b> ${r.focusScore}/100</div>
           <div class="metric"><b>Account Fit:</b> <span class="${signalClass(r.accountFit.fit)}">${r.accountFit.fit}</span></div>
           <div class="metric"><b>Estimated Capital:</b> $${Math.round(r.accountFit.capitalRequired).toLocaleString()} (${r.accountFit.usagePct}% of account)</div>
-          <div class="metric"><b>Setup:</b> ${r.a.grade} / ${r.a.score} â Alignment ${r.a.alignmentScore?.score || 0}</div>
+          <div class="metric"><b>Setup:</b> ${r.a.grade} / ${r.a.score} - Alignment ${r.a.alignmentScore?.score || 0}</div>
           <div class="metric"><b>Evolution:</b> ${evolution}</div>
           <button class="small-btn" onclick="loadDeskTicker('${r.ticker}')">Load ${r.ticker}</button>
         </div>`;
@@ -1310,7 +1310,7 @@ function renderAlertHistory(){
   const latest = alertLog[0];
   const cls = latest.level === "red" ? "alert-red" : latest.level === "green" ? "alert-green" : "alert-yellow";
   top.innerHTML = `<div class="alert-banner ${cls}">${latest.message}</div>`;
-  container.innerHTML = alertLog.map(item=>`<div class="watch-item"><span>${item.time} â¢ ${item.message}</span></div>`).join("");
+  container.innerHTML = alertLog.map(item=>`<div class="watch-item"><span>${item.time} - ${item.message}</span></div>`).join("");
 }
 function pushAlert(message, level){
   const now = new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
@@ -1327,7 +1327,7 @@ function pushAlert(message, level){
   }catch(e){}
 }
 function clearAlerts(){ alertLog = []; setStore("ai_options_alert_log", alertLog); renderAlertHistory(); clearActiveAlertsPanel(); }
-function testAlert(){ pushAlert("TACTICAL TEST ALERT â SYSTEMS ARE LIVE.", "yellow"); }
+function testAlert(){ pushAlert("TACTICAL TEST ALERT - SYSTEMS ARE LIVE.", "yellow"); }
 
 function renderWatchlist(){
   const c = document.getElementById("watchlistContainer");
@@ -1458,7 +1458,7 @@ function renderClosedTradeJournal(){
   }
   el.innerHTML = closedTradeJournal.slice(0,20).map(t=>`
     <div class="watch-item">
-      <span>${t.ticker} ${t.strike} ${t.type} â¢ ${t.result} â¢ Exp ${t.expiration || "N/A"}</span>
+      <span>${t.ticker} ${t.strike} ${t.type} - ${t.result} - Exp ${t.expiration || "N/A"}</span>
     </div>
   `).join("");
 }
@@ -1473,7 +1473,7 @@ function renderPositions(){
   c.innerHTML = savedPositions.map((p,index)=>`
     <div class="card" style="padding:12px;margin-top:10px;">
       <div class="metric"><b>${p.ticker}</b> ${p.strike} ${p.type}</div>
-      <div class="metric">BE ${p.breakeven}${p.expiration ? " â¢ Exp " + p.expiration : ""}</div>
+      <div class="metric">BE ${p.breakeven}${p.expiration ? " - Exp " + p.expiration : ""}</div>
       <div class="metric muted">Saved: ${p.entryDate ? new Date(p.entryDate).toLocaleDateString() : "N/A"}</div>
       <div class="metric"><b>Entry Thesis:</b> ${p.entryThesisLinked ? "<span class='green'>LINKED TO PREDATOR BUY</span>" : "<span class='yellow'>NOT LINKED</span>"}</div>
       ${!p.entryThesisLinked && findRecentApprovedBuyAnalysis(p.ticker,72) ? `<button class="small-btn" style="margin-top:8px;" onclick="relinkPositionToRecentBuyThesis('${p.ticker}')">Link Recent Predator BUY Thesis</button>` : ""}
@@ -1588,7 +1588,7 @@ function renderPerformanceTracker(){
     <div class="metric"><b>Average Time-to-Target at Entry:</b> ${Number.isFinite(avgTTT) ? Math.round(avgTTT) + "%" : "N/A"}</div>
     <div class="metric"><b>Average DTE at Entry:</b> ${Number.isFinite(avgDTE) ? avgDTE.toFixed(1) : "N/A"}</div>
   `;
-  log.innerHTML = performanceTrades.slice(0,10).map(t=>`<div class="watch-item"><span>${t.ticker} â¢ ${t.outcome} â¢ ${t.entrySignal}${typeof t.ttt==="number" ? " â¢ TTT " + t.ttt + "%" : ""}${typeof t.dte==="number" ? " â¢ DTE " + t.dte : ""}</span></div>`).join("");
+  log.innerHTML = performanceTrades.slice(0,10).map(t=>`<div class="watch-item"><span>${t.ticker} - ${t.outcome} - ${t.entrySignal}${typeof t.ttt==="number" ? " - TTT " + t.ttt + "%" : ""}${typeof t.dte==="number" ? " - DTE " + t.dte : ""}</span></div>`).join("");
 }
 
 function getLossStreak(){
@@ -1662,7 +1662,7 @@ function renderRiskControlSummary(){
     <div class="metric"><b>Estimated Open Risk:</b> $${Math.round(estRiskDollars).toLocaleString()} (${actualRiskPct}% of portfolio)</div>
     <div class="bar"><div class="fill" style="width:${Math.min(100, actualRiskPct)}%"></div></div>
     <div class="metric"><b>Loss Streak:</b> ${lossStreak}</div>
-    <div class="metric"><b>Risk Warnings:</b> ${warnings.length ? warnings.join(" â¢ ") : "NONE"}</div>`;
+    <div class="metric"><b>Risk Warnings:</b> ${warnings.length ? warnings.join(" - ") : "NONE"}</div>`;
 }
 function getRiskControlAdvice(){
   normalizeAccountProfile();
@@ -2210,7 +2210,7 @@ function getExpirationRecommendationConfidence(a){
   oneMonth = clamp(oneMonth);
   threeMonth = clamp(threeMonth);
 
-  // Internal monthly buckets: 30â60 DTE versus 60-90 DTE.
+  // Internal monthly buckets: 30-60 DTE versus 60-90 DTE.
   const monthlyOptions = [
     {label:"45-60 DTE Monthly", confidence:oneMonth},
     {label:"60-90 DTE Monthly", confidence:threeMonth}
@@ -2586,7 +2586,7 @@ function getSupportResistance(closes){
   const clean = (Array.isArray(closes) ? closes : []).map(Number).filter(Number.isFinite);
   const currentClose = clean[0];
 
-  // v47.7.13: prior structure deliberately EXCLUDES the current daily close.
+  // v47.7.13.1: prior structure deliberately EXCLUDES the current daily close.
   // This prevents a fresh 10-day high/low from defining itself as 0.0% room.
   const prior10 = clean.slice(1,11);
   const prior20 = clean.slice(1,21);
@@ -2604,7 +2604,7 @@ function getSupportResistance(closes){
     deeperSupport,
     higherResistance,
     currentClose:Number.isFinite(currentClose) ? currentClose : null,
-    basis:"PRIOR STRUCTURE â CURRENT CLOSE EXCLUDED"
+    basis:"PRIOR STRUCTURE - CURRENT CLOSE EXCLUDED"
   };
 }
 
@@ -3293,7 +3293,7 @@ function renderUniversalWheelAnalysis(a){
       <div class="metric"><b>Suggested Put Strike Zone:</b> ${w.suggestedStrike > 0 ? "$"+w.suggestedStrike : "N/A"}</div>
       <div class="metric"><b>Expiration:</b> ${w.expiration}</div>
       <div class="metric"><b>Cash Collateral:</b> $${w.collateral.toLocaleString()}</div>
-      <div class="metric"><b>Wheel Budget Used:</b> ${w.usagePct}% of portfolio â¢ Budget cap $${w.budget.toLocaleString()}</div>
+      <div class="metric"><b>Wheel Budget Used:</b> ${w.usagePct}% of portfolio - Budget cap $${w.budget.toLocaleString()}</div>
       <div class="metric"><b>Account Fit:</b> <span class="${signalClass(w.accountFit)}">${escapeHtml(w.accountFit)}</span></div>
       <div class="metric"><b>Downside Cushion to Suggested Strike:</b> ${w.cushionPct}%</div>
       <div class="metric"><b>Assignment Read:</b> ${escapeHtml(w.assignmentRead)}</div>
@@ -3524,8 +3524,8 @@ function getEntryReadinessEngine(a){
   let entryStatus = "WAIT FOR CONFIRMATION", bannerColor = "yellow";
   if(bot.status === "BOT REJECTED" || quality === "REJECT"){ entryStatus = "DO NOT ENTER YET"; bannerColor = "red"; }
   else if(bot.status === "BOT APPROVED" && currentReadiness >= 85 && priceConfirm >= 80 && openingConfirm >= 70){ entryStatus = "ENTRY READY"; bannerColor = "green"; }
-  else if(bot.status === "BOT APPROVED" && currentReadiness >= 70){ entryStatus = "APPROVED SETUP â WAITING ON TRIGGER"; }
-  else if(bot.status === "BOT WAIT" && thesisScore >= 80){ entryStatus = "GOOD SETUP â NOT READY YET"; }
+  else if(bot.status === "BOT APPROVED" && currentReadiness >= 70){ entryStatus = "APPROVED SETUP - WAITING ON TRIGGER"; }
+  else if(bot.status === "BOT WAIT" && thesisScore >= 80){ entryStatus = "GOOD SETUP - NOT READY YET"; }
 
   let missingPiece = "Needs cleaner confirmation.";
   if(priceConfirm < 80 && Number.isFinite(triggerNum)){
@@ -3761,8 +3761,8 @@ function getHumanDecisionEngine(a){
   const invalidation = readiness.invalidation || a.nextDay?.invalidation || "N/A";
   const holdMinutes = readiness.holdMinutes || a.confirmationHold?.holdMinutes || 30;
 
-  const step1 = bot.status === "BOT REJECTED" ? "NO" : readiness.conviction.includes("ELITE") || readiness.conviction.includes("HIGH") ? "YES â HIGH QUALITY" : "MAYBE â WATCHLIST ONLY";
-  const step2 = patienceStatus === "ENTER NOW" ? "YES â ENTRY READY" : "NOT YET";
+  const step1 = bot.status === "BOT REJECTED" ? "NO" : readiness.conviction.includes("ELITE") || readiness.conviction.includes("HIGH") ? "YES - HIGH QUALITY" : "MAYBE - WATCHLIST ONLY";
+  const step2 = patienceStatus === "ENTER NOW" ? "YES - ENTRY READY" : "NOT YET";
   const step3 = isCall ? `Wait for price to hold above $${trigger} for ${holdMinutes} minutes.` : isPut ? `Wait for price to hold below $${trigger} for ${holdMinutes} minutes.` : "Wait for a clean directional trigger.";
   const step4 = patienceStatus === "ENTER NOW" ? `${direction} is allowed now under the bot rules.` : `If confirmation happens, the favored action becomes ${direction}.`;
   const step5 = `If price invalidates near $${invalidation}, do nothing and protect capital.`;
@@ -3818,11 +3818,11 @@ function renderWhyWaitingCard(a){
 function renderDecisionTimelineCard(a){
   const h = getHumanDecisionEngine(a);
   return `<div class="card"><div class="section-title">Predator Decision Timeline</div><div class="timeline">
-    <div class="timeline-step"><b>Step 1 â Opportunity:</b> ${h.step1}</div>
-    <div class="timeline-step"><b>Step 2 â Entry Now:</b> ${h.step2}</div>
-    <div class="timeline-step"><b>Step 3 â Trigger:</b> ${h.step3}</div>
-    <div class="timeline-step"><b>Step 4 â If Confirmed:</b> ${h.step4}</div>
-    <div class="timeline-step"><b>Step 5 â If Not Confirmed:</b> ${h.step5}</div>
+    <div class="timeline-step"><b>Step 1 - Opportunity:</b> ${h.step1}</div>
+    <div class="timeline-step"><b>Step 2 - Entry Now:</b> ${h.step2}</div>
+    <div class="timeline-step"><b>Step 3 - Trigger:</b> ${h.step3}</div>
+    <div class="timeline-step"><b>Step 4 - If Confirmed:</b> ${h.step4}</div>
+    <div class="timeline-step"><b>Step 5 - If Not Confirmed:</b> ${h.step5}</div>
   </div></div>`;
 }
 
@@ -3873,8 +3873,8 @@ function getStrategyExpirationPolicy(a){
   const weeklyCall = safeNum(a.wheelExpiration?.rows?.find(x=>x.label==="Weekly")?.sellCallScore, wheel.sellCallScore);
   const biCall = safeNum(a.wheelExpiration?.rows?.find(x=>x.label==="Bi-Weekly")?.sellCallScore, wheel.sellCallScore);
 
-  const putDuration = biPut >= weeklyPut ? "BI-WEEKLY (ABOUT 8-14 DTE)" : "WEEKLY (ABOUT 5â7 DTE)";
-  const callDuration = biCall >= weeklyCall ? "BI-WEEKLY (ABOUT 8-14 DTE)" : "WEEKLY (ABOUT 5â7 DTE)";
+  const putDuration = biPut >= weeklyPut ? "BI-WEEKLY (ABOUT 8-14 DTE)" : "WEEKLY (ABOUT 5-7 DTE)";
+  const callDuration = biCall >= weeklyCall ? "BI-WEEKLY (ABOUT 8-14 DTE)" : "WEEKLY (ABOUT 5-7 DTE)";
 
   return {
     buyDirection,
@@ -3927,7 +3927,7 @@ function getEntryIntegrityEngine(a){
     }else{
       nextStructure = resistance;
       roomPct = Math.max(0, ((resistance - price) / price) * 100);
-      structureState = roomPct <= 0.35 ? "AT PRIOR RESISTANCE â BREAK REQUIRED" : "ROOM TO PRIOR RESISTANCE";
+      structureState = roomPct <= 0.35 ? "AT PRIOR RESISTANCE - BREAK REQUIRED" : "ROOM TO PRIOR RESISTANCE";
     }
   }
 
@@ -3946,7 +3946,7 @@ function getEntryIntegrityEngine(a){
     }else{
       nextStructure = support;
       roomPct = Math.max(0, ((price - support) / price) * 100);
-      structureState = roomPct <= 0.35 ? "AT PRIOR SUPPORT â BREAK REQUIRED" : "ROOM TO PRIOR SUPPORT";
+      structureState = roomPct <= 0.35 ? "AT PRIOR SUPPORT - BREAK REQUIRED" : "ROOM TO PRIOR SUPPORT";
     }
   }
 
@@ -3957,8 +3957,8 @@ function getEntryIntegrityEngine(a){
     structureState === "20D SUPPORT CLEARED";
 
   const atStructure =
-    structureState === "AT PRIOR RESISTANCE â BREAK REQUIRED" ||
-    structureState === "AT PRIOR SUPPORT â BREAK REQUIRED";
+    structureState === "AT PRIOR RESISTANCE - BREAK REQUIRED" ||
+    structureState === "AT PRIOR SUPPORT - BREAK REQUIRED";
 
   // Extension is still a risk control, but a confirmed structural break is no longer
   // automatically rejected just because it sits at a recent extreme.
@@ -4060,15 +4060,17 @@ function getSwingValidationEngine(a){
   const strongMonthlyThesis = validDirection && !hardBlock && alignment >= 75 && timing >= 65 && conviction >= 75;
   const eliteMonthlyThesis = validDirection && !hardBlock && alignment >= 85 && timing >= 75 && conviction >= 85;
 
-  let validation = "PASS";
+  let validation = "NO TRADE";
   let entryMode = "NO ENTRY";
   let reason = "Monthly setup is not strong enough.";
   let blocker = "SETUP QUALITY";
 
   if(hardBlock){
+    validation = "NO TRADE";
     blocker = !structureValid ? "STRUCTURE INVALIDATION" : noTrade !== "CLEAR" ? "NO-TRADE ZONE" : quality === "REJECT" ? "QUALITY REJECT" : alignment < 60 ? "ALIGNMENT" : "SETUP QUALITY";
     reason = "The monthly thesis is not structurally valid enough to enter.";
   }else if(!strongMonthlyThesis){
+    validation = "NO TRADE";
     blocker = "THESIS QUALITY";
     reason = "The directional thesis has not reached the minimum monthly BUY standard.";
   }else if(entryIntegrity.status === "WAIT"){
@@ -4078,9 +4080,9 @@ function getSwingValidationEngine(a){
     reason = entryIntegrity.reason;
   }else if(!triggerConfirmed){
     validation = "WAIT";
-    entryMode = eliteMonthlyThesis ? "ELITE SETUP â TRIGGER REQUIRED" : "GOOD SETUP â TRIGGER REQUIRED";
+    entryMode = eliteMonthlyThesis ? "ELITE SETUP - TRIGGER REQUIRED" : "GOOD SETUP - TRIGGER REQUIRED";
     blocker = "PRICE CONFIRMATION";
-    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13 no longer waives the entry trigger. Wait for price confirmation.`;
+    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13.1 no longer waives the entry trigger. Wait for price confirmation.`;
   }else if(quality !== "APPROVED"){
     validation = "WAIT";
     entryMode = "QUALITY CONFIRMATION REQUIRED";
@@ -4088,7 +4090,7 @@ function getSwingValidationEngine(a){
     reason = "The trigger is present, but the quality engine is not fully APPROVED. Reduced-size quality can no longer become a fresh BUY.";
   }else{
     validation = "BUY";
-    entryMode = entryIntegrity.status === "CAUTION" ? "CONFIRMED ENTRY â LOCATION CAUTION" : "CONFIRMED SWING ENTRY";
+    entryMode = entryIntegrity.status === "CAUTION" ? "CONFIRMED ENTRY - LOCATION CAUTION" : "CONFIRMED SWING ENTRY";
     blocker = "NONE";
     reason = entryIntegrity.status === "CAUTION"
       ? `Monthly thesis and trigger are confirmed, but entry location remains less than ideal. ${entryIntegrity.reason}`
@@ -5346,7 +5348,7 @@ function updateContractDtePreview(){
   }
 
   if(dte < 0){
-    preview.innerHTML = `<b>Expiration:</b> ${escapeHtml(formatContractExpiration(expiration))} â¢ <span class="red">PAST DATE</span>`;
+    preview.innerHTML = `<b>Expiration:</b> ${escapeHtml(formatContractExpiration(expiration))} - <span class="red">PAST DATE</span>`;
     preview.className = "metric";
     return;
   }
@@ -5358,8 +5360,8 @@ function updateContractDtePreview(){
     "SHORT-DATED";
 
   preview.innerHTML =
-    `<b>Expiration:</b> ${escapeHtml(formatContractExpiration(expiration))} â¢ ` +
-    `<b>${dte} DTE</b> â¢ ${escapeHtml(fit)}`;
+    `<b>Expiration:</b> ${escapeHtml(formatContractExpiration(expiration))} - ` +
+    `<b>${dte} DTE</b> - ${escapeHtml(fit)}`;
   preview.className = dte >= 45 && dte <= 75 ? "metric green" : "metric yellow";
 }
 
@@ -5478,7 +5480,7 @@ function gradeCurrentContract(){
         <div class="metric"><b>Ticker:</b> ${escapeHtml(lastTicker)}</div>
         <div class="metric"><b>Expiration:</b> ${escapeHtml(formatContractExpiration(contract.expiration))}</div>
         <div class="metric"><b>Calculated DTE:</b> ${contract.dte}</div>
-        <div class="metric green"><b>Analysis Source:</b> Cached completed Predator analysis â no new API request.</div>
+        <div class="metric green"><b>Analysis Source:</b> Cached completed Predator analysis - no new API request.</div>
       </div>
       ${renderContractGrader(a, contract)}
     `;
@@ -5790,41 +5792,49 @@ function getEntryClassificationLabel(a){
 function getBuyFunnelDiagnostics(a){
   a = ensureEngineDefaults(a);
   const swing = getSwingValidationEngine(a);
+  const simple = getSimplePredatorDecision(a);
   const conviction = safeNum(getPredatorConvictionEngine(a)?.conviction,0);
   const alignment = safeNum(a.alignmentScore?.score,0);
   const timing = safeNum(a.timeTarget?.probability,0);
   const quality = a.qualityDecision?.decision || "N/A";
   const noTrade = a.noTradeZone?.zone || "CLEAR";
   const market = a.marketRegimeFilter?.state || "N/A";
-  const validDirection = swing && (a.direction === "BUY CALL" || a.direction === "BUY PUT");
+  const validDirection = a.direction === "BUY CALL" || a.direction === "BUY PUT";
   const thesisPass = swing.monthlyThesis === "STRONG" || swing.monthlyThesis === "ELITE";
   const integrityPass = swing.entryIntegrity?.status !== "WAIT";
+  const triggerApplicable = validDirection && thesisPass && swing.trigger !== "N/A";
+  const finalBuyApproved = simple.decision === "BUY" && swing.validation === "BUY" && swing.triggerConfirmed;
 
   const gates = [
-    {name:"Directional Setup", pass:validDirection, detail:a.direction || "WAIT"},
-    {name:"Alignment", pass:alignment >= 60, detail:`${Math.round(alignment)}/100`},
-    {name:"No-Trade Zone", pass:noTrade === "CLEAR", detail:noTrade},
-    {name:"Market Regime", pass:market !== "DANGEROUS", detail:market},
-    {name:"Quality", pass:quality === "APPROVED", detail:quality},
-    {name:"Monthly Thesis", pass:thesisPass, detail:`${swing.monthlyThesis} â¢ timing ${Math.round(timing)} â¢ conviction ${Math.round(conviction)}`},
-    {name:"Structure", pass:swing.structureValid, detail:swing.entryIntegrity?.structureState || "N/A"},
-    {name:"Entry Location", pass:integrityPass, detail:swing.entryIntegrity?.status || "N/A"},
-    {name:"Price Trigger", pass:swing.triggerConfirmed, detail:swing.triggerConfirmed ? "CONFIRMED" : `WAITING FOR $${swing.trigger}`},
-    {name:"Final BUY Authority", pass:swing.validation === "BUY", detail:swing.validation}
+    {name:"Directional Setup", state:validDirection ? "PASS" : "BLOCK", detail:a.direction || "WAIT"},
+    {name:"Alignment", state:alignment >= 60 ? "PASS" : "BLOCK", detail:`${Math.round(alignment)}/100`},
+    {name:"No-Trade Zone", state:noTrade === "CLEAR" ? "PASS" : "BLOCK", detail:noTrade},
+    {name:"Market Regime", state:market !== "DANGEROUS" ? "PASS" : "BLOCK", detail:market},
+    {name:"Quality", state:quality === "APPROVED" ? "PASS" : "BLOCK", detail:quality},
+    {name:"Monthly Thesis", state:thesisPass ? "PASS" : "BLOCK", detail:`${swing.monthlyThesis} - timing ${Math.round(timing)} - conviction ${Math.round(conviction)}`},
+    {name:"Structure", state:swing.structureValid ? "PASS" : "BLOCK", detail:swing.entryIntegrity?.structureState || "N/A"},
+    {name:"Entry Location", state:integrityPass ? "PASS" : "BLOCK", detail:swing.entryIntegrity?.status || "N/A"},
+    {name:"Price Trigger", state:triggerApplicable ? (swing.triggerConfirmed ? "PASS" : "BLOCK") : "N/A",
+      detail:triggerApplicable ? (swing.triggerConfirmed ? "CONFIRMED" : `WAITING FOR $${swing.trigger}`) : "NOT APPLICABLE"},
+    {name:"Final BUY Authority", state:finalBuyApproved ? "PASS" : "BLOCK",
+      detail:finalBuyApproved ? "BUY APPROVED" : simple.decision === "WAIT" ? "WAIT - NOT APPROVED YET" : "NO TRADE - BLOCKED"}
   ];
-
-  const remaining = gates.filter(g=>!g.pass && g.name !== "Final BUY Authority").length;
-  return {gates,remaining,swing};
+  const remaining = gates.filter(g=>g.state === "BLOCK" && g.name !== "Final BUY Authority").length;
+  return {gates,remaining,swing,finalBuyApproved};
 }
 
 function renderBuyFunnelDiagnostics(a){
   const d = getBuyFunnelDiagnostics(a);
   return `<div class="card"><div class="section-title">BUY Funnel Diagnostics</div>
     <div class="metric"><b>Gates Remaining:</b> ${d.remaining}</div>
-    ${d.gates.map(g=>`<div class="metric"><span class="${g.pass ? "green" : "yellow"}"><b>${g.pass ? "PASS" : "BLOCK"}:</b></span> ${g.name} â ${g.detail}</div>`).join("")}
-    <div class="metric muted">A fresh BUY is reachable only when every required gate is satisfied. Strong thesis alone does not grant entry permission.</div>
+    ${d.gates.map(g=>{
+      const cls = g.state === "PASS" ? "green" : g.state === "BLOCK" ? "yellow" : "muted";
+      return `<div class="metric"><span class="${cls}"><b>${g.state}:</b></span> ${g.name} - ${g.detail}</div>`;
+    }).join("")}
+    <div class="metric muted">Final BUY Authority can show PASS only when the actual fresh-entry decision is BUY and every required confirmation is satisfied.</div>
   </div>`;
 }
+
 
 function renderSimplePredatorDecision(a){
   const d = getSimplePredatorDecision(a);
@@ -5928,7 +5938,7 @@ function renderExpirationPolicyCard(a){
   return `
   <div class="card expiration-policy">
     <div class="section-title">v46.1 Expiration Rules</div>
-    <div class="simple-rule"><span class="green"><b>BUY CALL / BUY PUT:</b></span> Monthly expirations only â normally ${p.buyWindow}.</div>
+    <div class="simple-rule"><span class="green"><b>BUY CALL / BUY PUT:</b></span> Monthly expirations only - normally ${p.buyWindow}.</div>
     <div class="simple-rule"><span class="green"><b>SELL CASH-SECURED PUT:</b></span> ${p.sellPutWindow}.</div>
     <div class="simple-rule"><span class="green"><b>SELL COVERED CALL:</b></span> ${p.sellCallWindow}.</div>
     <div class="simple-rule"><b>Why:</b> ${p.buyWindowReason}</div>
@@ -5955,7 +5965,7 @@ function getPredatorConvictionEngine(a){
   const triggerConfidence = clampScore(session?.triggerConfidence || 50);
   const accountFit = clampScore(fit.score || 50);
 
-  // v47.7.13: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
+  // v47.7.13.1: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
   const directionalEvidence = clampScore((setup + alignment) / 2);
   let conviction = clampScore(
     directionalEvidence * .32 +
@@ -5993,7 +6003,7 @@ function getPredatorConvictionEngine(a){
     sizeLabel = "FULL ALLOWED SIZE";
     riskPct = 3;
     capitalPct = Math.min(accountProfile?.maxOptionAllocationPct || 15, 15);
-    aggression = "HIGH â WITH DISCIPLINE";
+    aggression = "HIGH - WITH DISCIPLINE";
     coach = "If I were following these rules with my own money, this is the type of confirmed setup I would consider taking at the full allowed size.";
   }else if(conviction >= 88 && triggerReady){
     tier = "GOOD BUY";
@@ -6012,7 +6022,7 @@ function getPredatorConvictionEngine(a){
     aggression = "LOW";
     coach = "The trade has an edge, but the evidence is not strong enough for normal size. Only take it if you accept the added uncertainty.";
   }else if(conviction >= 82 && !triggerReady){
-    tier = "WAIT â GOOD SETUP";
+    tier = "WAIT - GOOD SETUP";
     color = "yellow";
     sizeLabel = "NO ENTRY YET";
     riskPct = 0;
@@ -6315,7 +6325,7 @@ function renderPredatorPositionCoachCard(r){
     <div class="section-title">Predator Position Coach</div>
     <div class="brain-verdict ${c.color}">${c.decision}</div>
     <div class="metric"><b>Position Confidence:</b> ${c.confidence}/100</div>
-    <div class="metric"><b>Thesis:</b> ${c.thesisScore}/100 â ${c.thesisLabel}</div>
+    <div class="metric"><b>Thesis:</b> ${c.thesisScore}/100 - ${c.thesisLabel}</div>
     <div class="divider"></div>
     <div class="coach-text">${c.coach}</div>
     <div class="divider"></div>
@@ -6958,7 +6968,7 @@ function renderPositionCards(results){
             ? "VERIFIED ENTRY BASELINE"
             : "LEGACY / RECONSTRUCTED"
       }</span></div>
-      ` : `<div class="metric"><b>Thesis Score:</b> ${r.positionIntelligence.thesisScore}/100 â ${escapeHtml(r.positionIntelligence.thesisLabel)}</div>`}
+      ` : `<div class="metric"><b>Thesis Score:</b> ${r.positionIntelligence.thesisScore}/100 - ${escapeHtml(r.positionIntelligence.thesisLabel)}</div>`}
       <div class="metric"><b>Position Rule:</b> ${escapeHtml(r.positionIntelligence.positionRule)}</div>
       <div class="metric"><b>Noise Read:</b> ${escapeHtml(r.positionIntelligence.normalNoiseRead)}</div>
       ` : ""}
@@ -7017,11 +7027,11 @@ function renderPositionCards(results){
       ${r.targetConfidence ? `
       <div class="divider"></div>
       <div class="section-title">Target Confidence Engine</div>
-      <div class="metric"><b>Conservative Target:</b> ${r.targetConfidence.conservativeTarget === "N/A" ? "N/A" : "$" + r.targetConfidence.conservativeTarget} (+${r.targetConfidence.conservativeGain}%) â ${r.targetConfidence.conservativeConfidence}/100</div>
-      <div class="metric"><b>Ideal Target:</b> ${r.targetConfidence.idealTarget === "N/A" ? "N/A" : "$" + r.targetConfidence.idealTarget} (+${r.targetConfidence.idealGain}%) â ${r.targetConfidence.idealConfidence}/100</div>
-      <div class="metric"><b>Stretch Target:</b> ${r.targetConfidence.stretchTarget === "N/A" ? "N/A" : "$" + r.targetConfidence.stretchTarget} (+${r.targetConfidence.stretchGain}%) â ${r.targetConfidence.stretchConfidence}/100</div>
+      <div class="metric"><b>Conservative Target:</b> ${r.targetConfidence.conservativeTarget === "N/A" ? "N/A" : "$" + r.targetConfidence.conservativeTarget} (+${r.targetConfidence.conservativeGain}%) - ${r.targetConfidence.conservativeConfidence}/100</div>
+      <div class="metric"><b>Ideal Target:</b> ${r.targetConfidence.idealTarget === "N/A" ? "N/A" : "$" + r.targetConfidence.idealTarget} (+${r.targetConfidence.idealGain}%) - ${r.targetConfidence.idealConfidence}/100</div>
+      <div class="metric"><b>Stretch Target:</b> ${r.targetConfidence.stretchTarget === "N/A" ? "N/A" : "$" + r.targetConfidence.stretchTarget} (+${r.targetConfidence.stretchGain}%) - ${r.targetConfidence.stretchConfidence}/100</div>
       <div class="metric"><b>Recommended Exit:</b> <span class="${signalClass(r.targetConfidence.recommendedTarget)}">${r.targetConfidence.recommendedTarget}</span></div>
-      <div class="metric"><b>Hold Score:</b> ${r.targetConfidence.holdScore}/100 â <span class="${signalClass(r.targetConfidence.holdLabel)}">${r.targetConfidence.holdLabel}</span></div>
+      <div class="metric"><b>Hold Score:</b> ${r.targetConfidence.holdScore}/100 - <span class="${signalClass(r.targetConfidence.holdLabel)}">${r.targetConfidence.holdLabel}</span></div>
       <div class="metric"><b>Profit Protection:</b> ${r.targetConfidence.protectionStatus}</div>
       <div class="metric"><b>Giveback Risk:</b> ${r.targetConfidence.givebackRisk}</div>
       <div class="metric"><b>Why:</b> ${r.targetConfidence.recommendationReason}</div>
@@ -7200,7 +7210,7 @@ function renderFull(ticker, a){
     <div class="metric"><b>Trigger Checklist:</b> ${a.confirmationHold.checklist}</div>
     <div class="divider"></div>
     <div class="section-title">Long-Term Options / LEAP Engine</div>
-    <div class="metric"><b>Best Duration:</b> <span class="${signalClass(a.longTermOptions.expirationFit)}">${a.longTermOptions.bestLabel}</span> â ${a.longTermOptions.bestScore}/100</div>
+    <div class="metric"><b>Best Duration:</b> <span class="${signalClass(a.longTermOptions.expirationFit)}">${a.longTermOptions.bestLabel}</span> - ${a.longTermOptions.bestScore}/100</div>
     <div class="metric"><b>Recommended Direction:</b> <span class="${signalClass(a.longTermOptions.favoredDirection)}">${a.longTermOptions.favoredDirection}</span></div>
     <div class="metric"><b>Expiration Fit:</b> ${a.longTermOptions.expirationFit}</div>
     <div class="metric"><b>Long-Term Trend:</b> ${a.longTermOptions.longTermTrend}</div>
@@ -7211,11 +7221,11 @@ function renderFull(ticker, a){
     <div class="metric"><b>3-6 Month Score:</b> ${a.longTermOptions.threeToSixMonthScore}/100</div>
     <div class="metric"><b>6-12 Month Score:</b> ${a.longTermOptions.sixToTwelveMonthScore}/100</div>
     <div class="metric"><b>12+ Month LEAP Score:</b> ${a.longTermOptions.twelvePlusLeapScore}/100</div>
-    <div class="metric"><b>Long Bull / Bear:</b> ${a.longTermOptions.longBull}/100 bullish â¢ ${a.longTermOptions.longBear}/100 bearish</div>
+    <div class="metric"><b>Long Bull / Bear:</b> ${a.longTermOptions.longBull}/100 bullish - ${a.longTermOptions.longBear}/100 bearish</div>
     <div class="metric"><b>Reason:</b> ${a.longTermOptions.reason}</div>
     <div class="divider"></div>
     <div class="section-title">Expiration Recommendation Confidence</div>
-    <div class="metric"><b>Recommended Expiration:</b> <span class="${signalClass(a.expirationConfidence.confidenceGrade)}">${a.expirationConfidence.recommendedDuration}</span> â ${a.expirationConfidence.recommendedConfidence}/100</div>
+    <div class="metric"><b>Recommended Expiration:</b> <span class="${signalClass(a.expirationConfidence.confidenceGrade)}">${a.expirationConfidence.recommendedDuration}</span> - ${a.expirationConfidence.recommendedConfidence}/100</div>
     <div class="metric"><b>Vehicle Type:</b> ${a.expirationConfidence.vehicleType}</div>
     <div class="metric"><b>Confidence Grade:</b> ${a.expirationConfidence.confidenceGrade}</div>
     <div class="metric"><b>Weekly:</b> ${a.expirationConfidence.weekly}/100</div>
@@ -7252,24 +7262,24 @@ function renderFull(ticker, a){
     <div class="divider"></div>
     <div class="section-title">Wheel Strategy Mode</div>
     <div class="metric"><b>Best Wheel/Options Action:</b> <span class="${signalClass(a.wheelMode.bestAction)}">${a.wheelMode.bestAction}</span></div>
-    <div class="metric"><b>Sell Put:</b> ${a.wheelMode.sellPutRead} â¢ Score ${a.wheelMode.sellPutScore}/100</div>
+    <div class="metric"><b>Sell Put:</b> ${a.wheelMode.sellPutRead} - Score ${a.wheelMode.sellPutScore}/100</div>
     <div class="metric"><b>Suggested Put Strike:</b> ${a.wheelMode.suggestedPutStrike} near support $${a.wheelMode.support}</div>
-    <div class="metric"><b>Sell Call:</b> ${a.wheelMode.sellCallRead} â¢ Score ${a.wheelMode.sellCallScore}/100</div>
+    <div class="metric"><b>Sell Call:</b> ${a.wheelMode.sellCallRead} - Score ${a.wheelMode.sellCallScore}/100</div>
     <div class="metric"><b>Suggested Call Strike:</b> ${a.wheelMode.suggestedCallStrike} near resistance $${a.wheelMode.resistance}</div>
-    <div class="metric"><b>Buy Call:</b> ${a.wheelMode.buyCallRead} â¢ Score ${a.wheelMode.buyCallScore}/100</div>
-    <div class="metric"><b>Buy Put:</b> ${a.wheelMode.buyPutRead} â¢ Score ${a.wheelMode.buyPutScore}/100</div>
+    <div class="metric"><b>Buy Call:</b> ${a.wheelMode.buyCallRead} - Score ${a.wheelMode.buyCallScore}/100</div>
+    <div class="metric"><b>Buy Put:</b> ${a.wheelMode.buyPutRead} - Score ${a.wheelMode.buyPutScore}/100</div>
     <div class="metric"><b>Wheel Warning:</b> ${a.wheelMode.wheelWarning}</div>
     <div class="divider"></div>
     <div class="section-title">Wheel Expiration Engine</div>
     <div class="metric muted">Wheel selling durations shown below are generated dynamically from the active strategy policy.</div>
     <div class="metric"><b>Best Wheel Action:</b> <span class="${signalClass(a.wheelExpiration.bestSide)}">${a.wheelExpiration.bestSide}</span></div>
-    <div class="metric"><b>Best Duration:</b> ${a.wheelExpiration.bestDuration} â ${a.wheelExpiration.bestScore}/100</div>
+    <div class="metric"><b>Best Duration:</b> ${a.wheelExpiration.bestDuration} - ${a.wheelExpiration.bestScore}/100</div>
     <div class="metric"><b>Wheel Style:</b> ${a.wheelExpiration.wheelStyle}</div>
     <div class="metric"><b>Assignment Mode:</b> ${a.wheelExpiration.assignmentMode}</div>
-    <div class="metric"><b>Best Sell Put Duration:</b> ${a.wheelExpiration.putBestDuration} â ${a.wheelExpiration.putBestScore}/100</div>
-    <div class="metric"><b>Best Sell Call Duration:</b> ${a.wheelExpiration.callBestDuration} â ${a.wheelExpiration.callBestScore}/100</div>
+    <div class="metric"><b>Best Sell Put Duration:</b> ${a.wheelExpiration.putBestDuration} - ${a.wheelExpiration.putBestScore}/100</div>
+    <div class="metric"><b>Best Sell Call Duration:</b> ${a.wheelExpiration.callBestDuration} - ${a.wheelExpiration.callBestScore}/100</div>
     ${(a.wheelExpiration?.rows || []).map(row => `
-      <div class="metric"><b>${row.label}:</b> Put ${row.sellPutScore}/100 â¢ Call ${row.sellCallScore}/100</div>
+      <div class="metric"><b>${row.label}:</b> Put ${row.sellPutScore}/100 - Call ${row.sellCallScore}/100</div>
     `).join("")}
     <div class="metric"><b>Reason:</b> ${a.wheelExpiration.reason}</div>
     <div class="divider"></div>
@@ -7283,8 +7293,8 @@ function renderFull(ticker, a){
     <div class="section-title">Account Suitability</div>
     ${(()=>{ const m=getAccountFit(a,"MOMENTUM"), w=getAccountFit(a,"WHEEL"); return `
       <div class="metric"><b>Portfolio:</b> $${Math.round(accountProfile.portfolioValue).toLocaleString()}</div>
-      <div class="metric"><b>Buy-Option Fit:</b> <span class="${signalClass(m.fit)}">${m.fit}</span> â Est. $${Math.round(m.capitalRequired)} (${m.usagePct}%)</div>
-      <div class="metric"><b>Cash-Secured Put Fit:</b> <span class="${signalClass(w.fit)}">${w.fit}</span> â Est. $${Math.round(w.capitalRequired).toLocaleString()} (${w.usagePct}%)</div>
+      <div class="metric"><b>Buy-Option Fit:</b> <span class="${signalClass(m.fit)}">${m.fit}</span> - Est. $${Math.round(m.capitalRequired)} (${m.usagePct}%)</div>
+      <div class="metric"><b>Cash-Secured Put Fit:</b> <span class="${signalClass(w.fit)}">${w.fit}</span> - Est. $${Math.round(w.capitalRequired).toLocaleString()} (${w.usagePct}%)</div>
       <div class="metric muted">${m.note}</div>`; })()}
 
         <div class="section-title">Position Sizing</div>
@@ -7463,7 +7473,7 @@ async function runFallbackAnalysis(ticker){
   output.innerHTML = `
     <div class="card weak-alert">
       <div class="section-title">Quote-Only Fallback Mode</div>
-      <div class="metric"><b>${ticker}</b> â $${price.toFixed(2)}</div>
+      <div class="metric"><b>${ticker}</b> - $${price.toFixed(2)}</div>
       <div class="metric"><b>Status:</b> Price loaded, but historical data was unavailable.</div>
       <div class="metric"><b>Important:</b> Full Predator Analysis needs daily history for trend, alignment, quality score, and next-day confirmation.</div>
       <div class="metric"><b>Action:</b> Do not take a new trade from fallback mode alone. Use it only as a price check.</div>
@@ -7813,7 +7823,7 @@ async function scanList(list, title){
         </div>
         <div class="metric"><b>Successfully analyzed:</b> 0/${attempted}</div>
         <div class="metric"><b>Data failures:</b> ${failures.length}</div>
-        <div class="metric"><b>Latest issue:</b> ${lastFailure ? `${lastFailure.ticker} â ${lastFailure.stage}: ${String(lastFailure.message).slice(0,220)}` : "Unknown data failure"}</div>
+        <div class="metric"><b>Latest issue:</b> ${lastFailure ? `${lastFailure.ticker} - ${lastFailure.stage}: ${String(lastFailure.message).slice(0,220)}` : "Unknown data failure"}</div>
         <div class="metric red"><b>Do not interpret this as NO TRADES.</b></div>
         <div class="metric"><b>What to do:</b> Check the API warning/status and retry later. One individual scan can be used as a diagnostic, but it should not be counted as a trading signal if data does not load.</div>
       </div>`;
@@ -7845,7 +7855,7 @@ async function scanList(list, title){
           <div class="section-title">Closest Watchlist Setups</div>
           ${closest.map(r=>`
             <div class="card" style="padding:12px;margin-top:9px;">
-              <div class="metric"><b>${r.ticker}</b> â <span class="yellow">WAIT</span></div>
+              <div class="metric"><b>${r.ticker}</b> - <span class="yellow">WAIT</span></div>
               <div class="metric"><b>Favored Trade:</b> ${r.finalDecision.direction}</div>
               <div class="metric"><b>Why not yet:</b> ${r.finalDecision.reason}</div>
               <div class="metric"><b>What changes it to BUY:</b> ${r.finalDecision.upgrade}</div>
@@ -7868,12 +7878,12 @@ async function scanList(list, title){
       </div>
 
       <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
-      ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length} â failed names were not classified.</div>` : ""}
+      ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length} - failed names were not classified.</div>` : ""}
 
       ${topBuys.map((r,index)=>`
         <div class="card" style="padding:14px;margin-top:12px;">
           <div class="section-title">#${index+1} BUY-READY</div>
-          <div class="metric"><b>${r.ticker}</b> â <span class="green">${r.finalDecision.direction}</span></div>
+          <div class="metric"><b>${r.ticker}</b> - <span class="green">${r.finalDecision.direction}</span></div>
           <div class="metric"><b>Final Decision:</b> <span class="green">BUY</span></div>
           <div class="metric"><b>Bot Confidence:</b> ${r.conviction}/100</div>
           <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
@@ -7969,7 +7979,7 @@ async function findBestTrade(){
     <div class="card hold-alert">
       <div class="section-title">Best Trade Right Now</div>
       <div class="final-answer-word green">BUY</div>
-      <div class="metric"><b>${best.ticker}</b> â ${best.d.direction}</div>
+      <div class="metric"><b>${best.ticker}</b> - ${best.d.direction}</div>
       <div class="metric"><b>Bot Confidence:</b> ${best.d.conviction}/100</div>
       <div class="metric"><b>Expiration:</b> ${best.d.expiration}</div>
       <div class="metric"><b>Account Fit:</b> ${best.d.accountFit}</div>
