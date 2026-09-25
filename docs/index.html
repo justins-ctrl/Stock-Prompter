@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.11 Entry Thesis Link</title>
+  <title>Signal Predator AI v47.7.12 BUY Signal Integrity</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.11 // entry thesis link // BUY snapshot archive // provenance-safe position management</div>
+  <div class="subtitle">v47.7.12 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -548,14 +548,6 @@ function getAlphaVantageKey(){
     const storageKey = APP_CONFIG.alphaVantageKeyStorageKey;
     let savedKey = String(localStorage.getItem(storageKey) || "").trim();
 
-    // One-time convenience seed for this personal build.
-    // After first load, Signal Predator reads the key from localStorage normally.
-    if(!savedKey){
-      const initialKey = "OHCJWFQEFSXI8IJ3";
-      localStorage.setItem(storageKey, initialKey);
-      savedKey = initialKey;
-    }
-
     return savedKey;
   }catch(e){
     return "";
@@ -648,7 +640,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.7.11",
+    version: "v47.7.12",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -665,7 +657,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-11.json";
+  a.download = "signal-predator-backup-v47-7-12.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -3883,13 +3875,65 @@ function getStrategyExpirationPolicy(a){
   };
 }
 
+function getEntryIntegrityEngine(a){
+  a = ensureEngineDefaults(a);
+  const direction = a.direction || "WAIT";
+  const price = safeNum(a.price, 0);
+  const support = safeNum(a.supportResistance?.support, NaN);
+  const resistance = safeNum(a.supportResistance?.resistance, NaN);
+  const rangeLocation = safeNum(a.noTradeZone?.rangeLocation, 50);
+  const quality = a.qualityDecision?.decision || "N/A";
+  const chaseRisk = a.nextDay?.chaseRisk || "N/A";
+  const reversalTrap = a.nextDay?.reversalTrap || "N/A";
+  const overnightRisk = a.nextDay?.overnightRisk || "N/A";
+
+  let roomPct = null;
+  if(price > 0 && direction === "BUY CALL" && Number.isFinite(resistance)) roomPct = ((resistance - price) / price) * 100;
+  if(price > 0 && direction === "BUY PUT" && Number.isFinite(support)) roomPct = ((price - support) / price) * 100;
+
+  const extremeExtension = direction === "BUY CALL" ? rangeLocation >= 80 : direction === "BUY PUT" ? rangeLocation <= 20 : true;
+  const moderateExtension = direction === "BUY CALL" ? rangeLocation >= 70 : direction === "BUY PUT" ? rangeLocation <= 30 : true;
+  const insufficientRoom = roomPct !== null && roomPct <= 1.25;
+  const tightRoom = roomPct !== null && roomPct <= 2.50;
+  const qualityFullyApproved = quality === "APPROVED";
+  const highRisk = chaseRisk === "HIGH" || reversalTrap === "HIGH" || overnightRisk === "HIGH";
+
+  let status = "CLEAR";
+  let blocker = "NONE";
+  let reason = "Entry location has acceptable room and no major extension warning.";
+
+  if(!qualityFullyApproved){
+    status = "WAIT";
+    blocker = quality === "REDUCED SIZE" ? "QUALITY NOT FULLY APPROVED" : "QUALITY";
+    reason = quality === "REDUCED SIZE"
+      ? "Quality engine only supports reduced-size conditions. Predator will not promote that state to a fresh BUY."
+      : `Quality decision is ${quality}; fresh BUY authority requires APPROVED.`;
+  }else if(insufficientRoom){
+    status = "WAIT";
+    blocker = "INSUFFICIENT ROOM";
+    reason = `Only about ${Math.max(0,roomPct).toFixed(1)}% remains to nearby ${direction === "BUY CALL" ? "resistance" : "support"}; the move may already be too mature for a new long option.`;
+  }else if(extremeExtension || highRisk){
+    status = "WAIT";
+    blocker = "EXTENSION / REVERSAL RISK";
+    reason = "Direction may be correct, but the entry is extended or carries elevated reversal/chase risk. Wait for a cleaner reset and confirmation.";
+  }else if(tightRoom || moderateExtension){
+    status = "CAUTION";
+    blocker = "ENTRY LOCATION";
+    reason = roomPct !== null
+      ? `Directional thesis is intact, but only about ${Math.max(0,roomPct).toFixed(1)}% remains to nearby ${direction === "BUY CALL" ? "resistance" : "support"}. Trigger confirmation is mandatory.`
+      : "Directional thesis is intact, but price is relatively extended inside the recent range. Trigger confirmation is mandatory.";
+  }
+
+  return {status,blocker,reason,roomPct,rangeLocation,qualityFullyApproved,extremeExtension,moderateExtension,insufficientRoom,tightRoom,highRisk};
+}
+
 function getSwingValidationEngine(a){
   a = ensureEngineDefaults(a);
   const policy = getStrategyExpirationPolicy(a);
   const direction = policy.buyDirection;
   const validDirection = direction === "BUY CALL" || direction === "BUY PUT";
   const alignment = safeNum(a.alignmentScore?.score, 0);
-  const timing = safeNum(a.timeTarget?.probability, 0);
+  const timing = safeNum(a.timeTarget?.probability, 0); // heuristic score, not a statistical probability
   const conviction = safeNum(getPredatorConvictionEngine(a)?.conviction, 0);
   const quality = a.qualityDecision?.decision || "N/A";
   const noTrade = a.noTradeZone?.zone || "CLEAR";
@@ -3897,9 +3941,7 @@ function getSwingValidationEngine(a){
   const trigger = parseFloat(a.nextDay?.buyTrigger || "NaN");
   const invalidation = parseFloat(a.nextDay?.invalidation || "NaN");
   const price = parseFloat(a.price || "NaN");
-  const chaseRisk = a.nextDay?.chaseRisk || "N/A";
-  const reversalTrap = a.nextDay?.reversalTrap || "N/A";
-  const overnightRisk = a.nextDay?.overnightRisk || "N/A";
+  const entryIntegrity = getEntryIntegrityEngine(a);
 
   let structureValid = true;
   let triggerConfirmed = false;
@@ -3929,7 +3971,6 @@ function getSwingValidationEngine(a){
   const hardBlock = !validDirection || quality === "REJECT" || noTrade !== "CLEAR" || marketState === "DANGEROUS" || !structureValid || alignment < 60;
   const strongMonthlyThesis = validDirection && !hardBlock && alignment >= 75 && timing >= 65 && conviction >= 75;
   const eliteMonthlyThesis = validDirection && !hardBlock && alignment >= 85 && timing >= 75 && conviction >= 85;
-  const riskNeedsStrictConfirmation = chaseRisk === "HIGH" || reversalTrap === "HIGH" || overnightRisk === "HIGH" || (distanceToInvalidationPct !== null && distanceToInvalidationPct < 1.0);
 
   let validation = "PASS";
   let entryMode = "NO ENTRY";
@@ -3939,32 +3980,39 @@ function getSwingValidationEngine(a){
   if(hardBlock){
     blocker = !structureValid ? "STRUCTURE INVALIDATION" : noTrade !== "CLEAR" ? "NO-TRADE ZONE" : quality === "REJECT" ? "QUALITY REJECT" : alignment < 60 ? "ALIGNMENT" : "SETUP QUALITY";
     reason = "The monthly thesis is not structurally valid enough to enter.";
-  }else if(eliteMonthlyThesis && !riskNeedsStrictConfirmation){
-    validation = "BUY";
-    entryMode = triggerConfirmed ? "CONFIRMED SWING ENTRY" : "STRUCTURAL SWING ENTRY";
-    blocker = "NONE";
-    reason = triggerConfirmed ? "Strong monthly thesis and preferred trigger are both confirmed." : "Monthly thesis is strong enough that the trigger is preferred, not mandatory. Structure remains valid.";
-  }else if(strongMonthlyThesis && triggerConfirmed && !riskNeedsStrictConfirmation){
-    validation = "BUY";
-    entryMode = "CONFIRMED SWING ENTRY";
-    blocker = "NONE";
-    reason = "Monthly thesis is strong and the preferred trigger is confirmed.";
-  }else if(strongMonthlyThesis && !triggerConfirmed && !riskNeedsStrictConfirmation){
+  }else if(!strongMonthlyThesis){
+    blocker = "THESIS QUALITY";
+    reason = "The directional thesis has not reached the minimum monthly BUY standard.";
+  }else if(entryIntegrity.status === "WAIT"){
     validation = "WAIT";
-    entryMode = "NEAR-MISS SWING";
-    blocker = "PRICE VALIDATION";
-    reason = "The monthly thesis is good, but not strong enough to waive the preferred trigger.";
-  }else if(strongMonthlyThesis && riskNeedsStrictConfirmation){
+    entryMode = "ENTRY LOCATION REJECTED";
+    blocker = entryIntegrity.blocker;
+    reason = entryIntegrity.reason;
+  }else if(!triggerConfirmed){
     validation = "WAIT";
-    entryMode = "STRICT CONFIRMATION REQUIRED";
-    blocker = "RISK / PRICE VALIDATION";
-    reason = "The setup is good, but current extension or invalidation risk requires stricter price confirmation.";
+    entryMode = eliteMonthlyThesis ? "ELITE SETUP â TRIGGER REQUIRED" : "GOOD SETUP â TRIGGER REQUIRED";
+    blocker = "PRICE CONFIRMATION";
+    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.12 no longer waives the entry trigger. Wait for price confirmation.`;
+  }else if(quality !== "APPROVED"){
+    validation = "WAIT";
+    entryMode = "QUALITY CONFIRMATION REQUIRED";
+    blocker = "QUALITY NOT FULLY APPROVED";
+    reason = "The trigger is present, but the quality engine is not fully APPROVED. Reduced-size quality can no longer become a fresh BUY.";
+  }else{
+    validation = "BUY";
+    entryMode = entryIntegrity.status === "CAUTION" ? "CONFIRMED ENTRY â LOCATION CAUTION" : "CONFIRMED SWING ENTRY";
+    blocker = "NONE";
+    reason = entryIntegrity.status === "CAUTION"
+      ? `Monthly thesis and trigger are confirmed, but entry location remains less than ideal. ${entryIntegrity.reason}`
+      : "Monthly thesis, full quality approval, entry location, and price trigger are aligned.";
   }
 
-  let readiness = Math.round(alignment * 0.30 + timing * 0.20 + conviction * 0.25 + (structureValid ? 15 : 0) + (triggerConfirmed ? 10 : 5));
+  let readiness = Math.round(alignment * 0.25 + timing * 0.15 + conviction * 0.20 + (structureValid ? 15 : 0) + (triggerConfirmed ? 15 : 0) + (quality === "APPROVED" ? 10 : 0));
+  if(entryIntegrity.status === "WAIT") readiness -= 12;
+  else if(entryIntegrity.status === "CAUTION") readiness -= 5;
   readiness = Math.max(0, Math.min(100, readiness));
 
-  return {validation,entryMode,reason,blocker,readiness,structureValid,triggerConfirmed,distanceToTriggerPct,distanceToInvalidationPct,trigger:Number.isFinite(trigger)?trigger.toFixed(2):"N/A",invalidation:Number.isFinite(invalidation)?invalidation.toFixed(2):"N/A",buyWindow:policy.buyWindow,monthlyThesis:eliteMonthlyThesis?"ELITE":strongMonthlyThesis?"STRONG":"WEAK"};
+  return {validation,entryMode,reason,blocker,readiness,structureValid,triggerConfirmed,distanceToTriggerPct,distanceToInvalidationPct,trigger:Number.isFinite(trigger)?trigger.toFixed(2):"N/A",invalidation:Number.isFinite(invalidation)?invalidation.toFixed(2):"N/A",buyWindow:policy.buyWindow,monthlyThesis:eliteMonthlyThesis?"ELITE":strongMonthlyThesis?"STRONG":"WEAK",entryIntegrity};
 }
 
 const PREDATOR_POSITION_THESIS_KEY = "signal_predator_position_theses_v47_7";
@@ -5648,7 +5696,7 @@ function getEntryClassificationLabel(a){
 
   return s.triggerConfirmed
     ? {label:"BUY - CONFIRMED ENTRY", color:"green"}
-    : {label:"BUY - EARLY STRUCTURAL ENTRY", color:"yellow"};
+    : {label:"WAIT - TRIGGER REQUIRED", color:"yellow"};
 }
 
 function renderSimplePredatorDecision(a){
@@ -5671,7 +5719,10 @@ function renderSimplePredatorDecision(a){
     </div>
 
     <div class="divider"></div>
-    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div><div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Adaptive Contract Coach below to compare profiles, then enter Robinhood's live contract stats into the Contract Grader before placing the trade. After entry, save the position thesis once, then use Live Position Scan for HOLD / WATCH / TAKE PROFIT / REDUCE / EXIT guidance based on that original thesis.</div>
+    <div class="metric"><b>Entry Type:</b> <span class="${getEntryClassificationLabel(a).color}">${getEntryClassificationLabel(a).label}</span></div>
+    <div class="metric"><b>Entry Integrity:</b> <span class="${d.swingValidation?.entryIntegrity?.status === "CLEAR" ? "green" : d.swingValidation?.entryIntegrity?.status === "CAUTION" ? "yellow" : "red"}">${d.swingValidation?.entryIntegrity?.status || "N/A"}</span></div>
+    <div class="metric"><b>Room to Nearby Structure:</b> ${d.swingValidation?.entryIntegrity?.roomPct === null ? "N/A" : Math.max(0,d.swingValidation.entryIntegrity.roomPct).toFixed(1)+"%"}</div>
+    <div class="metric"><b>What to do:</b> ${d.action}</div><div class="metric green"><b>Next:</b> Use the Adaptive Contract Coach below to compare profiles, then enter Robinhood's live contract stats into the Contract Grader before placing the trade. After entry, save the position thesis once, then use Live Position Scan for HOLD / WATCH / TAKE PROFIT / REDUCE / EXIT guidance based on that original thesis.</div>
     ${d.decision === "WAIT" ? `<div class="metric"><b>What changes this to BUY:</b> ${d.upgrade}</div>` : ""}
     <div class="metric"><b>Invalidation:</b> ${d.invalidation}</div>
   </div>`;
@@ -5776,14 +5827,15 @@ function getPredatorConvictionEngine(a){
   const triggerConfidence = clampScore(session?.triggerConfidence || 50);
   const accountFit = clampScore(fit.score || 50);
 
+  // v47.7.12: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
+  const directionalEvidence = clampScore((setup + alignment) / 2);
   let conviction = clampScore(
-    setup * .22 +
-    alignment * .20 +
-    timing * .17 +
-    expiration * .13 +
-    triggerConfidence * .12 +
-    accountFit * .10 +
-    dataReadiness * .06
+    directionalEvidence * .32 +
+    timing * .12 +
+    expiration * .12 +
+    triggerConfidence * .22 +
+    accountFit * .14 +
+    dataReadiness * .08
   );
 
   if(a.qualityDecision?.decision === "REJECT") conviction -= 24;
@@ -6987,7 +7039,7 @@ function renderFull(ticker, a){
     <div class="metric"><b>Range Location:</b> ${a.noTradeZone.rangeLocation}%</div>
     <div class="divider"></div>
     <div class="section-title">Time-to-Target Engine</div>
-    <div class="metric"><b>Time-to-Target Probability:</b> ${a.timeTarget.probability}%</div>
+    <div class="metric"><b>Time-to-Target Score:</b> ${a.timeTarget.probability}/100</div>
     <div class="bar"><div class="fill" style="width:${a.timeTarget.probability}%"></div></div>
     <div class="metric"><b>Time Window:</b> <span class="${signalClass(a.timeTarget.window)}">${a.timeTarget.window}</span></div>
     <div class="metric"><b>Outcome Bias:</b> <span class="${signalClass(a.timeTarget.bias)}">${a.timeTarget.bias}</span></div>
