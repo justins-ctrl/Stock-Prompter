@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.13.1 BUY Signal Integrity</title>
+  <title>Signal Predator AI v47.7.13.2 Diagnostic Applicability</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.13.1 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
+  <div class="subtitle">v47.7.13.2 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -641,7 +641,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.7.13.1",
+    version: "v47.7.13.2",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -2586,7 +2586,7 @@ function getSupportResistance(closes){
   const clean = (Array.isArray(closes) ? closes : []).map(Number).filter(Number.isFinite);
   const currentClose = clean[0];
 
-  // v47.7.13.1: prior structure deliberately EXCLUDES the current daily close.
+  // v47.7.13.2: prior structure deliberately EXCLUDES the current daily close.
   // This prevents a fresh 10-day high/low from defining itself as 0.0% room.
   const prior10 = clean.slice(1,11);
   const prior20 = clean.slice(1,21);
@@ -4059,6 +4059,8 @@ function getSwingValidationEngine(a){
   const hardBlock = !validDirection || quality === "REJECT" || noTrade !== "CLEAR" || marketState === "DANGEROUS" || !structureValid || alignment < 60;
   const strongMonthlyThesis = validDirection && !hardBlock && alignment >= 75 && timing >= 65 && conviction >= 75;
   const eliteMonthlyThesis = validDirection && !hardBlock && alignment >= 85 && timing >= 75 && conviction >= 85;
+  // v47.7.13.2: structure/entry-location diagnostics are meaningful only after a directional monthly thesis exists.
+  const structureApplicable = validDirection && (strongMonthlyThesis || eliteMonthlyThesis);
 
   let validation = "NO TRADE";
   let entryMode = "NO ENTRY";
@@ -4082,7 +4084,7 @@ function getSwingValidationEngine(a){
     validation = "WAIT";
     entryMode = eliteMonthlyThesis ? "ELITE SETUP - TRIGGER REQUIRED" : "GOOD SETUP - TRIGGER REQUIRED";
     blocker = "PRICE CONFIRMATION";
-    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13.1 no longer waives the entry trigger. Wait for price confirmation.`;
+    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13.2 no longer waives the entry trigger. Wait for price confirmation.`;
   }else if(quality !== "APPROVED"){
     validation = "WAIT";
     entryMode = "QUALITY CONFIRMATION REQUIRED";
@@ -4102,7 +4104,7 @@ function getSwingValidationEngine(a){
   else if(entryIntegrity.status === "CAUTION") readiness -= 5;
   readiness = Math.max(0, Math.min(100, readiness));
 
-  return {validation,entryMode,reason,blocker,readiness,structureValid,triggerConfirmed,distanceToTriggerPct,distanceToInvalidationPct,trigger:Number.isFinite(trigger)?trigger.toFixed(2):"N/A",invalidation:Number.isFinite(invalidation)?invalidation.toFixed(2):"N/A",buyWindow:policy.buyWindow,monthlyThesis:eliteMonthlyThesis?"ELITE":strongMonthlyThesis?"STRONG":"WEAK",entryIntegrity};
+  return {validation,entryMode,reason,blocker,readiness,structureValid,structureApplicable,triggerConfirmed,distanceToTriggerPct,distanceToInvalidationPct,trigger:Number.isFinite(trigger)?trigger.toFixed(2):"N/A",invalidation:Number.isFinite(invalidation)?invalidation.toFixed(2):"N/A",buyWindow:policy.buyWindow,monthlyThesis:eliteMonthlyThesis?"ELITE":strongMonthlyThesis?"STRONG":"WEAK",entryIntegrity};
 }
 
 const PREDATOR_POSITION_THESIS_KEY = "signal_predator_position_theses_v47_7";
@@ -5802,7 +5804,9 @@ function getBuyFunnelDiagnostics(a){
   const validDirection = a.direction === "BUY CALL" || a.direction === "BUY PUT";
   const thesisPass = swing.monthlyThesis === "STRONG" || swing.monthlyThesis === "ELITE";
   const integrityPass = swing.entryIntegrity?.status !== "WAIT";
-  const triggerApplicable = validDirection && thesisPass && swing.trigger !== "N/A";
+  const structureApplicable = validDirection && thesisPass && swing.structureApplicable !== false;
+  const entryLocationApplicable = structureApplicable && swing.structureValid;
+  const triggerApplicable = entryLocationApplicable && swing.trigger !== "N/A";
   const finalBuyApproved = simple.decision === "BUY" && swing.validation === "BUY" && swing.triggerConfirmed;
 
   const gates = [
@@ -5812,8 +5816,8 @@ function getBuyFunnelDiagnostics(a){
     {name:"Market Regime", state:market !== "DANGEROUS" ? "PASS" : "BLOCK", detail:market},
     {name:"Quality", state:quality === "APPROVED" ? "PASS" : "BLOCK", detail:quality},
     {name:"Monthly Thesis", state:thesisPass ? "PASS" : "BLOCK", detail:`${swing.monthlyThesis} - timing ${Math.round(timing)} - conviction ${Math.round(conviction)}`},
-    {name:"Structure", state:swing.structureValid ? "PASS" : "BLOCK", detail:swing.entryIntegrity?.structureState || "N/A"},
-    {name:"Entry Location", state:integrityPass ? "PASS" : "BLOCK", detail:swing.entryIntegrity?.status || "N/A"},
+    {name:"Structure", state:structureApplicable ? (swing.structureValid ? "PASS" : "BLOCK") : "N/A", detail:structureApplicable ? (swing.entryIntegrity?.structureState || "VALID") : "NOT EVALUATED"},
+    {name:"Entry Location", state:entryLocationApplicable ? (integrityPass ? "PASS" : "BLOCK") : "N/A", detail:entryLocationApplicable ? (swing.entryIntegrity?.status || "N/A") : "NOT EVALUATED"},
     {name:"Price Trigger", state:triggerApplicable ? (swing.triggerConfirmed ? "PASS" : "BLOCK") : "N/A",
       detail:triggerApplicable ? (swing.triggerConfirmed ? "CONFIRMED" : `WAITING FOR $${swing.trigger}`) : "NOT APPLICABLE"},
     {name:"Final BUY Authority", state:finalBuyApproved ? "PASS" : "BLOCK",
@@ -5965,7 +5969,7 @@ function getPredatorConvictionEngine(a){
   const triggerConfidence = clampScore(session?.triggerConfidence || 50);
   const accountFit = clampScore(fit.score || 50);
 
-  // v47.7.13.1: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
+  // v47.7.13.2: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
   const directionalEvidence = clampScore((setup + alignment) / 2);
   let conviction = clampScore(
     directionalEvidence * .32 +
@@ -7132,7 +7136,7 @@ function renderFull(ticker, a){
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
-  ${(()=>{ const s=getSwingValidationEngine(a); return `<div class="card"><div class="section-title">Monthly Swing Validation</div><div class="metric"><b>Validation:</b> <span class="${signalClass(s.validation)}">${s.validation}</span></div><div class="metric"><b>Entry Mode:</b> ${s.entryMode}</div><div class="metric"><b>Monthly Thesis:</b> ${s.monthlyThesis}</div><div class="metric"><b>Readiness:</b> ${s.readiness}/100</div><div class="metric"><b>Blocker:</b> ${s.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${s.trigger==="N/A"?"N/A":"$"+s.trigger}</div><div class="metric"><b>Structural Invalidation:</b> ${s.invalidation==="N/A"?"N/A":"$"+s.invalidation}</div><div class="metric"><b>Trigger Confirmed:</b> ${s.triggerConfirmed?"YES":"NO"}</div><div class="metric"><b>Structure Valid:</b> ${s.structureValid?"YES":"NO"}</div><div class="metric"><b>Reason:</b> ${s.reason}</div></div>`; })()}
+  ${(()=>{ const s=getSwingValidationEngine(a); return `<div class="card"><div class="section-title">Monthly Swing Validation</div><div class="metric"><b>Validation:</b> <span class="${signalClass(s.validation)}">${s.validation}</span></div><div class="metric"><b>Entry Mode:</b> ${s.entryMode}</div><div class="metric"><b>Monthly Thesis:</b> ${s.monthlyThesis}</div><div class="metric"><b>Readiness:</b> ${s.readiness}/100</div><div class="metric"><b>Blocker:</b> ${s.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${s.trigger==="N/A"?"N/A":"$"+s.trigger}</div><div class="metric"><b>Structural Invalidation:</b> ${s.invalidation==="N/A"?"N/A":"$"+s.invalidation}</div><div class="metric"><b>Trigger Confirmed:</b> ${s.triggerConfirmed?"YES":"NO"}</div><div class="metric"><b>Structure Valid:</b> ${s.structureApplicable ? (s.structureValid?"YES":"NO") : "N/A - NOT EVALUATED"}</div><div class="metric"><b>Reason:</b> ${s.reason}</div></div>`; })()}
   ${renderBuyFunnelDiagnostics(a)}
   <div class="scan-support">
     ${renderExpirationPolicyCard(a)}
