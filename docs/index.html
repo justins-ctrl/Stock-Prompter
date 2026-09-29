@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.13.2 Diagnostic Applicability</title>
+  <title>Signal Predator AI v47.7.13.3 Diagnostic Applicability</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.13.2 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
+  <div class="subtitle">v47.7.13.3 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -641,7 +641,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.7.13.2",
+    version: "v47.7.13.3",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -1709,25 +1709,96 @@ function logDataRequest(source, success, detail=""){
 }
 
 
+const PREDATOR_DAILY_HISTORY_CACHE_KEY = "signal_predator_daily_history_cache_v1";
+const PREDATOR_API_USAGE_KEY = "signal_predator_api_usage_v1";
+const PREDATOR_FREE_DAILY_BUDGET = 25;
+const PREDATOR_HISTORY_CACHE_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+const PREDATOR_HISTORY_CACHE_HARD_MAX_AGE_MS = 96 * 60 * 60 * 1000;
+
+function predatorUsageDayKey(){
+  // Local counter is diagnostic only; Alpha Vantage remains authoritative.
+  return new Date().toISOString().slice(0,10);
+}
+function getPredatorApiUsage(){
+  const raw = getStore(PREDATOR_API_USAGE_KEY, {});
+  const day = predatorUsageDayKey();
+  if(!raw || raw.day !== day) return {day, requests:0, successes:0, failures:0, quotaStops:0};
+  return {...raw};
+}
+function recordPredatorApiAttempt(outcome="attempt"){
+  const u = getPredatorApiUsage();
+  u.requests = safeNum(u.requests,0) + 1;
+  if(outcome === "success") u.successes = safeNum(u.successes,0) + 1;
+  if(outcome === "failure") u.failures = safeNum(u.failures,0) + 1;
+  setStore(PREDATOR_API_USAGE_KEY,u);
+  return u;
+}
+function updatePredatorApiOutcome(outcome){
+  const u = getPredatorApiUsage();
+  if(outcome === "success") u.successes = safeNum(u.successes,0) + 1;
+  if(outcome === "failure") u.failures = safeNum(u.failures,0) + 1;
+  if(outcome === "quota") u.quotaStops = safeNum(u.quotaStops,0) + 1;
+  setStore(PREDATOR_API_USAGE_KEY,u);
+  return u;
+}
+function classifyAlphaVantageMessage(data){
+  const msg = String(data?.Note || data?.Information || data?.["Error Message"] || "");
+  const lower = msg.toLowerCase();
+  if(data?.["Error Message"]) return {kind:"INVALID_SYMBOL_OR_API_ERROR", message:msg};
+  if(lower.includes("rate limit") || lower.includes("frequency") || lower.includes("requests per day") || lower.includes("standard api rate limit") || lower.includes("premium")){
+    return {kind:"QUOTA_OR_ENTITLEMENT", message:msg};
+  }
+  if(msg) return {kind:"API_MESSAGE", message:msg};
+  return {kind:"NONE", message:""};
+}
+function getDailyHistoryCache(){
+  const c = getStore(PREDATOR_DAILY_HISTORY_CACHE_KEY, {});
+  return c && typeof c === "object" ? c : {};
+}
+function readCachedDailyHistory(symbol, allowStale=false){
+  try{
+    const item = getDailyHistoryCache()[normalizeTicker(symbol)];
+    if(!item || !Array.isArray(item.closes) || !item.closes.length || !item.savedAt) return null;
+    const ageMs = Date.now() - new Date(item.savedAt).getTime();
+    if(!Number.isFinite(ageMs) || ageMs < 0) return null;
+    if(!allowStale && ageMs > PREDATOR_HISTORY_CACHE_MAX_AGE_MS) return null;
+    if(allowStale && ageMs > PREDATOR_HISTORY_CACHE_HARD_MAX_AGE_MS) return null;
+    return {...item, ageMs};
+  }catch(e){ return null; }
+}
+function writeCachedDailyHistory(symbol, closes){
+  try{
+    const key = normalizeTicker(symbol);
+    if(!key || !Array.isArray(closes) || !closes.length) return;
+    const c = getDailyHistoryCache();
+    c[key] = {closes:closes.slice(0,60), savedAt:new Date().toISOString()};
+    const entries = Object.entries(c).sort((a,b)=>new Date(b[1]?.savedAt||0)-new Date(a[1]?.savedAt||0)).slice(0,40);
+    setStore(PREDATOR_DAILY_HISTORY_CACHE_KEY,Object.fromEntries(entries));
+  }catch(e){ console.warn("Daily history cache skipped:",e); }
+}
+function isQuotaStop(){ return lastApiIssue?.kind === "QUOTA_OR_ENTITLEMENT"; }
+
 async function fetchJson(url){
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), APP_CONFIG.apiTimeoutMs);
   try{
+    recordPredatorApiAttempt();
     const r = await fetch(url, {signal: controller.signal});
     const data = await r.json();
 
     if(data.Note || data.Information || data["Error Message"]){
-      const msg = data.Note || data.Information || data["Error Message"];
-      const kind = data["Error Message"] ? "API_ERROR" : "API_MESSAGE";
-      lastApiIssue = {kind, message:String(msg), at:new Date().toISOString()};
-      try{ logDataRequest("alpha", false, String(msg).slice(0,160)); }catch(e){}
+      const classified = classifyAlphaVantageMessage(data);
+      lastApiIssue = {kind:classified.kind, message:String(classified.message), at:new Date().toISOString()};
+      updatePredatorApiOutcome(classified.kind === "QUOTA_OR_ENTITLEMENT" ? "quota" : "failure");
+      try{ logDataRequest("alpha", false, String(classified.message).slice(0,160)); }catch(e){}
 
       const box = document.getElementById("apiStatusBox");
       if(box){
-        box.innerHTML = `<div class="metric"><b>API Message:</b> ${escapeHtml(String(msg).slice(0,220))}</div>`;
+        box.innerHTML = `<div class="metric"><b>API Message:</b> ${escapeHtml(String(classified.message).slice(0,220))}</div>`;
       }
     }else{
       lastApiIssue = null;
+      updatePredatorApiOutcome("success");
       try{ logDataRequest("alpha", true, "Response received"); }catch(e){}
     }
 
@@ -1742,6 +1813,7 @@ async function fetchJson(url){
     if(box){
       box.innerHTML = `<div class="metric"><b>API Request Failed:</b> ${escapeHtml(lastApiIssue.message)}</div>`;
     }
+    updatePredatorApiOutcome("failure");
     try{ logDataRequest("alpha", false, lastApiIssue.message); }catch(e){}
     throw err;
   }finally{
@@ -1753,20 +1825,36 @@ function updateApiStatus(message, level="blue"){
   if(!box) return;
   box.innerHTML = `<div class="metric"><b>Status:</b> <span class="${level}">${escapeHtml(message)}</span></div>`;
 }
-async function getHistory(symbol){
+async function getHistory(symbol, options={}){
+  const forceFresh = !!options.forceFresh;
+  const allowStaleFallback = options.allowStaleFallback !== false;
   try{
+    const cached = readCachedDailyHistory(symbol, false);
+    if(cached && !forceFresh){
+      lastApiIssue = null;
+      updateApiStatus(`Daily history loaded from cache (${Math.floor(cached.ageMs/60000)} min old).`, "green");
+      return cached.closes.slice();
+    }
+
     const apiKey = getAlphaVantageKey();
     if(!apiKey){
       lastApiIssue = {kind:"NO_API_KEY", message:"No Alpha Vantage API key is saved.", at:new Date().toISOString()};
       updateApiStatus("No Alpha Vantage API key saved. Add it in API Status / Security.", "yellow");
-      return null;
+      const fallback = allowStaleFallback ? readCachedDailyHistory(symbol, true) : null;
+      return fallback ? fallback.closes.slice() : null;
     }
-    const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(apiKey)}`);
-    const s = d["Time Series (Daily)"];
 
-    if(!s){
+    const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&outputsize=compact&apikey=${encodeURIComponent(apiKey)}`);
+    const series = d["Time Series (Daily)"];
+
+    if(!series){
+      const fallback = allowStaleFallback ? readCachedDailyHistory(symbol, true) : null;
+      if(fallback && isQuotaStop()){
+        updateApiStatus(`API quota/entitlement stop. Using cached daily history (${Math.floor(fallback.ageMs/3600000)}h old) for screening only.`, "yellow");
+        return fallback.closes.slice();
+      }
       if(d.Note || d.Information){
-        updateApiStatus("Alpha Vantage limit/message returned. Try again later or use fewer scans.", "yellow");
+        updateApiStatus(isQuotaStop() ? "Alpha Vantage quota/entitlement limit reached. Further fresh requests stopped." : "Alpha Vantage message returned.", "yellow");
       }else if(d["Error Message"]){
         updateApiStatus("Invalid ticker or API error.", "red");
       }else{
@@ -1775,10 +1863,20 @@ async function getHistory(symbol){
       return null;
     }
 
-    logDataRequest("daily", true, "Daily candles loaded");
-    updateApiStatus("Daily history loaded successfully.", "green");
-    return Object.values(s).slice(0,60).map(v=>parseFloat(v["4. close"])).filter(v=>!Number.isNaN(v));
+    const closes = Object.values(series).slice(0,60).map(v=>parseFloat(v["4. close"])).filter(v=>!Number.isNaN(v));
+    if(closes.length){
+      writeCachedDailyHistory(symbol, closes);
+      logDataRequest("daily", true, "Daily candles loaded and cached");
+      updateApiStatus("Daily history loaded successfully and cached.", "green");
+      return closes;
+    }
+    return null;
   }catch(e){
+    const fallback = allowStaleFallback ? readCachedDailyHistory(symbol, true) : null;
+    if(fallback){
+      updateApiStatus("Network/API request failed; using cached daily history for screening only.", "yellow");
+      return fallback.closes.slice();
+    }
     updateApiStatus("Network/API request failed.", "red");
     return null;
   }
@@ -2586,7 +2684,7 @@ function getSupportResistance(closes){
   const clean = (Array.isArray(closes) ? closes : []).map(Number).filter(Number.isFinite);
   const currentClose = clean[0];
 
-  // v47.7.13.2: prior structure deliberately EXCLUDES the current daily close.
+  // v47.7.13.3: prior structure deliberately EXCLUDES the current daily close.
   // This prevents a fresh 10-day high/low from defining itself as 0.0% room.
   const prior10 = clean.slice(1,11);
   const prior20 = clean.slice(1,21);
@@ -4059,7 +4157,7 @@ function getSwingValidationEngine(a){
   const hardBlock = !validDirection || quality === "REJECT" || noTrade !== "CLEAR" || marketState === "DANGEROUS" || !structureValid || alignment < 60;
   const strongMonthlyThesis = validDirection && !hardBlock && alignment >= 75 && timing >= 65 && conviction >= 75;
   const eliteMonthlyThesis = validDirection && !hardBlock && alignment >= 85 && timing >= 75 && conviction >= 85;
-  // v47.7.13.2: structure/entry-location diagnostics are meaningful only after a directional monthly thesis exists.
+  // v47.7.13.3: structure/entry-location diagnostics are meaningful only after a directional monthly thesis exists.
   const structureApplicable = validDirection && (strongMonthlyThesis || eliteMonthlyThesis);
 
   let validation = "NO TRADE";
@@ -4084,7 +4182,7 @@ function getSwingValidationEngine(a){
     validation = "WAIT";
     entryMode = eliteMonthlyThesis ? "ELITE SETUP - TRIGGER REQUIRED" : "GOOD SETUP - TRIGGER REQUIRED";
     blocker = "PRICE CONFIRMATION";
-    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13.2 no longer waives the entry trigger. Wait for price confirmation.`;
+    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13.3 no longer waives the entry trigger. Wait for price confirmation.`;
   }else if(quality !== "APPROVED"){
     validation = "WAIT";
     entryMode = "QUALITY CONFIRMATION REQUIRED";
@@ -5969,7 +6067,7 @@ function getPredatorConvictionEngine(a){
   const triggerConfidence = clampScore(session?.triggerConfidence || 50);
   const accountFit = clampScore(fit.score || 50);
 
-  // v47.7.13.2: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
+  // v47.7.13.3: reduce correlated trend/momentum double-counting and give entry confirmation more authority.
   const directionalEvidence = clampScore((setup + alignment) / 2);
   let conviction = clampScore(
     directionalEvidence * .32 +
@@ -7738,11 +7836,22 @@ async function scanList(list, title){
   const funnelRows = [];
   let processed = 0;
 
+  let quotaStopped = false;
+  let cacheHits = 0;
+  const usageAtStart = getPredatorApiUsage().requests;
+
   for(let i=0; i<list.length; i++){
     const ticker = normalizeTicker(list[i]);
     updateApiStatus(`Scanning ${ticker} (${i+1}/${list.length})...`, "blue");
 
+    const hadFreshCache = !!readCachedDailyHistory(ticker, false);
+    if(quotaStopped && !hadFreshCache){
+      failures.push({ticker, stage:"API budget", message:"Not requested after Alpha Vantage quota/entitlement stop."});
+      continue;
+    }
     const closes = await getHistory(ticker);
+    if(hadFreshCache && closes?.length) cacheHits++;
+    if(isQuotaStop()) quotaStopped = true;
     if(!closes || !closes.length){
       failures.push({
         ticker,
@@ -7813,6 +7922,9 @@ async function scanList(list, title){
   const attempted = list.length;
   const completeScan = processed === attempted;
   const partialScan = processed > 0 && processed < attempted;
+  const usageAfter = getPredatorApiUsage();
+  const scanApiRequests = Math.max(0, safeNum(usageAfter.requests,0) - safeNum(usageAtStart,0));
+  const apiBudgetText = `API requests this scan: ${scanApiRequests} | Cache hits: ${cacheHits} | Local diagnostic today: ${usageAfter.requests}/${PREDATOR_FREE_DAILY_BUDGET}`;
 
   // CRITICAL: zero successfully processed tickers is DATA FAILURE, never "NO TRADES".
   if(processed === 0){
@@ -7826,10 +7938,11 @@ async function scanList(list, title){
           The earlier instant "NO TRADES" behavior was not a valid market decision.
         </div>
         <div class="metric"><b>Successfully analyzed:</b> 0/${attempted}</div>
+        <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
         <div class="metric"><b>Data failures:</b> ${failures.length}</div>
         <div class="metric"><b>Latest issue:</b> ${lastFailure ? `${lastFailure.ticker} - ${lastFailure.stage}: ${String(lastFailure.message).slice(0,220)}` : "Unknown data failure"}</div>
         <div class="metric red"><b>Do not interpret this as NO TRADES.</b></div>
-        <div class="metric"><b>What to do:</b> Check the API warning/status and retry later. One individual scan can be used as a diagnostic, but it should not be counted as a trading signal if data does not load.</div>
+        <div class="metric"><b>What to do:</b> Check the API warning/status. Predator now stops additional fresh requests after a quota/entitlement response and reuses cached daily history when available. A data failure is never a trading signal.</div>
       </div>`;
     return;
   }
@@ -7847,6 +7960,8 @@ async function scanList(list, title){
             : `Predator successfully analyzed the full list. None has a BUY-approved monthly option entry right now.`}
         </div>
         <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
+      <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
+        <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
         <div class="metric"><b>BUY-ready:</b> 0</div>
         <div class="metric"><b>WAIT / watch only:</b> ${waits.length}</div>
         <div class="metric"><b>NO TRADE:</b> ${noTrades.length}</div>
