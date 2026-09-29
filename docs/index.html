@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.7.13.3 Diagnostic Applicability</title>
+  <title>Signal Predator AI v47.8 Trade Journal & Learning Foundation</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.7.13.3 // BUY signal integrity // trigger-required entries // extension guard // provenance-safe position management</div>
+  <div class="subtitle">v47.8 // autonomous signal journal // learning foundation // BUY integrity // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -505,6 +505,16 @@ body.advanced-on .scan-support{display:block}
   </div>
 
   <div class="card">
+    <div class="section-title">Predator Learning Journal</div>
+    <div class="metric muted">Automatically records fresh Predator decisions for later calibration. Cached rechecks are not duplicated, and this journal does not change BUY / WAIT / NO TRADE authority.</div>
+    <div id="learningJournalSummary" style="margin-top:12px;"></div>
+    <div class="row" style="margin-top:10px;">
+      <button class="secondary" onclick="exportLearningJournal()">Export Learning Data</button>
+      <button class="secondary" onclick="clearLearningJournal()">Clear Learning Data</button>
+    </div>
+  </div>
+
+  <div class="card">
     <div class="section-title">Saved Positions / Unified Trade Journal</div>
     <div class="metric muted">Saved positions now track bought calls/puts and sold calls/puts. Mark trades as win/loss when closed.</div>
     <div class="grid-2">
@@ -607,6 +617,125 @@ function normalizeTicker(ticker){
   return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,"");
 }
 
+// v47.8 - Trade Journal & Learning Foundation.
+// This is an observational dataset only. It never grants BUY authority or changes trading thresholds.
+const PREDATOR_LEARNING_JOURNAL_KEY = "signal_predator_learning_journal_v47_8";
+const PREDATOR_LEARNING_MAX_ROWS = 1000;
+let learningJournal = [];
+
+function loadLearningJournal(){
+  const rows = getStore(PREDATOR_LEARNING_JOURNAL_KEY, []);
+  learningJournal = Array.isArray(rows) ? rows.filter(x=>x && typeof x === "object").slice(0,PREDATOR_LEARNING_MAX_ROWS) : [];
+  return learningJournal;
+}
+
+function buildLearningSnapshot(ticker, analysisData, source="Predator Analysis"){
+  const symbol = normalizeTicker(ticker);
+  if(!symbol || !analysisData) return null;
+  const a = ensureEngineDefaults(analysisData);
+  const d = getSimplePredatorDecision(a);
+  const swing = d.swingValidation || getSwingValidationEngine(a);
+  const integrity = swing?.entryIntegrity || getEntryIntegrityEngine(a);
+  const capturedAt = new Date().toISOString();
+  return {
+    schemaVersion:1,
+    release:"v47.8",
+    capturedAt,
+    ticker:symbol,
+    source:String(source || "Predator Analysis"),
+    decision:String(d.decision || "N/A"),
+    direction:String(d.direction || "N/A"),
+    price:safeNum(a.price,0),
+    conviction:clampScore(d.conviction),
+    alignment:clampScore(a.alignmentScore?.score),
+    timeToTargetScore:clampScore(a.timeTarget?.probability),
+    monthlyThesis:String(swing?.monthlyThesis || "N/A"),
+    readiness:clampScore(swing?.readiness),
+    blocker:String(swing?.blocker || "N/A"),
+    trigger:Number.isFinite(Number(swing?.trigger)) ? Number(swing.trigger) : null,
+    invalidation:Number.isFinite(Number(swing?.invalidation)) ? Number(swing.invalidation) : null,
+    quality:String(a.qualityDecision?.decision || "N/A"),
+    noTradeZone:String(a.noTradeZone?.zone || "N/A"),
+    marketRegime:String(a.marketRegimeFilter?.state || "N/A"),
+    structureState:String(integrity?.structureState || "N/A"),
+    roomPct:Number.isFinite(Number(integrity?.roomPct)) ? Number(integrity.roomPct) : null,
+    entryIntegrity:String(integrity?.state || integrity?.status || "N/A"),
+    expirationGuidance:String(d.expiration || "N/A"),
+    accountFit:String(d.accountFit || "N/A")
+  };
+}
+
+function persistLearningJournal(){
+  try{ localStorage.setItem(PREDATOR_LEARNING_JOURNAL_KEY, JSON.stringify(learningJournal.slice(0,PREDATOR_LEARNING_MAX_ROWS))); return true; }
+  catch(e){ console.warn("Learning journal storage failed:",e); return false; }
+}
+
+function recordLearningSnapshot(ticker, analysisData, source="Predator Analysis"){
+  try{
+    const row = buildLearningSnapshot(ticker, analysisData, source);
+    if(!row) return null;
+    if(!Array.isArray(learningJournal)) loadLearningJournal();
+    // Prevent accidental duplicate observations from double-clicks/re-renders.
+    const recent = learningJournal.find(x=>x.ticker===row.ticker && x.source===row.source && x.decision===row.decision && x.direction===row.direction && (Date.now()-new Date(x.capturedAt||0).getTime()) < 60000);
+    if(recent) return recent;
+    learningJournal.unshift(row);
+    learningJournal = learningJournal.slice(0,PREDATOR_LEARNING_MAX_ROWS);
+    persistLearningJournal();
+    renderLearningJournalSummary();
+    return row;
+  }catch(e){ console.warn("Learning journal skipped:",e); return null; }
+}
+
+function getLearningJournalStats(){
+  const rows = Array.isArray(learningJournal) ? learningJournal : [];
+  const counts = {BUY:0,WAIT:0,PASS:0,OTHER:0};
+  const blockers = {};
+  rows.forEach(r=>{
+    const key = ["BUY","WAIT","PASS"].includes(r.decision) ? r.decision : "OTHER";
+    counts[key]++;
+    if(r.decision !== "BUY"){
+      const b = String(r.blocker || "N/A");
+      blockers[b] = (blockers[b]||0)+1;
+    }
+  });
+  const topBlocker = Object.entries(blockers).sort((a,b)=>b[1]-a[1])[0] || ["N/A",0];
+  const uniqueTickers = new Set(rows.map(r=>r.ticker)).size;
+  return {total:rows.length, counts, topBlocker, uniqueTickers};
+}
+
+function renderLearningJournalSummary(){
+  const el = document.getElementById("learningJournalSummary");
+  if(!el) return;
+  const s = getLearningJournalStats();
+  if(!s.total){
+    el.innerHTML = "<div class='metric muted'>No fresh decisions recorded yet. Your next fresh individual or watchlist analysis will begin the learning dataset automatically.</div>";
+    return;
+  }
+  el.innerHTML = `
+    <div class="metric"><b>Recorded fresh decisions:</b> ${s.total}</div>
+    <div class="metric"><b>Unique tickers:</b> ${s.uniqueTickers}</div>
+    <div class="metric"><b>BUY:</b> <span class="green">${s.counts.BUY}</span> &nbsp; <b>WAIT:</b> <span class="yellow">${s.counts.WAIT}</span> &nbsp; <b>NO TRADE:</b> ${s.counts.PASS}</div>
+    <div class="metric"><b>Most common blocker:</b> ${escapeHtml(s.topBlocker[0])} (${s.topBlocker[1]})</div>
+    <div class="metric muted">Foundation dataset only. v47.8 does not self-modify trading thresholds from these observations.</div>`;
+}
+
+function exportLearningJournal(){
+  loadLearningJournal();
+  const payload = {release:"v47.8", exportedAt:new Date().toISOString(), rowCount:learningJournal.length, rows:learningJournal};
+  const blob = new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href=url; a.download="signal-predator-learning-journal-v47-8.json";
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function clearLearningJournal(){
+  if(!confirm("Clear Predator Learning Journal data on this device? This does not delete saved positions or the closed-trade journal.")) return;
+  learningJournal=[];
+  persistLearningJournal();
+  renderLearningJournalSummary();
+}
+
 function getStore(key, fallback){
   try{
     const raw = localStorage.getItem(key);
@@ -641,7 +770,7 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.7.13.3",
+    version: "v47.8",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -650,6 +779,7 @@ function exportAppBackup(){
     riskSettings,
     accountProfile,
     opportunityHistory,
+    learningJournal: Array.isArray(learningJournal) ? learningJournal : [],
     gradeFilterSetting: typeof gradeFilterSetting !== "undefined" ? gradeFilterSetting : "A_AND_APLUS",
     lastAnalysis: getStore("signal_predator_last_analysis", null)
   };
@@ -658,7 +788,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-7-12.json";
+  a.download = "signal-predator-backup-v47-8.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -670,7 +800,7 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v47.0",
+    version: "v47.8",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
@@ -679,6 +809,7 @@ function showBackupText(){
     riskSettings,
     accountProfile,
     opportunityHistory,
+    learningJournal: Array.isArray(learningJournal) ? learningJournal : [],
     gradeFilterSetting: typeof gradeFilterSetting !== "undefined" ? gradeFilterSetting : "A_AND_APLUS"
   };
 
@@ -7816,6 +7947,7 @@ async function runAI(){
 
   const a = analyze(closes, pricePack.price);
   saveFreshTickerAnalysis(ticker, a, pricePack.source);
+  recordLearningSnapshot(ticker, a, "Individual Fresh Analysis");
 
   const fullHtml = safeRender(()=>renderFull(ticker, a));
   const compactHtml = safeRender(()=>renderCompact(ticker, a));
@@ -7876,6 +8008,7 @@ async function scanList(list, title){
 
     const a = analyze(closes, scanPrice);
     saveFreshTickerAnalysis(ticker, a, "Latest Completed Daily Close");
+    recordLearningSnapshot(ticker, a, `${title} Screening Scan`);
     const finalDecision = getSimplePredatorDecision(a);
     const funnel = getOpportunityFunnelRow(a);
     funnel.ticker = ticker;
@@ -7961,7 +8094,6 @@ async function scanList(list, title){
         </div>
         <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
       <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
-        <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
         <div class="metric"><b>BUY-ready:</b> 0</div>
         <div class="metric"><b>WAIT / watch only:</b> ${waits.length}</div>
         <div class="metric"><b>NO TRADE:</b> ${noTrades.length}</div>
@@ -8059,6 +8191,7 @@ async function findBestTrade(){
 
       a = analyze(closes, scanPrice);
       saveFreshTickerAnalysis(ticker, a, "Latest Completed Daily Close");
+      recordLearningSnapshot(ticker, a, "Find Best Trade Fresh Scan");
     }
 
     const d = getSimplePredatorDecision(a);
@@ -8187,7 +8320,9 @@ function quickRecheckPositions(){
   output.innerHTML = `<div class='card'><div class='section-title'>Quick Recheck</div><div class='metric'>Using your most recent live scan from ${new Date(cache.scannedAt).toLocaleString()}.</div><div class='metric muted'>No new API calls were used.</div><div class="pill blue">CACHE MODE</div><div class="pill green">API SAFE</div></div>` + renderPositionCards(refreshed);
 }
 
+loadLearningJournal();
 renderApiKeyStatus();
+renderLearningJournalSummary();
 renderWatchlist();
 renderPositions();
 renderPerformanceTracker();
