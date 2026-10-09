@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.8 Trade Journal & Learning Foundation</title>
+  <title>Signal Predator AI v47.9 Universe & Calibration Foundation</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -494,6 +494,16 @@ body.advanced-on .scan-support{display:block}
   </div>
 
   <div class="card">
+    <div class="section-title">Predator Strategy Universes (v47.9)</div>
+    <div class="metric muted">BUY: monthly 45-75 DTE directional candidates. SELL: weekly/biweekly cash-secured-put or covered-call candidates, NOT approved trades. The SELL list is informational until collateral, ownership, contract liquidity, and assignment risk are verified.</div>
+    <div class="row" style="margin-top:10px;flex-wrap:wrap;">
+      <button class="secondary" onclick="safeAction('Load BUY Batch',loadPredatorBuyBatch)">Load BUY Batch</button>
+      <button class="secondary" onclick="safeAction('Next BUY Batch',nextPredatorBuyBatch)">Next BUY Batch</button>
+      <button class="secondary" onclick="safeAction('View SELL Universe',showPredatorSellUniverse)">View SELL List</button>
+    </div>
+    <div id="predatorUniverseStatus" class="metric muted" style="margin-top:10px;"></div>
+    <div class="metric muted">Loading a batch replaces only the 15-symbol scan watchlist; it never places an order or changes existing positions. Batches are manual to respect the free data budget.</div>
+    <div class="divider"></div>
     <div class="section-title">Target Watchlist</div>
     <div class="row" style="margin-top:12px;">
       <input id="watchlistInput" placeholder="Add ticker (AAPL, NVDA, SOFI)" onkeydown="if(event.key==='Enter'){event.preventDefault();safeAction('Add Ticker', addTicker);}">
@@ -508,6 +518,8 @@ body.advanced-on .scan-support{display:block}
     <div class="section-title">Predator Learning Journal</div>
     <div class="metric muted">Automatically records fresh Predator decisions for later calibration. Cached rechecks are not duplicated, and this journal does not change BUY / WAIT / NO TRADE authority.</div>
     <div id="learningJournalSummary" style="margin-top:12px;"></div>
+    <div class="section-title" style="margin-top:16px;">v47.9 Predator vs Reality - Research Dashboard</div>
+    <div id="predatorCalibrationSummary" class="metric muted"></div>
     <div class="row" style="margin-top:10px;">
       <button class="secondary" onclick="exportLearningJournal()">Export Learning Data</button>
       <button class="secondary" onclick="clearLearningJournal()">Clear Learning Data</button>
@@ -617,6 +629,43 @@ function normalizeTicker(ticker){
   return String(ticker || "").toUpperCase().trim().replace(/[^A-Z.]/g,"");
 }
 
+// v47.9 - Separate candidate universes and read-only calibration research.
+const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
+const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
+const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
+const PREDATOR_BUY_BATCH_KEY = "signal_predator_buy_batch_v47_9";
+function getPredatorBuyBatchIndex(){const n=Number(getStore(PREDATOR_BUY_BATCH_KEY,0));return Number.isInteger(n)&&n>=0?n%Math.ceil(PREDATOR_BUY_UNIVERSE.length/PREDATOR_UNIVERSE_BATCH_SIZE):0;}
+function loadPredatorBuyBatch(){
+  const index=getPredatorBuyBatchIndex();
+  const start=index*PREDATOR_UNIVERSE_BATCH_SIZE;
+  customWatchlist=PREDATOR_BUY_UNIVERSE.slice(start,start+PREDATOR_UNIVERSE_BATCH_SIZE);
+  setStore("ai_options_watchlist",customWatchlist);
+  renderWatchlist();renderPredatorUniverseStatus();
+}
+function nextPredatorBuyBatch(){
+  setStore(PREDATOR_BUY_BATCH_KEY,(getPredatorBuyBatchIndex()+1)%Math.ceil(PREDATOR_BUY_UNIVERSE.length/PREDATOR_UNIVERSE_BATCH_SIZE));
+  loadPredatorBuyBatch();
+}
+function renderPredatorUniverseStatus(){
+  const el=document.getElementById("predatorUniverseStatus");if(!el)return;
+  const i=getPredatorBuyBatchIndex();
+  el.textContent=`BUY master: ${PREDATOR_BUY_UNIVERSE.length} candidates | Batch ${i+1} of ${Math.ceil(PREDATOR_BUY_UNIVERSE.length/PREDATOR_UNIVERSE_BATCH_SIZE)} | SELL master: ${PREDATOR_SELL_UNIVERSE.length} candidates`;
+}
+function showPredatorSellUniverse(){
+  const el=document.getElementById("output");if(!el)return;
+  el.innerHTML=`<div class="card"><div class="section-title">SELL / Wheel Candidate Universe</div><div class="metric">${PREDATOR_SELL_UNIVERSE.join(" Â· ")}</div><div class="metric yellow">CANDIDATES ONLY â NOT SELL SIGNALS. No live option chain, premium, delta, bid/ask or assignment collateral was verified.</div><div class="metric muted">Cash-secured put collateral = strike Ã 100 per contract (less premium only where broker rules permit). Covered calls require 100 owned shares per contract. Weekly/biweekly options are not automatically suitable for a small account.</div></div>`;
+}
+function getPredatorCalibrationResearch(){
+  const rows=Array.isArray(learningJournal)?learningJournal:[];
+  const valid=rows.filter(r=>r&&Number.isFinite(Number(r.price))&&Number(r.price)>0);
+  const groups={};for(const r of valid){const key=String(r.decision||"UNKNOWN");(groups[key]||(groups[key]=[])).push(r);}
+  return {observations:valid.length,uniqueSymbols:new Set(valid.map(r=>r.ticker)).size,byDecision:Object.fromEntries(Object.entries(groups).map(([k,v])=>[k,v.length])),outcomeCount:0};
+}
+function renderPredatorCalibrationSummary(){
+  const el=document.getElementById("predatorCalibrationSummary");if(!el)return;
+  const x=getPredatorCalibrationResearch();
+  el.innerHTML=`<div class="metric"><b>Valid recorded decision snapshots:</b> ${x.observations} across ${x.uniqueSymbols} symbols</div><div class="metric"><b>Decision distribution:</b> ${Object.entries(x.byDecision).map(([k,v])=>`${escapeHtml(k)} ${v}`).join(" | ")||"No observations yet"}</div><div class="metric"><b>Verified future outcomes:</b> ${x.outcomeCount} (not yet collected)</div><div class="metric yellow">Calibration status: INSUFFICIENT VERIFIED OUTCOMES. Win rate, expectancy, prediction accuracy, and rule-change recommendations are withheld. No BUY/WAIT/NO TRADE thresholds are modified.</div><div class="metric muted">A historical snapshot is not a realized trade or a measured future outcome. Future release must add date-aligned forward prices and contract-level fills before making performance claims.</div>`;
+}
 // v47.8 - Trade Journal & Learning Foundation.
 // This is an observational dataset only. It never grants BUY authority or changes trading thresholds.
 const PREDATOR_LEARNING_JOURNAL_KEY = "signal_predator_learning_journal_v47_8";
@@ -682,6 +731,7 @@ function recordLearningSnapshot(ticker, analysisData, source="Predator Analysis"
     learningJournal = learningJournal.slice(0,PREDATOR_LEARNING_MAX_ROWS);
     persistLearningJournal();
     renderLearningJournalSummary();
+    renderPredatorCalibrationSummary();
     return row;
   }catch(e){ console.warn("Learning journal skipped:",e); return null; }
 }
@@ -734,6 +784,7 @@ function clearLearningJournal(){
   learningJournal=[];
   persistLearningJournal();
   renderLearningJournalSummary();
+  renderPredatorCalibrationSummary();
 }
 
 function getStore(key, fallback){
@@ -8323,6 +8374,8 @@ function quickRecheckPositions(){
 loadLearningJournal();
 renderApiKeyStatus();
 renderLearningJournalSummary();
+renderPredatorCalibrationSummary();
+renderPredatorUniverseStatus();
 renderWatchlist();
 renderPositions();
 renderPerformanceTracker();
