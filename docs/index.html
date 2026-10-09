@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signal Predator AI v47.9 Universe & Calibration Foundation</title>
+  <title>Signal Predator AI v47.9.1 Universe & Calibration Foundation</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-  <div class="subtitle">v47.8 // autonomous signal journal // learning foundation // BUY integrity // provenance-safe position management</div>
+  <div class="subtitle">v47.9 // strategy universes // observational calibration // BUY integrity // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -634,16 +634,27 @@ const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAP
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
 const PREDATOR_BUY_BATCH_KEY = "signal_predator_buy_batch_v47_9";
-function getPredatorBuyBatchIndex(){const n=Number(getStore(PREDATOR_BUY_BATCH_KEY,0));return Number.isInteger(n)&&n>=0?n%Math.ceil(PREDATOR_BUY_UNIVERSE.length/PREDATOR_UNIVERSE_BATCH_SIZE):0;}
+let predatorBuyBatchSessionIndex = null;
+function getPredatorBuyBatchIndex(){
+  const count=Math.ceil(PREDATOR_BUY_UNIVERSE.length/PREDATOR_UNIVERSE_BATCH_SIZE);
+  if(Number.isInteger(predatorBuyBatchSessionIndex)) return predatorBuyBatchSessionIndex%count;
+  const n=Number(getStore(PREDATOR_BUY_BATCH_KEY,0));
+  predatorBuyBatchSessionIndex=Number.isInteger(n)&&n>=0?n%count:0;
+  return predatorBuyBatchSessionIndex;
+}
 function loadPredatorBuyBatch(){
   const index=getPredatorBuyBatchIndex();
   const start=index*PREDATOR_UNIVERSE_BATCH_SIZE;
-  customWatchlist=PREDATOR_BUY_UNIVERSE.slice(start,start+PREDATOR_UNIVERSE_BATCH_SIZE);
+  const next=PREDATOR_BUY_UNIVERSE.slice(start,start+PREDATOR_UNIVERSE_BATCH_SIZE);
+  if(!next.length || next.length>PREDATOR_UNIVERSE_BATCH_SIZE) throw new Error("Invalid BUY batch");
+  customWatchlist=[...next];
   setStore("ai_options_watchlist",customWatchlist);
   renderWatchlist();renderPredatorUniverseStatus();
 }
 function nextPredatorBuyBatch(){
-  setStore(PREDATOR_BUY_BATCH_KEY,(getPredatorBuyBatchIndex()+1)%Math.ceil(PREDATOR_BUY_UNIVERSE.length/PREDATOR_UNIVERSE_BATCH_SIZE));
+  const count=Math.ceil(PREDATOR_BUY_UNIVERSE.length/PREDATOR_UNIVERSE_BATCH_SIZE);
+  predatorBuyBatchSessionIndex=(getPredatorBuyBatchIndex()+1)%count;
+  setStore(PREDATOR_BUY_BATCH_KEY,predatorBuyBatchSessionIndex);
   loadPredatorBuyBatch();
 }
 function renderPredatorUniverseStatus(){
