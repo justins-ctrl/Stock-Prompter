@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-<title>Signal Predator AI v47.9.2 Certified Release — Universe & Calibration Foundation</title>
+    <title>Signal Predator AI v48.0 Contract Intelligence</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
- <div class="subtitle">v47.9.2 // strategy universes // observational calibration // BUY integrity // provenance-safe position management</div>
+    <div class="subtitle">v48.0 // Contract Intelligence // v47.9.2 BUY authority frozen // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -630,7 +630,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-  const PREDATOR_BUILD_ID = "v47.9.2";
+      const PREDATOR_BUILD_ID = "v48.0";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -8382,7 +8382,96 @@ function quickRecheckPositions(){
   applyPortfolioAlertSummary(refreshed, "TACTICAL QUICK RECHECK");
   output.innerHTML = `<div class='card'><div class='section-title'>Quick Recheck</div><div class='metric'>Using your most recent live scan from ${new Date(cache.scannedAt).toLocaleString()}.</div><div class='metric muted'>No new API calls were used.</div><div class="pill blue">CACHE MODE</div><div class="pill green">API SAFE</div></div>` + renderPositionCards(refreshed);
 }
+// v48.0 - Contract Intelligence Layer. BUY/WAIT/NO TRADE authority remains v47.9.2.
+const PREDATOR_CONTRACT_ENGINE_VERSION = "v48.0";
+const PREDATOR_V4792_GET_CONTRACT_GRADER = getContractGrader;
+const PREDATOR_V4792_RENDER_CONTRACT_GRADER = renderContractGrader;
 
+function getV48ContractIntegrity(a, contract={}, direction="N/A"){
+  const strike=safeNum(contract.strike,0), bid=safeNum(contract.bid,0), ask=safeNum(contract.ask,0);
+  const mark=safeNum(contract.mark,0), iv=safeNum(contract.iv,0), delta=safeNum(contract.delta,0);
+  const theta=safeNum(contract.theta,0), dte=Math.floor(safeNum(contract.dte,-1));
+  const volume=Math.max(0,Math.floor(safeNum(contract.volume,0)));
+  const openInterest=Math.max(0,Math.floor(safeNum(contract.openInterest,0)));
+  const sharePrice=safeNum(contract.sharePrice,0)>0?safeNum(contract.sharePrice,0):safeNum(a?.price,0);
+  const missing=[], invalid=[], warnings=[];
+
+  if(!(strike>0)) missing.push("Strike");
+  if(!(dte>=0)) missing.push("Expiration / DTE");
+  if(!(bid>0)) missing.push("Bid");
+  if(!(ask>0)) missing.push("Ask");
+  if(!(iv>0)) missing.push("IV");
+  if(!(Math.abs(delta)>0)) missing.push("Delta");
+  if(theta===0) missing.push("Theta");
+  if(!(sharePrice>0)) missing.push("Share Price");
+  if(volume===0 && openInterest===0) missing.push("Volume / Open Interest");
+
+  if(bid>0 && ask>0 && ask<bid) invalid.push("Ask is below bid (crossed quote)");
+  if(mark>0 && bid>0 && ask>0 && (mark<bid || mark>ask)) invalid.push("Mark is outside bid/ask");
+  if(iv<0 || iv>=1000) invalid.push("IV is outside a usable range");
+  if(Math.abs(delta)>1) invalid.push("Delta must be between -1 and 1");
+  if(direction==="BUY CALL" && delta<0) invalid.push("Call delta should be positive");
+  if(direction==="BUY PUT" && delta>0) invalid.push("Put delta should be negative");
+  if(theta>0) invalid.push("Long-option theta should be negative");
+
+  const effectiveMark=mark>0?mark:(bid>0&&ask>0?(bid+ask)/2:0);
+  const spreadPct=bid>0&&ask>0&&ask>=bid&&effectiveMark>0?((ask-bid)/effectiveMark)*100:null;
+  if(dte>=0 && (dte<45 || dte>75)) warnings.push("DTE outside Predator's 45-75 target");
+  if(spreadPct!==null && spreadPct>20) warnings.push("Bid/ask spread wider than 20%");
+  if((volume<10)&&(openInterest<50)&&(volume>0||openInterest>0)) warnings.push("Thin contract liquidity");
+
+  return {status:missing.length?"INCOMPLETE":invalid.length?"INVALID":"COMPLETE",missing,invalid,warnings,sharePrice,effectiveMark,spreadPct,volume,openInterest,dte};
+}
+
+getContractGrader = function(a, contract={}){
+  a=ensureEngineDefaults(a);
+  const d=getSimplePredatorDecision(a);
+  const direction=contract.direction||d.direction||"N/A";
+  const integrity=getV48ContractIntegrity(a,contract,direction);
+  const normalized={...contract,sharePrice:integrity.sharePrice,mark:integrity.effectiveMark};
+  const g=PREDATOR_V4792_GET_CONTRACT_GRADER(a,normalized);
+  const contractDebit=integrity.effectiveMark>0?integrity.effectiveMark*100:0;
+  const maxContractDebit=safeNum(g.maxPremium,0)>0?safeNum(g.maxPremium,0)*100:0;
+  const capitalFits=maxContractDebit<=0?true:(contractDebit>0&&contractDebit<=maxContractDebit+0.0001);
+  const outsideDte=integrity.dte<45||integrity.dte>75;
+  const wideSpread=integrity.spreadPct===null||integrity.spreadPct>20;
+  const weakLiquidity=integrity.volume<10&&integrity.openInterest<50;
+  const hardReject=d.decision!=="BUY"||!capitalFits||outsideDte||wideSpread||weakLiquidity||Math.abs(safeNum(contract.delta,0))<0.25;
+
+  let verdict="REJECTED",color="red",execution="DO NOT ENTER THIS CONTRACT";
+  let reason="This specific option contract does not meet Predator's v48 execution-quality rules.";
+  if(integrity.status==="INCOMPLETE"){
+    verdict="INCOMPLETE";execution="DO NOT ENTER - COMPLETE CONTRACT DATA";reason=`Missing required contract data: ${integrity.missing.join(", ")}.`;
+  }else if(integrity.status==="INVALID"){
+    verdict="INVALID";execution="DO NOT ENTER - FIX CONTRACT DATA";reason=integrity.invalid.join("; ");
+  }else if(!hardReject && g.total>=85 && g.spreadScore>=70 && g.liquidityScore>=55){
+    verdict="APPROVED";color="green";execution="CONTRACT APPROVED";reason="The stock BUY already exists, and this contract separately passes v48 data, capital, DTE, spread, liquidity, and Greek guards.";
+  }else if(!hardReject && g.total>=70){
+    verdict="CONDITIONAL";color="yellow";execution="LIMIT ORDER / IMPROVE EXECUTION";reason="The stock BUY exists and this contract is usable, but execution quality is not strong enough for full approval.";
+  }
+
+  let primaryWarning="NONE";
+  if(d.decision!=="BUY") primaryWarning="NO STOCK BUY AUTHORITY";
+  else if(integrity.status==="INCOMPLETE") primaryWarning="CONTRACT DATA INCOMPLETE";
+  else if(integrity.status==="INVALID") primaryWarning="CONTRACT DATA INVALID";
+  else if(!capitalFits) primaryWarning="PREMIUM EXCEEDS ACCOUNT LIMIT";
+  else if(outsideDte) primaryWarning="DTE OUTSIDE 45-75 TARGET";
+  else if(wideSpread) primaryWarning="BID/ASK SPREAD TOO WIDE";
+  else if(weakLiquidity) primaryWarning="LOW LIQUIDITY";
+  else if(g.deltaScore<60) primaryWarning="DELTA OUTSIDE TARGET";
+  else if(g.ivScore<45) primaryWarning="RICH IMPLIED VOLATILITY";
+
+  return {...g,verdict,color,execution,reason,primaryWarning,capitalFits,contractDebit,maxContractDebit,integrity,dataSource:"MANUAL ROBINHOOD CONTRACT INPUT"};
+};
+
+renderContractGrader = function(a, contract={}){
+  const g=getContractGrader(a,contract);
+  let html=PREDATOR_V4792_RENDER_CONTRACT_GRADER(a,contract).replace("Live Contract Grader","v48.0 Contract Intelligence");
+  const extra=`<div class="metric"><b>Stock BUY Authority:</b> ${getSimplePredatorDecision(a).decision==="BUY"?"BUY EXISTS":"NO BUY - CONTRACT CANNOT OVERRIDE"}</div><div class="metric"><b>Contract Data Status:</b> ${escapeHtml(g.integrity.status)}</div><div class="metric"><b>Data Source:</b> ${escapeHtml(g.dataSource)}</div><div class="metric"><b>Approx. Contract Debit:</b> ${g.contractDebit>0?"$"+g.contractDebit.toFixed(2):"N/A"}</div><div class="metric"><b>Predator Max Contract Debit:</b> ${g.maxContractDebit>0?"$"+g.maxContractDebit.toFixed(2):"N/A"}</div>${g.integrity.missing.length?`<div class="metric red"><b>Missing:</b> ${escapeHtml(g.integrity.missing.join("; "))}</div>`:""}${g.integrity.invalid.length?`<div class="metric red"><b>Invalid:</b> ${escapeHtml(g.integrity.invalid.join("; "))}</div>`:""}${g.integrity.warnings.length?`<div class="metric yellow"><b>Warnings:</b> ${escapeHtml(g.integrity.warnings.join("; "))}</div>`:""}`;
+  html=html.replace('<div class="divider"></div>\n       <div class="section-title">Contract Snapshot</div>',extra+'<div class="divider"></div>\n       <div class="section-title">Contract Snapshot</div>');
+  html=html.replace('This score grades the contract data you enter. It does not guarantee profit, and it does not place an order.','v48 grades the Robinhood contract values you enter. It does not read Robinhood live option-chain data, place orders, or change Predator stock BUY / WAIT / NO TRADE authority.');
+  return html;
+};
 loadLearningJournal();
 renderApiKeyStatus();
 renderLearningJournalSummary();
