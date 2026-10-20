@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v48.0 Contract Intelligence</title>
+    <title>Signal Predator AI v48.2 Freshness & Reliability</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v48.0 // Contract Intelligence // v47.9.2 BUY authority frozen // provenance-safe position management</div>
+    <div class="subtitle">v48.2 // Freshness & Reliability // v47.9.2 BUY authority frozen // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -630,7 +630,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v48.0";
+      const PREDATOR_BUILD_ID = "v48.2";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -665,7 +665,7 @@ function renderPredatorUniverseStatus(){
 }
 function showPredatorSellUniverse(){
   const el=document.getElementById("output");if(!el)return;
-  el.innerHTML=`<div class="card"><div class="section-title">SELL / Wheel Candidate Universe</div><div class="metric">${PREDATOR_SELL_UNIVERSE.join(" Â· ")}</div><div class="metric yellow">CANDIDATES ONLY â NOT SELL SIGNALS. No live option chain, premium, delta, bid/ask or assignment collateral was verified.</div><div class="metric muted">Cash-secured put collateral = strike Ã 100 per contract (less premium only where broker rules permit). Covered calls require 100 owned shares per contract. Weekly/biweekly options are not automatically suitable for a small account.</div></div>`;
+  el.innerHTML=`<div class="card"><div class="section-title">SELL / Wheel Candidate Universe</div><div class="metric">${PREDATOR_SELL_UNIVERSE.join(" ÃÂ· ")}</div><div class="metric yellow">CANDIDATES ONLY Ã¢ÂÂ NOT SELL SIGNALS. No live option chain, premium, delta, bid/ask or assignment collateral was verified.</div><div class="metric muted">Cash-secured put collateral = strike ÃÂ 100 per contract (less premium only where broker rules permit). Covered calls require 100 owned shares per contract. Weekly/biweekly options are not automatically suitable for a small account.</div></div>`;
 }
 function getPredatorCalibrationResearch(){
   const rows=Array.isArray(learningJournal)?learningJournal:[];
@@ -1281,7 +1281,7 @@ function renderOpportunityBoard(rows, title, desk){
       ${rows.map((r,i)=>{
         const prev = getPreviousOpportunity(r.ticker, desk);
         const evolution = prev
-          ? `${prev.verdict} ${prev.focusScore} â ${r.verdict} ${r.focusScore}`
+          ? `${prev.verdict} ${prev.focusScore} Ã¢ÂÂ ${r.verdict} ${r.focusScore}`
           : "First ranked scan";
         return `<div class="opportunity-row">
           <div class="metric"><span class="rank-badge">${i+1}</span><b>${r.ticker}</b> - <span class="${signalClass(r.verdict)}">${r.verdict}</span></div>
@@ -1945,6 +1945,39 @@ function classifyAlphaVantageMessage(data){
   if(msg) return {kind:"API_MESSAGE", message:msg};
   return {kind:"NONE", message:""};
 }
+// v48.2: Candle date, not download/cache time, is the source of freshness authority.
+// Daily bars are completed-session data. US exchange holidays are conservatively
+// treated as stale until a dated completed bar is available.
+const PREDATOR_CANDLE_META_KEY = "signal_predator_candle_meta_v482";
+function predatorEasternParts(now=new Date()){
+  const parts = new Intl.DateTimeFormat("en-US", {timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit",weekday:"short",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(now);
+  return Object.fromEntries(parts.map(p=>[p.type,p.value]));
+}
+function predatorExpectedCompletedSession(now=new Date()){
+  const p=predatorEasternParts(now);
+  let day=new Date(`${p.year}-${p.month}-${p.day}T12:00:00Z`);
+  // The daily endpoint may lag after close. Wait until 19:00 ET.
+  if(Number(p.hour)<19) day.setUTCDate(day.getUTCDate()-1);
+  while(day.getUTCDay()===0 || day.getUTCDay()===6) day.setUTCDate(day.getUTCDate()-1);
+  return day.toISOString().slice(0,10);
+}
+function predatorCandleStatus(symbol, now=new Date()){
+  const meta=getStore(PREDATOR_CANDLE_META_KEY,{});
+  const row=meta?.[normalizeTicker(symbol)];
+  const candleDate=typeof row?.candleDate==="string" ? row.candleDate : null;
+  const expected=predatorExpectedCompletedSession(now);
+  const valid=!!candleDate && /^\d{4}-\d{2}-\d{2}$/.test(candleDate);
+  return {candleDate:valid?candleDate:null, expected, current:valid && candleDate>=expected, source:row?.source||"unknown", checkedAt:row?.checkedAt||null};
+}
+function predatorSaveCandleMeta(symbol,candleDate,source){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(candleDate))) return;
+  const meta=getStore(PREDATOR_CANDLE_META_KEY,{});
+  meta[normalizeTicker(symbol)]={candleDate,source,checkedAt:new Date().toISOString()};
+  setStore(PREDATOR_CANDLE_META_KEY,Object.fromEntries(Object.entries(meta).slice(-60)));
+}
+function predatorFreshnessLabel(status){
+  return `Newest completed candle: ${status.candleDate||"UNKNOWN"} | Expected by conservative session check: ${status.expected} | ${status.current?"CURRENT DAILY CLOSE":"STALE / UNVERIFIED"}`;
+}
 function getDailyHistoryCache(){
   const c = getStore(PREDATOR_DAILY_HISTORY_CACHE_KEY, {});
   return c && typeof c === "object" ? c : {};
@@ -1957,6 +1990,7 @@ function readCachedDailyHistory(symbol, allowStale=false){
     if(!Number.isFinite(ageMs) || ageMs < 0) return null;
     if(!allowStale && ageMs > PREDATOR_HISTORY_CACHE_MAX_AGE_MS) return null;
     if(allowStale && ageMs > PREDATOR_HISTORY_CACHE_HARD_MAX_AGE_MS) return null;
+    if(item.candleDate && !predatorCandleStatus(symbol).candleDate) predatorSaveCandleMeta(symbol,item.candleDate,"Daily cache");
     return {...item, ageMs};
   }catch(e){ return null; }
 }
@@ -1965,7 +1999,7 @@ function writeCachedDailyHistory(symbol, closes){
     const key = normalizeTicker(symbol);
     if(!key || !Array.isArray(closes) || !closes.length) return;
     const c = getDailyHistoryCache();
-    c[key] = {closes:closes.slice(0,60), savedAt:new Date().toISOString()};
+    c[key] = {closes:closes.slice(0,60), savedAt:new Date().toISOString(), candleDate:getStore(PREDATOR_CANDLE_META_KEY,{})?.[key]?.candleDate||null};
     const entries = Object.entries(c).sort((a,b)=>new Date(b[1]?.savedAt||0)-new Date(a[1]?.savedAt||0)).slice(0,40);
     setStore(PREDATOR_DAILY_HISTORY_CACHE_KEY,Object.fromEntries(entries));
   }catch(e){ console.warn("Daily history cache skipped:",e); }
@@ -2057,8 +2091,10 @@ async function getHistory(symbol, options={}){
       return null;
     }
 
-    const closes = Object.values(series).slice(0,60).map(v=>parseFloat(v["4. close"])).filter(v=>!Number.isNaN(v));
+    const datedCandles = Object.entries(series).filter(([day])=>/^\d{4}-\d{2}-\d{2}$/.test(day)).sort((a,b)=>b[0].localeCompare(a[0]));
+    const closes = datedCandles.slice(0,60).map(([,v])=>parseFloat(v["4. close"])).filter(v=>Number.isFinite(v)&&v>0);
     if(closes.length){
+      predatorSaveCandleMeta(symbol,datedCandles[0][0],"Alpha Vantage daily");
       writeCachedDailyHistory(symbol, closes);
       logDataRequest("daily", true, "Daily candles loaded and cached");
       updateApiStatus("Daily history loaded successfully and cached.", "green");
@@ -4102,7 +4138,7 @@ function renderWhyWaitingCard(a){
     <div class="section-title">Why Predator Is Waiting</div>
     <div class="metric"><b>Current Status:</b> <span class="${h.patienceColor}">${h.patienceStatus}</span></div>
     <div class="metric"><b>Why:</b> ${r.missingPiece}</div>
-    <div class="plain-rule"><div class="big-simple">If this happens:</div><div class="metric">â ${h.step3}</div><div class="metric">â Price does not invalidate near $${r.invalidation}</div><div class="metric">â Confirmation hold rule is satisfied</div></div>
+    <div class="plain-rule"><div class="big-simple">If this happens:</div><div class="metric">Ã¢ÂÂ ${h.step3}</div><div class="metric">Ã¢ÂÂ Price does not invalidate near $${r.invalidation}</div><div class="metric">Ã¢ÂÂ Confirmation hold rule is satisfied</div></div>
     <div class="divider"></div><div class="metric"><b>Then:</b> ${h.step4}</div><div class="metric"><b>Confidence Now:</b> ${r.currentReadiness}/100</div><div class="metric"><b>Confidence After Confirmation:</b> ${r.confirmedReadiness}/100</div>
   </div>`;
 }
@@ -6433,8 +6469,8 @@ function renderProfessionalReasonCard(a){
   <div class="card">
     <div class="section-title">Why a Disciplined Trader Would ${c.tier === "PASS" ? "Avoid" : c.tier.startsWith("WAIT") || c.tier === "WATCHLIST ONLY" ? "Wait" : "Consider This"}</div>
     <div class="pro-list">
-      ${c.reasonsFor.map(x=>`<div class="pro-row"><span class="green">â</span> ${x}</div>`).join("")}
-      ${c.reasonsAgainst.map(x=>`<div class="pro-row"><span class="red">â</span> ${x}</div>`).join("")}
+      ${c.reasonsFor.map(x=>`<div class="pro-row"><span class="green">Ã¢ÂÂ</span> ${x}</div>`).join("")}
+      ${c.reasonsAgainst.map(x=>`<div class="pro-row"><span class="red">Ã¢ÂÂ</span> ${x}</div>`).join("")}
     </div>
     <div class="divider"></div>
     <div class="metric"><b>Predator Coach:</b> ${c.coach}</div>
@@ -6578,7 +6614,7 @@ function renderPredatorBrainCard(a){
     <div class="metric"><b>Cancel Rule:</b> ${b.cancelRule}</div>
     <div class="divider"></div>
     <div class="section-title">Predator Checklist</div>
-    ${b.checklist.map(x=>`<div class="checklist-row"><span>${x.pass ? "â" : "â"} ${x.name}</span><span class="${x.pass ? "green" : "yellow"}">${x.pass ? "PASS" : "WAIT"}</span></div>`).join("")}
+    ${b.checklist.map(x=>`<div class="checklist-row"><span>${x.pass ? "Ã¢ÂÂ" : "Ã¢ÂÂ"} ${x.name}</span><span class="${x.pass ? "green" : "yellow"}">${x.pass ? "PASS" : "WAIT"}</span></div>`).join("")}
   </div>`;
 }
 
@@ -6664,7 +6700,7 @@ function renderStrategyRankingCard(a){
     <div class="section-title">Strategy Rankings</div>
     ${bot.rankings.rows.map((r,i)=>`
       <div class="rank-row">
-        <span>${i+1}. ${r.name}${i===0 ? " â­" : ""}</span>
+        <span>${i+1}. ${r.name}${i===0 ? " Ã¢Â­Â" : ""}</span>
         <span class="${signalClass(r.name)}">${r.score}/100</span>
       </div>`).join("")}
     <div class="divider"></div>
@@ -8021,6 +8057,7 @@ async function scanList(list, title){
   renderThinkingCard([
     "SCANNING WITH THE FINAL DECISION ENGINE...",
     "CHECKING MONTHLY BUY SETUPS...",
+    "VERIFYING DATED DAILY CANDLES (NOT LIVE OPTIONS QUOTES)...",
     "VERIFYING EACH TICKER BEFORE CALLING NO TRADES..."
   ]);
 
@@ -8033,6 +8070,7 @@ async function scanList(list, title){
 
   let quotaStopped = false;
   let cacheHits = 0;
+  const staleRows = [];
   const usageAtStart = getPredatorApiUsage().requests;
 
   for(let i=0; i<list.length; i++){
@@ -8044,7 +8082,10 @@ async function scanList(list, title){
       failures.push({ticker, stage:"API budget", message:"Not requested after Alpha Vantage quota/entitlement stop."});
       continue;
     }
-    const closes = await getHistory(ticker);
+    // Only force an API refresh if the latest completed candle is unverified.
+    // This avoids burning free-tier requests on known-current daily bars.
+    const beforeStatus=predatorCandleStatus(ticker);
+    const closes = await getHistory(ticker,{forceFresh:!beforeStatus.current});
     if(hadFreshCache && closes?.length) cacheHits++;
     if(isQuotaStop()) quotaStopped = true;
     if(!closes || !closes.length){
@@ -8053,6 +8094,13 @@ async function scanList(list, title){
         stage:"Daily history",
         message:lastApiIssue?.message || "Daily history unavailable."
       });
+      continue;
+    }
+
+    const candleStatus=predatorCandleStatus(ticker);
+    if(!candleStatus.current){
+      staleRows.push({ticker,status:candleStatus});
+      failures.push({ticker,stage:"Data freshness",message:predatorFreshnessLabel(candleStatus)});
       continue;
     }
 
@@ -8122,6 +8170,8 @@ async function scanList(list, title){
   const scanApiRequests = Math.max(0, safeNum(usageAfter.requests,0) - safeNum(usageAtStart,0));
   const apiBudgetText = `API requests this scan: ${scanApiRequests} | Cache hits: ${cacheHits} | Local diagnostic today: ${usageAfter.requests}/${PREDATOR_FREE_DAILY_BUDGET}`;
 
+  const freshnessText = `Verified current completed daily candles: ${processed}/${attempted} | Stale or unverified: ${staleRows.length} | Expected completed session: ${predatorExpectedCompletedSession()}`;
+
   // CRITICAL: zero successfully processed tickers is DATA FAILURE, never "NO TRADES".
   if(processed === 0){
     const lastFailure = failures[failures.length - 1];
@@ -8135,6 +8185,7 @@ async function scanList(list, title){
         </div>
         <div class="metric"><b>Successfully analyzed:</b> 0/${attempted}</div>
         <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
+        <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div>
         <div class="metric"><b>Data failures:</b> ${failures.length}</div>
         <div class="metric"><b>Latest issue:</b> ${lastFailure ? `${lastFailure.ticker} - ${lastFailure.stage}: ${String(lastFailure.message).slice(0,220)}` : "Unknown data failure"}</div>
         <div class="metric red"><b>Do not interpret this as NO TRADES.</b></div>
@@ -8156,12 +8207,14 @@ async function scanList(list, title){
             : `Predator successfully analyzed the full list. None has a BUY-approved monthly option entry right now.`}
         </div>
         <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
+        <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div>
       <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
+        <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div>
         <div class="metric"><b>BUY-ready:</b> 0</div>
         <div class="metric"><b>WAIT / watch only:</b> ${waits.length}</div>
         <div class="metric"><b>NO TRADE:</b> ${noTrades.length}</div>
         ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length}</div>` : ""}
-        <div class="metric ${completeScan ? "green" : "yellow"}"><b>${completeScan ? "No individual rescans are needed." : "Do not assume the failed tickers are NO TRADE."}</b></div>
+        <div class="metric ${completeScan ? "green" : "yellow"}"><b>${completeScan ? "All tickers had dated completed-session data; live contract verification is still required." : "Do not assume the failed tickers are NO TRADE."}</b></div>
 
         ${renderOpportunityFunnelSummary(funnelRows, "Monthly Buy Opportunity Funnel")}
         ${closest.length ? `
@@ -8186,19 +8239,20 @@ async function scanList(list, title){
   output.innerHTML = `
     <div class="card hold-alert">
       <div class="section-title">${title}</div>
-      <div class="final-answer-word green">${topBuys.length === 1 ? "1 TRADE READY" : topBuys.length + " TRADES READY"}</div>
+      <div class="final-answer-word green">${topBuys.length === 1 ? "1 SCREENING CANDIDATE" : topBuys.length + " SCREENING CANDIDATES"}</div>
       <div class="final-answer-sub">
-        These names passed the same final BUY gate used by an individual Predator Analysis.
+        These stock setups passed the internal model gate using verified dated daily candles. Options contracts, bid/ask and fills are NOT live-verified. Check the actual broker chain before any order.
       </div>
 
       <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
+      <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div>
       ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length} - failed names were not classified.</div>` : ""}
 
       ${topBuys.map((r,index)=>`
         <div class="card" style="padding:14px;margin-top:12px;">
-          <div class="section-title">#${index+1} BUY-READY</div>
+          <div class="section-title">#${index+1} SCREENING CANDIDATE</div>
           <div class="metric"><b>${r.ticker}</b> - <span class="green">${r.finalDecision.direction}</span></div>
-          <div class="metric"><b>Final Decision:</b> <span class="green">BUY</span></div>
+          <div class="metric"><b>Stock setup:</b> <span class="yellow">CONDITIONAL â VERIFY CONTRACT</span></div>
           <div class="metric"><b>Bot Confidence:</b> ${r.conviction}/100</div>
           <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
           <div class="metric"><b>Account Fit:</b> ${r.finalDecision.accountFit}</div>
