@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v48.3 Decision Integrity</title>
+    <title>Signal Predator AI v48.4 Directional Diagnostics</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v48.3 // Decision Integrity & Reliability // v47.9.2 BUY authority frozen // provenance-safe position management</div>
+    <div class="subtitle">v48.4 // Directional Diagnostics & Reliability // v47.9.2 BUY authority frozen // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -630,7 +630,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v48.3";
+      const PREDATOR_BUILD_ID = "v48.4";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -4406,7 +4406,7 @@ function getSwingValidationEngine(a){
   const price = parseFloat(a.price || "NaN");
   const entryIntegrity = getEntryIntegrityEngine(a);
 
-  let structureValid = true;
+  let structureValid = false;
   let triggerConfirmed = false;
   let distanceToTriggerPct = null;
   let distanceToInvalidationPct = null;
@@ -4431,7 +4431,7 @@ function getSwingValidationEngine(a){
     }
   }
 
-  const hasValidLevels = Number.isFinite(price) && price > 0 && Number.isFinite(trigger) && trigger > 0 && Number.isFinite(invalidation) && invalidation > 0;
+  const hasValidLevels = Number.isFinite(price) && price > 0 && Number.isFinite(trigger) && trigger > 0 && Number.isFinite(invalidation) && invalidation > 0 && (direction === "BUY CALL" ? invalidation < trigger : direction === "BUY PUT" ? invalidation > trigger : false);
   const hardBlock = !hasValidLevels || !validDirection || quality === "REJECT" || noTrade !== "CLEAR" || marketState === "DANGEROUS" || !structureValid || alignment < 60;
   const strongMonthlyThesis = validDirection && !hardBlock && alignment >= 75 && timing >= 65 && conviction >= 75;
   const eliteMonthlyThesis = validDirection && !hardBlock && alignment >= 85 && timing >= 75 && conviction >= 85;
@@ -4445,8 +4445,8 @@ function getSwingValidationEngine(a){
 
   if(hardBlock){
     validation = "NO TRADE";
-    blocker = !hasValidLevels ? "MISSING / INVALID PRICE LEVELS" : !validDirection ? "NO DIRECTIONAL EDGE" : !structureValid ? "STRUCTURE INVALIDATION" : noTrade !== "CLEAR" ? "NO-TRADE ZONE" : quality === "REJECT" ? "QUALITY REJECT" : marketState === "DANGEROUS" ? "DANGEROUS MARKET" : alignment < 60 ? "ALIGNMENT" : "SETUP QUALITY";
-    reason = blocker === "NO-TRADE ZONE" ? `No-trade zone: ${a.noTradeZone?.zone || "UNKNOWN"}. ${a.noTradeZone?.reason || "Setup location does not pass the risk gate."}` : blocker === "MISSING / INVALID PRICE LEVELS" ? "Cannot verify price, trigger, and invalidation. No entry permitted." : "The monthly thesis is not structurally valid enough to enter.";
+    blocker = !validDirection ? "NO DIRECTIONAL EDGE" : !hasValidLevels ? "MISSING / INVALID PRICE LEVELS" : !structureValid ? "STRUCTURE INVALIDATION" : noTrade !== "CLEAR" ? "NO-TRADE ZONE" : quality === "REJECT" ? "QUALITY REJECT" : marketState === "DANGEROUS" ? "DANGEROUS MARKET" : alignment < 60 ? "ALIGNMENT" : "SETUP QUALITY";
+    reason = blocker === "NO-TRADE ZONE" ? `No-trade zone: ${a.noTradeZone?.zone || "UNKNOWN"}. ${a.noTradeZone?.reason || "Setup location does not pass the risk gate."}` : blocker === "MISSING / INVALID PRICE LEVELS" ? "Directional setup exists, but price, trigger, or invalidation is missing or invalid. No entry permitted." : blocker === "NO DIRECTIONAL EDGE" ? "No qualified BUY CALL or BUY PUT direction. Entry price levels are intentionally unavailable until a directional setup exists." : "The monthly thesis is not structurally valid enough to enter.";
   }else if(!strongMonthlyThesis){
     validation = "NO TRADE";
     blocker = "THESIS QUALITY";
