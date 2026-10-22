@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v48.2 Freshness & Reliability</title>
+    <title>Signal Predator AI v48.3 Decision Integrity</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v48.2 // Freshness & Reliability // v47.9.2 BUY authority frozen // provenance-safe position management</div>
+    <div class="subtitle">v48.3 // Decision Integrity & Reliability // v47.9.2 BUY authority frozen // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -630,7 +630,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v48.2";
+      const PREDATOR_BUILD_ID = "v48.3";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -1945,7 +1945,7 @@ function classifyAlphaVantageMessage(data){
   if(msg) return {kind:"API_MESSAGE", message:msg};
   return {kind:"NONE", message:""};
 }
-// v48.2: Candle date, not download/cache time, is the source of freshness authority.
+// v48.3: Candle date, not download/cache time, is the source of freshness authority.
 // Daily bars are completed-session data. US exchange holidays are conservatively
 // treated as stale until a dated completed bar is available.
 const PREDATOR_CANDLE_META_KEY = "signal_predator_candle_meta_v482";
@@ -1953,13 +1953,60 @@ function predatorEasternParts(now=new Date()){
   const parts = new Intl.DateTimeFormat("en-US", {timeZone:"America/New_York",year:"numeric",month:"2-digit",day:"2-digit",weekday:"short",hour:"2-digit",minute:"2-digit",hour12:false}).formatToParts(now);
   return Object.fromEntries(parts.map(p=>[p.type,p.value]));
 }
+function predatorObservedHoliday(year, month, day){
+  // month is 1-based. Weekends observed on nearest weekday.
+  const d=new Date(Date.UTC(year,month-1,day));
+  const w=d.getUTCDay();
+  if(w===6)d.setUTCDate(d.getUTCDate()-1);
+  if(w===0)d.setUTCDate(d.getUTCDate()+1);
+  return d.toISOString().slice(0,10);
+}
+function predatorNthWeekday(year,month,weekday,n){
+  const d=new Date(Date.UTC(year,month-1,1));
+  d.setUTCDate(1+(weekday-d.getUTCDay()+7)%7+(n-1)*7);
+  return d.toISOString().slice(0,10);
+}
+function predatorLastWeekday(year,month,weekday){
+  const d=new Date(Date.UTC(year,month,0));
+  d.setUTCDate(d.getUTCDate()-(d.getUTCDay()-weekday+7)%7);
+  return d.toISOString().slice(0,10);
+}
+function predatorEasterSunday(year){
+  const a=year%19,b=Math.floor(year/100),c=year%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k+7)%7,m=Math.floor((a+11*h+22*l)/451);
+  const month=Math.floor((h+l-7*m+114)/31),day=(h+l-7*m+114)%31+1;
+  return new Date(Date.UTC(year,month-1,day));
+}
+function predatorExchangeHoliday(iso){
+  const year=Number(iso.slice(0,4));
+  for(const y of [year-1,year,year+1]){
+    const holidays=[
+      predatorObservedHoliday(y,1,1),
+      predatorNthWeekday(y,1,1,3),
+      predatorNthWeekday(y,2,1,3),
+      predatorLastWeekday(y,5,1),
+      predatorObservedHoliday(y,6,19),
+      predatorObservedHoliday(y,7,4),
+      predatorNthWeekday(y,9,1,1),
+      predatorNthWeekday(y,11,4,4),
+      predatorObservedHoliday(y,12,25)
+    ];
+    const goodFriday=predatorEasterSunday(y);goodFriday.setUTCDate(goodFriday.getUTCDate()-2);
+    holidays.push(goodFriday.toISOString().slice(0,10));
+    if(holidays.includes(iso))return true;
+  }
+  return false;
+}
 function predatorExpectedCompletedSession(now=new Date()){
   const p=predatorEasternParts(now);
   let day=new Date(`${p.year}-${p.month}-${p.day}T12:00:00Z`);
-  // The daily endpoint may lag after close. Wait until 19:00 ET.
-  if(Number(p.hour)<19) day.setUTCDate(day.getUTCDate()-1);
-  while(day.getUTCDay()===0 || day.getUTCDay()===6) day.setUTCDate(day.getUTCDate()-1);
-  return day.toISOString().slice(0,10);
+  // Conservative daily-feed cutoff at 19:00 Eastern. The provider can still lag.
+  if(Number(p.hour)<19)day.setUTCDate(day.getUTCDate()-1);
+  for(let i=0;i<14;i++){
+    const iso=day.toISOString().slice(0,10);
+    if(day.getUTCDay()!==0 && day.getUTCDay()!==6 && !predatorExchangeHoliday(iso))return iso;
+    day.setUTCDate(day.getUTCDate()-1);
+  }
+  throw new Error("Cannot determine last completed exchange session");
 }
 function predatorCandleStatus(symbol, now=new Date()){
   const meta=getStore(PREDATOR_CANDLE_META_KEY,{});
@@ -1967,7 +2014,7 @@ function predatorCandleStatus(symbol, now=new Date()){
   const candleDate=typeof row?.candleDate==="string" ? row.candleDate : null;
   const expected=predatorExpectedCompletedSession(now);
   const valid=!!candleDate && /^\d{4}-\d{2}-\d{2}$/.test(candleDate);
-  return {candleDate:valid?candleDate:null, expected, current:valid && candleDate>=expected, source:row?.source||"unknown", checkedAt:row?.checkedAt||null};
+  return {candleDate:valid?candleDate:null, expected, current:valid && candleDate>=expected && candleDate<=predatorEasternParts(now).year+"-"+predatorEasternParts(now).month+"-"+predatorEasternParts(now).day, source:row?.source||"unknown", checkedAt:row?.checkedAt||null};
 }
 function predatorSaveCandleMeta(symbol,candleDate,source){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(candleDate))) return;
@@ -1990,7 +2037,7 @@ function readCachedDailyHistory(symbol, allowStale=false){
     if(!Number.isFinite(ageMs) || ageMs < 0) return null;
     if(!allowStale && ageMs > PREDATOR_HISTORY_CACHE_MAX_AGE_MS) return null;
     if(allowStale && ageMs > PREDATOR_HISTORY_CACHE_HARD_MAX_AGE_MS) return null;
-    if(item.candleDate && !predatorCandleStatus(symbol).candleDate) predatorSaveCandleMeta(symbol,item.candleDate,"Daily cache");
+    if(item.candleDate && predatorCandleStatus(symbol).candleDate !== item.candleDate) predatorSaveCandleMeta(symbol,item.candleDate,"Daily cache");
     return {...item, ageMs};
   }catch(e){ return null; }
 }
@@ -4384,7 +4431,8 @@ function getSwingValidationEngine(a){
     }
   }
 
-  const hardBlock = !validDirection || quality === "REJECT" || noTrade !== "CLEAR" || marketState === "DANGEROUS" || !structureValid || alignment < 60;
+  const hasValidLevels = Number.isFinite(price) && price > 0 && Number.isFinite(trigger) && trigger > 0 && Number.isFinite(invalidation) && invalidation > 0;
+  const hardBlock = !hasValidLevels || !validDirection || quality === "REJECT" || noTrade !== "CLEAR" || marketState === "DANGEROUS" || !structureValid || alignment < 60;
   const strongMonthlyThesis = validDirection && !hardBlock && alignment >= 75 && timing >= 65 && conviction >= 75;
   const eliteMonthlyThesis = validDirection && !hardBlock && alignment >= 85 && timing >= 75 && conviction >= 85;
   // v47.7.13.3: structure/entry-location diagnostics are meaningful only after a directional monthly thesis exists.
@@ -4397,8 +4445,8 @@ function getSwingValidationEngine(a){
 
   if(hardBlock){
     validation = "NO TRADE";
-    blocker = !structureValid ? "STRUCTURE INVALIDATION" : noTrade !== "CLEAR" ? "NO-TRADE ZONE" : quality === "REJECT" ? "QUALITY REJECT" : alignment < 60 ? "ALIGNMENT" : "SETUP QUALITY";
-    reason = "The monthly thesis is not structurally valid enough to enter.";
+    blocker = !hasValidLevels ? "MISSING / INVALID PRICE LEVELS" : !validDirection ? "NO DIRECTIONAL EDGE" : !structureValid ? "STRUCTURE INVALIDATION" : noTrade !== "CLEAR" ? "NO-TRADE ZONE" : quality === "REJECT" ? "QUALITY REJECT" : marketState === "DANGEROUS" ? "DANGEROUS MARKET" : alignment < 60 ? "ALIGNMENT" : "SETUP QUALITY";
+    reason = blocker === "NO-TRADE ZONE" ? `No-trade zone: ${a.noTradeZone?.zone || "UNKNOWN"}. ${a.noTradeZone?.reason || "Setup location does not pass the risk gate."}` : blocker === "MISSING / INVALID PRICE LEVELS" ? "Cannot verify price, trigger, and invalidation. No entry permitted." : "The monthly thesis is not structurally valid enough to enter.";
   }else if(!strongMonthlyThesis){
     validation = "NO TRADE";
     blocker = "THESIS QUALITY";
@@ -6065,7 +6113,7 @@ function renderContractSelectionCoach(a){
       <div class="metric"><b>Trigger Confirmed:</b> ${c.triggerConfirmed ? "YES" : "NO"}</div>
       <div class="metric"><b>Structural Invalidation:</b> ${c.invalidation === "N/A" ? "N/A" : "$"+c.invalidation}</div>
 
-      <div class="metric muted">Manual execution remains required. Predator is not yet reading Robinhood's live option-chain bid/ask, IV, open interest, volume, or live Greeks.</div>
+      <div class="metric muted">Position profit estimates require broker quotes. Manual execution remains required. Predator is not yet reading Robinhood's live option-chain bid/ask, IV, open interest, volume, or live Greeks.</div>
     </div>`;
 }
 function getSimplePredatorDecision(a){
@@ -6089,16 +6137,16 @@ function getSimplePredatorDecision(a){
   }else if(!fit.affordable){
     reason = "The setup may be interesting, but the estimated contract cost does not fit the saved account allocation.";
     action = "Pass and look for a more affordable monthly option setup.";
-  }else if(swing.validation === "PASS"){
+  }else if((swing.validation === "PASS" || swing.validation === "NO TRADE")){
     reason = swing.reason;
     action = "Pass and wait for a stronger or cleaner monthly setup.";
-  }else if(swing.validation === "BUY"){
+  }else if(swing.validation === "BUY" && swing.triggerConfirmed === true){
     decision = "BUY"; color = "green"; reason = swing.reason;
     action = `Use a monthly ${direction === "BUY CALL" ? "call" : "put"} in the ${policy.buyWindow} window and stay within the saved account-size limit.`;
     upgrade = "Already approved.";
-  }else{
+  }else if(swing.validation === "WAIT" || swing.validation === "BUY"){
     decision = "WAIT"; color = "yellow"; reason = swing.reason; action = "Wait. Do not buy yet.";
-    upgrade = swing.blocker.includes("PRICE") ? `Preferred trigger: $${swing.trigger}. If structure stays valid and price confirms, this can upgrade to BUY.` : "Upgrade to BUY when the remaining swing blocker clears.";
+    upgrade = String(swing.blocker||"").includes("PRICE") ? `Preferred trigger: $${swing.trigger}. If structure stays valid and price confirms, this can upgrade to BUY.` : "Upgrade to BUY when the remaining swing blocker clears.";
   }
 
   return {decision,color,direction,reason,action,upgrade,expiration,invalidation,conviction:safeNum(getPredatorConvictionEngine(a)?.conviction,0),accountFit:fit.fit,policy,swingValidation:swing,setupStatus:swing.monthlyThesis==="ELITE"?"ELITE MONTHLY SETUP":swing.monthlyThesis==="STRONG"?"GOOD MONTHLY SETUP":"WEAK / REJECTED SETUP",entryStatus:decision==="BUY"?swing.entryMode:decision==="WAIT"?"ENTRY NOT APPROVED YET":"NO ENTRY"};
@@ -6201,17 +6249,17 @@ function renderSimplePredatorDecision(a){
 function getOpportunityFunnelRow(a){
   const d = getSimplePredatorDecision(a);
   const s = d.swingValidation || getSwingValidationEngine(a);
-  return {decision:d.decision,blocker:s.blocker||"UNKNOWN",readiness:s.readiness||0,direction:d.direction,trigger:s.trigger||"N/A",invalidation:s.invalidation||"N/A",expiration:d.expiration,reason:d.reason};
+  return {decision:d.decision,blocker:s.blocker||"UNKNOWN",blockerDetail:s.blocker === "NO-TRADE ZONE" ? `${a.noTradeZone?.zone||"UNKNOWN"}: ${a.noTradeZone?.reason||""}` : s.reason,readiness:s.readiness||0,direction:d.direction,trigger:s.trigger||"N/A",invalidation:s.invalidation||"N/A",expiration:d.expiration,reason:d.reason};
 }
 
 function renderOpportunityFunnelSummary(rows, title="Opportunity Funnel"){
   rows = Array.isArray(rows) ? rows : [];
   const counts = {BUY:0,WAIT:0,PASS:0};
   const blockers = {};
-  rows.forEach(r=>{ counts[r.decision]=(counts[r.decision]||0)+1; const b=r.blocker||"UNKNOWN"; blockers[b]=(blockers[b]||0)+1; });
+  rows.forEach(r=>{ counts[r.decision]=(counts[r.decision]||0)+1; const b=r.blocker === "NO-TRADE ZONE" ? `NO-TRADE ZONE / ${String(r.blockerDetail||"UNKNOWN").split(":")[0]}` : r.blocker||"UNKNOWN"; blockers[b]=(blockers[b]||0)+1; });
   const topBlocker = Object.entries(blockers).sort((a,b)=>b[1]-a[1])[0];
   const nearMisses = rows.filter(r=>r.decision==="WAIT").sort((a,b)=>b.readiness-a.readiness).slice(0,3);
-  return `<div class="card"><div class="section-title">${title}</div><div class="metric"><b>BUY-ready:</b> ${counts.BUY||0}</div><div class="metric"><b>WAIT:</b> ${counts.WAIT||0}</div><div class="metric"><b>NO TRADE:</b> ${counts.PASS||0}</div><div class="metric"><b>Most Common Blocker:</b> ${topBlocker?`${topBlocker[0]} (${topBlocker[1]})`:"NONE"}</div>${nearMisses.length?`<div class="divider"></div><div class="section-title">Closest Near-Misses</div>${nearMisses.map(r=>`<div class="card" style="padding:10px;margin-top:8px;"><div class="metric"><b>${r.ticker||""}</b> ${r.direction} - ${r.readiness}% READY</div><div class="metric"><b>Blocker:</b> ${r.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${r.trigger==="N/A"?"N/A":"$"+r.trigger}</div><div class="metric"><b>Invalidation:</b> ${r.invalidation==="N/A"?"N/A":"$"+r.invalidation}</div><div class="metric"><b>Why:</b> ${r.reason}</div></div>`).join("")}`:""}</div>`;
+  return `<div class="card"><div class="section-title">${title}</div><div class="metric"><b>BUY-ready:</b> ${counts.BUY||0}</div><div class="metric"><b>WAIT:</b> ${counts.WAIT||0}</div><div class="metric"><b>NO TRADE:</b> ${counts.PASS||0}</div><div class="metric"><b>Most Common Blocker:</b> ${topBlocker?`${topBlocker[0]} (${topBlocker[1]})`:"NONE"}</div>${nearMisses.length?`<div class="divider"></div><div class="section-title">Closest Near-Misses</div>${nearMisses.map(r=>`<div class="card" style="padding:10px;margin-top:8px;"><div class="metric"><b>${r.ticker||""}</b> ${r.direction} - ${r.readiness}% READY</div><div class="metric"><b>Blocker:</b> ${r.blocker}</div><div class="metric"><b>Blocker detail:</b> ${escapeHtml(String(r.blockerDetail||""))}</div><div class="metric"><b>Preferred Trigger:</b> ${r.trigger==="N/A"?"N/A":"$"+r.trigger}</div><div class="metric"><b>Invalidation:</b> ${r.invalidation==="N/A"?"N/A":"$"+r.invalidation}</div><div class="metric"><b>Why:</b> ${r.reason}</div></div>`).join("")}`:""}</div>`;
 }
 
 function renderSimpleDecisionSnapshot(a){
@@ -7132,8 +7180,8 @@ function analyzePosition(position, livePrice, ai, priceSource, scanContext={}){
   }
   const price = livePrice, type = position.type, strike = position.strike, breakeven = position.breakeven, entryPremium = position.entryPremium || 0, dte = getDTE(position.expiration);
   const intrinsic = type === "CALL" ? Math.max(0, price - strike) : Math.max(0, strike - price);
-  const approxOptionValue = intrinsic + (price * 0.01);
-  const approxPnLPercent = entryPremium > 0 ? Math.round(((approxOptionValue - entryPremium) / entryPremium) * 100) : null;
+  const approxOptionValue = null; // No actual option bid/ask quote; do not fabricate a current option price.
+  const approxPnLPercent = null; // Cannot infer an option position P/L from stock price plus an arbitrary time-value estimate. Broker mark required.
   const distanceToBE = Math.abs(breakeven - price), expectedMoveNum = parseFloat(ai.expectedMove), closeToBE = distanceToBE <= expectedMoveNum * 0.35, throughTargetCall = type === "CALL" && price >= breakeven + expectedMoveNum * 0.35, throughTargetPut = type === "PUT" && price <= breakeven - expectedMoveNum * 0.35;
   let timeRisk = "Unknown", expirationFit = "Unknown";
   if(dte !== null){ if(dte <= 1){ timeRisk = "Extreme"; expirationFit = "Very Short"; } else if(dte <= 3){ timeRisk = "High"; expirationFit = "Tight"; } else if(dte <= 7){ timeRisk = "Moderate"; expirationFit = "Good"; } else { timeRisk = "Low"; expirationFit = "Good"; } }
@@ -8208,8 +8256,7 @@ async function scanList(list, title){
         </div>
         <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
         <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div>
-      <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
-        <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div>
+        <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
         <div class="metric"><b>BUY-ready:</b> 0</div>
         <div class="metric"><b>WAIT / watch only:</b> ${waits.length}</div>
         <div class="metric"><b>NO TRADE:</b> ${noTrades.length}</div>
