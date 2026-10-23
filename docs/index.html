@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v48.4 Directional Diagnostics</title>
+    <title>Signal Predator AI v48.5 Scan Integrity</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v48.4 // Directional Diagnostics & Reliability // v47.9.2 BUY authority frozen // provenance-safe position management</div>
+    <div class="subtitle">v48.5 // Scan Integrity & Entry Confirmation // v47.9.2 BUY authority frozen // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -630,7 +630,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v48.4";
+      const PREDATOR_BUILD_ID = "v48.5";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -665,7 +665,7 @@ function renderPredatorUniverseStatus(){
 }
 function showPredatorSellUniverse(){
   const el=document.getElementById("output");if(!el)return;
-  el.innerHTML=`<div class="card"><div class="section-title">SELL / Wheel Candidate Universe</div><div class="metric">${PREDATOR_SELL_UNIVERSE.join(" ÃÂ· ")}</div><div class="metric yellow">CANDIDATES ONLY Ã¢ÂÂ NOT SELL SIGNALS. No live option chain, premium, delta, bid/ask or assignment collateral was verified.</div><div class="metric muted">Cash-secured put collateral = strike ÃÂ 100 per contract (less premium only where broker rules permit). Covered calls require 100 owned shares per contract. Weekly/biweekly options are not automatically suitable for a small account.</div></div>`;
+  el.innerHTML=`<div class="card"><div class="section-title">SELL / Wheel Candidate Universe</div><div class="metric">${PREDATOR_SELL_UNIVERSE.join(" Â· ")}</div><div class="metric yellow">CANDIDATES ONLY â NOT SELL SIGNALS. No live option chain, premium, delta, bid/ask or assignment collateral was verified.</div><div class="metric muted">Cash-secured put collateral = strike Ã 100 per contract (less premium only where broker rules permit). Covered calls require 100 owned shares per contract. Weekly/biweekly options are not automatically suitable for a small account.</div></div>`;
 }
 function getPredatorCalibrationResearch(){
   const rows=Array.isArray(learningJournal)?learningJournal:[];
@@ -1281,7 +1281,7 @@ function renderOpportunityBoard(rows, title, desk){
       ${rows.map((r,i)=>{
         const prev = getPreviousOpportunity(r.ticker, desk);
         const evolution = prev
-          ? `${prev.verdict} ${prev.focusScore} Ã¢ÂÂ ${r.verdict} ${r.focusScore}`
+          ? `${prev.verdict} ${prev.focusScore} â ${r.verdict} ${r.focusScore}`
           : "First ranked scan";
         return `<div class="opportunity-row">
           <div class="metric"><span class="rank-badge">${i+1}</span><b>${r.ticker}</b> - <span class="${signalClass(r.verdict)}">${r.verdict}</span></div>
@@ -4185,7 +4185,7 @@ function renderWhyWaitingCard(a){
     <div class="section-title">Why Predator Is Waiting</div>
     <div class="metric"><b>Current Status:</b> <span class="${h.patienceColor}">${h.patienceStatus}</span></div>
     <div class="metric"><b>Why:</b> ${r.missingPiece}</div>
-    <div class="plain-rule"><div class="big-simple">If this happens:</div><div class="metric">Ã¢ÂÂ ${h.step3}</div><div class="metric">Ã¢ÂÂ Price does not invalidate near $${r.invalidation}</div><div class="metric">Ã¢ÂÂ Confirmation hold rule is satisfied</div></div>
+    <div class="plain-rule"><div class="big-simple">If this happens:</div><div class="metric">â ${h.step3}</div><div class="metric">â Price does not invalidate near $${r.invalidation}</div><div class="metric">â Confirmation hold rule is satisfied</div></div>
     <div class="divider"></div><div class="metric"><b>Then:</b> ${h.step4}</div><div class="metric"><b>Confidence Now:</b> ${r.currentReadiness}/100</div><div class="metric"><b>Confidence After Confirmation:</b> ${r.confirmedReadiness}/100</div>
   </div>`;
 }
@@ -6246,6 +6246,30 @@ function renderSimplePredatorDecision(a){
   </div>`;
 }
 
+// Daily close screens can identify a setup, but cannot confirm a trigger calculated
+// beyond that same close. Never promote a completed-candle scan to an executable BUY.
+function getDailyCloseScanDecision(a){
+  const d = getSimplePredatorDecision(a);
+  const swing = d.swingValidation || getSwingValidationEngine(a);
+  const direction = d.direction;
+  const validDirection = direction === "BUY CALL" || direction === "BUY PUT";
+  const validLevels = Number.isFinite(Number(swing.trigger)) && Number(swing.trigger) > 0 &&
+    Number.isFinite(Number(swing.invalidation)) && Number(swing.invalidation) > 0;
+  if(!validDirection || swing.validation === "NO TRADE" || swing.validation === "PASS" || d.decision === "PASS") return d;
+  if(!validLevels) return {...d,decision:"PASS",reason:"Invalid trigger or invalidation levels. No entry permitted.",action:"PASS - investigate price levels.",scanOnly:true};
+  return {
+    ...d,
+    decision:"WAIT",
+    reason: swing.validation === "BUY"
+      ? "Stock setup passed model gates, but the completed daily candle cannot verify a newer live entry. Check a fresh underlying quote and the actual option chain."
+      : d.reason,
+    action:"WATCH ONLY. Verify a newer price, current contract bid/ask and risk limits before considering an order.",
+    upgrade:"Requires a newer quote confirming the trigger and a verified, liquid monthly option contract.",
+    scanOnly:true,
+    entryStatus:"DAILY-CLOSE SCREEN ONLY - NO LIVE ENTRY CONFIRMATION"
+  };
+}
+
 function getOpportunityFunnelRow(a){
   const d = getSimplePredatorDecision(a);
   const s = d.swingValidation || getSwingValidationEngine(a);
@@ -6517,8 +6541,8 @@ function renderProfessionalReasonCard(a){
   <div class="card">
     <div class="section-title">Why a Disciplined Trader Would ${c.tier === "PASS" ? "Avoid" : c.tier.startsWith("WAIT") || c.tier === "WATCHLIST ONLY" ? "Wait" : "Consider This"}</div>
     <div class="pro-list">
-      ${c.reasonsFor.map(x=>`<div class="pro-row"><span class="green">Ã¢ÂÂ</span> ${x}</div>`).join("")}
-      ${c.reasonsAgainst.map(x=>`<div class="pro-row"><span class="red">Ã¢ÂÂ</span> ${x}</div>`).join("")}
+      ${c.reasonsFor.map(x=>`<div class="pro-row"><span class="green">â</span> ${x}</div>`).join("")}
+      ${c.reasonsAgainst.map(x=>`<div class="pro-row"><span class="red">â</span> ${x}</div>`).join("")}
     </div>
     <div class="divider"></div>
     <div class="metric"><b>Predator Coach:</b> ${c.coach}</div>
@@ -6662,7 +6686,7 @@ function renderPredatorBrainCard(a){
     <div class="metric"><b>Cancel Rule:</b> ${b.cancelRule}</div>
     <div class="divider"></div>
     <div class="section-title">Predator Checklist</div>
-    ${b.checklist.map(x=>`<div class="checklist-row"><span>${x.pass ? "Ã¢ÂÂ" : "Ã¢ÂÂ"} ${x.name}</span><span class="${x.pass ? "green" : "yellow"}">${x.pass ? "PASS" : "WAIT"}</span></div>`).join("")}
+    ${b.checklist.map(x=>`<div class="checklist-row"><span>${x.pass ? "â" : "â"} ${x.name}</span><span class="${x.pass ? "green" : "yellow"}">${x.pass ? "PASS" : "WAIT"}</span></div>`).join("")}
   </div>`;
 }
 
@@ -6748,7 +6772,7 @@ function renderStrategyRankingCard(a){
     <div class="section-title">Strategy Rankings</div>
     ${bot.rankings.rows.map((r,i)=>`
       <div class="rank-row">
-        <span>${i+1}. ${r.name}${i===0 ? " Ã¢Â­Â" : ""}</span>
+        <span>${i+1}. ${r.name}${i===0 ? " â­" : ""}</span>
         <span class="${signalClass(r.name)}">${r.score}/100</span>
       </div>`).join("")}
     <div class="divider"></div>
@@ -8168,8 +8192,11 @@ async function scanList(list, title){
     const a = analyze(closes, scanPrice);
     saveFreshTickerAnalysis(ticker, a, "Latest Completed Daily Close");
     recordLearningSnapshot(ticker, a, `${title} Screening Scan`);
-    const finalDecision = getSimplePredatorDecision(a);
+    const finalDecision = getDailyCloseScanDecision(a);
     const funnel = getOpportunityFunnelRow(a);
+    funnel.decision = finalDecision.decision;
+    funnel.reason = finalDecision.reason;
+    funnel.scanOnly = true;
     funnel.ticker = ticker;
     funnelRows.push(funnel);
     processed++;
@@ -8219,6 +8246,7 @@ async function scanList(list, title){
   const apiBudgetText = `API requests this scan: ${scanApiRequests} | Cache hits: ${cacheHits} | Local diagnostic today: ${usageAfter.requests}/${PREDATOR_FREE_DAILY_BUDGET}`;
 
   const freshnessText = `Verified current completed daily candles: ${processed}/${attempted} | Stale or unverified: ${staleRows.length} | Expected completed session: ${predatorExpectedCompletedSession()}`;
+  const scanLimitText = "Daily-close screening only: the entry trigger is projected from the completed candle and cannot be confirmed by that same candle. BUY CALL/PUT execution requires a newer underlying quote and a real, liquid monthly options contract.";
 
   // CRITICAL: zero successfully processed tickers is DATA FAILURE, never "NO TRADES".
   if(processed === 0){
@@ -8233,7 +8261,7 @@ async function scanList(list, title){
         </div>
         <div class="metric"><b>Successfully analyzed:</b> 0/${attempted}</div>
         <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
-        <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div>
+        <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div><div class="metric yellow"><b>Entry verification:</b> ${scanLimitText}</div>
         <div class="metric"><b>Data failures:</b> ${failures.length}</div>
         <div class="metric"><b>Latest issue:</b> ${lastFailure ? `${lastFailure.ticker} - ${lastFailure.stage}: ${String(lastFailure.message).slice(0,220)}` : "Unknown data failure"}</div>
         <div class="metric red"><b>Do not interpret this as NO TRADES.</b></div>
@@ -8255,7 +8283,7 @@ async function scanList(list, title){
             : `Predator successfully analyzed the full list. None has a BUY-approved monthly option entry right now.`}
         </div>
         <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
-        <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div>
+        <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div><div class="metric yellow"><b>Entry verification:</b> ${scanLimitText}</div>
         <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
         <div class="metric"><b>BUY-ready:</b> 0</div>
         <div class="metric"><b>WAIT / watch only:</b> ${waits.length}</div>
@@ -8292,14 +8320,14 @@ async function scanList(list, title){
       </div>
 
       <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
-      <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div>
+      <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div><div class="metric yellow"><b>Entry verification:</b> ${scanLimitText}</div>
       ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length} - failed names were not classified.</div>` : ""}
 
       ${topBuys.map((r,index)=>`
         <div class="card" style="padding:14px;margin-top:12px;">
           <div class="section-title">#${index+1} SCREENING CANDIDATE</div>
           <div class="metric"><b>${r.ticker}</b> - <span class="green">${r.finalDecision.direction}</span></div>
-          <div class="metric"><b>Stock setup:</b> <span class="yellow">CONDITIONAL â VERIFY CONTRACT</span></div>
+          <div class="metric"><b>Stock setup:</b> <span class="yellow">CONDITIONAL — VERIFY CONTRACT</span></div>
           <div class="metric"><b>Bot Confidence:</b> ${r.conviction}/100</div>
           <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
           <div class="metric"><b>Account Fit:</b> ${r.finalDecision.accountFit}</div>
