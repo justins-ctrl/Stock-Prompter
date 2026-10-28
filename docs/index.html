@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v48.6 // iPhone Greek Input Fix & Entry Confirmation // v47.9.2 BUY authority frozen // provenance-safe position management</div>
+    <div class="subtitle">v48.7 // iPhone Greek Input Fix & Entry Confirmation // v47.9.2 BUY authority frozen // provenance-safe position management</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -5756,6 +5756,55 @@ function normalizeLongOptionGreeks(deltaInput, thetaInput, direction){
   };
 }
 
+
+// v48.7: Independent two-stage entry confirmation. Manual Robinhood quotes
+// are user-supplied, NOT independently verified or continuously monitored.
+function evaluateManualEntryGate(p){
+  const fail=(state,why)=>({state,why});
+  if(!p || !["BUY CALL","BUY PUT"].includes(p.direction)) return fail("PASS","No qualified directional setup.");
+  if(p.screenState!=="WAIT" || p.screenBlocker!=="PRICE CONFIRMATION") return fail("WAIT","Screening has unresolved conditions other than price confirmation.");
+  if(!Number.isFinite(p.trigger)||p.trigger<=0||!Number.isFinite(p.invalidation)||p.invalidation<=0) return fail("PASS","Invalid structural levels.");
+  if(p.direction==="BUY CALL" ? p.trigger<=p.invalidation : p.trigger>=p.invalidation) return fail("PASS","Trigger and invalidation are inconsistent.");
+  if(!Number.isFinite(p.quoteTime)||p.quoteTime<=0||!Number.isFinite(p.now)||p.now<p.quoteTime||p.now-p.quoteTime>120000) return fail("WAIT","Underlying quote is missing, future-dated, or older than 2 minutes.");
+  if(!Number.isFinite(p.contractTime)||p.contractTime<=0||p.contractTime>p.now||p.now-p.contractTime>120000) return fail("WAIT","Option quote is missing, future-dated, or older than 2 minutes.");
+  if(!Number.isFinite(p.price)||p.price<=0) return fail("WAIT","Current underlying price is missing.");
+  if(p.direction==="BUY CALL" ? p.price<=p.invalidation : p.price>=p.invalidation) return fail("PASS","Underlying has crossed the structural invalidation level.");
+  if(!(p.direction==="BUY CALL" ? p.price>=p.trigger : p.price<=p.trigger)) return fail("WAIT","Price trigger has not been reached.");
+  if(p.contractStatus!=="COMPLETE") return fail("PASS","Contract data is incomplete or invalid.");
+  if(!Number.isFinite(p.dte)||p.dte<45||p.dte>75) return fail("PASS","Contract expiration is outside the preferred 45–75 DTE range.");
+  if(!Number.isFinite(p.bid)||!Number.isFinite(p.ask)||p.bid<=0||p.ask<p.bid) return fail("PASS","Option bid/ask quote is invalid.");
+  const spread=(p.ask-p.bid)/((p.ask+p.bid)/2)*100;
+  if(spread>10) return fail("PASS","Bid/ask spread exceeds the conservative 10% entry limit.");
+  if(!Number.isFinite(p.delta)||Math.abs(p.delta)<0.25||Math.abs(p.delta)>0.75) return fail("PASS","Contract delta is outside the entry guardrails.");
+  if(p.direction==="BUY CALL" ? p.delta<=0 : p.delta>=0) return fail("PASS","Option delta sign does not match trade direction.");
+  if(!Number.isFinite(p.theta)||p.theta>=0) return fail("PASS","Long-option theta must be negative.");
+  if(!Number.isFinite(p.iv)||p.iv<=0||p.iv>=1000) return fail("PASS","Implied volatility is missing or invalid.");
+  if(!(p.volume>=10||p.openInterest>=50)) return fail("PASS","Insufficient reported contract liquidity.");
+  if(!Number.isFinite(p.maxPremium)||p.maxPremium<=0) return fail("WAIT","Account premium cap must be configured and positive.");
+  if(p.ask>p.maxPremium) return fail("PASS","Contract ask exceeds the saved maximum premium per share.");
+  return fail("READY FOR REVIEW","Trigger and entered contract checks pass; quotes are manually supplied and NOT independently verified. Recheck Robinhood before any order.");
+}
+function confirmPredatorEntry(){
+  const out=document.getElementById("entryGateResult");
+  if(!out) return;
+  const last=getLastAnalysis();
+  if(!last?.analysisData){out.textContent="Run an individual ticker analysis first.";return;}
+  const ticker=normalizeTicker(document.getElementById("ticker")?.value||"");
+  if(ticker!==normalizeTicker(last.ticker)){out.textContent="Ticker mismatch. Re-run the individual analysis.";return;}
+  const a=ensureEngineDefaults(last.analysisData), d=getSimplePredatorDecision(a), s=d.swingValidation||getSwingValidationEngine(a);
+  const c=readManualContractInputs(), integrity=getV48ContractIntegrity(a,c,d.direction);
+  const coach=getContractSelectionCoach(a);
+  const val=id=>document.getElementById(id)?.value||"";
+  const quoteTime=Date.parse(val("entryUnderlyingTime")), contractTime=Date.parse(val("entryContractTime"));
+  const now=Date.now();
+  const p={direction:d.direction,screenState:d.decision,screenBlocker:String(s.blocker||""),trigger:Number(s.trigger),invalidation:Number(s.invalidation),quoteTime,contractTime,now,price:Number(val("entryUnderlyingPrice")),contractStatus:integrity.status,dte:c.dte,bid:c.bid,ask:c.ask,delta:c.delta,theta:c.theta,iv:c.iv,volume:c.volume,openInterest:c.openInterest,maxPremium:Number(coach.maxPremiumPerContract)};
+  // A screen that already says BUY can still be checked; never waive other guards.
+  if(d.decision==="BUY" && s.triggerConfirmed===true){p.screenState="WAIT";p.screenBlocker="PRICE CONFIRMATION";}
+  const r=evaluateManualEntryGate(p);
+  const tone=r.state==="READY FOR REVIEW"?"yellow":r.state==="PASS"?"red":"yellow";
+  out.innerHTML=`<div class="card"><div class="section-title">Entry Verification</div><div class="metric ${tone}"><b>${escapeHtml(r.state)}</b></div><div class="metric">${escapeHtml(r.why)}</div><div class="metric muted">Entered quotes are not independently verified. No order is placed. A newer underlying quote and a contract quote must both be entered and time-stamped.</div></div>`;
+}
+
 function readManualContractInputs(){
   const expiration = document.getElementById("cgExpiration")?.value || "";
   const dte = getContractExpirationDTE(expiration);
@@ -7551,6 +7600,20 @@ function renderFull(ticker, a){
     </div>
     <input id="cgSharePrice" type="number" step="0.01" inputmode="decimal" placeholder="Current share price">
     <button onclick="safeAction('Grade Contract', gradeCurrentContract)">GRADE THIS CONTRACT</button>
+    <div class="card">
+      <div class="section-title">Stage 2 — Confirm Entry</div>
+      <div class="metric muted">For a WAIT setup blocked ONLY by price confirmation: copy the current underlying and option prices from Robinhood. These are manual snapshots, not live API verification. Never place an order from this screen alone.</div>
+      <label for="entryUnderlyingPrice">Current underlying price</label>
+      <input id="entryUnderlyingPrice" type="number" step="0.01" inputmode="decimal" placeholder="Current stock price">
+      <label for="entryUnderlyingTime">Time of underlying quote (local time)</label>
+      <input id="entryUnderlyingTime" type="datetime-local">
+      <label for="entryContractTime">Time of Robinhood option quote (local time)</label>
+      <input id="entryContractTime" type="datetime-local">
+      <div class="metric muted">Also fill out the complete Robinhood contract fields above. Entry review requires a recent quote for BOTH the stock and the option.</div>
+      <button onclick="safeAction('Verify Entry', confirmPredatorEntry)">CHECK ENTRY NOW</button>
+      <div id="entryGateResult"></div>
+    </div>
+
     <div id="contractGradeOutput"></div>
   </div>
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
