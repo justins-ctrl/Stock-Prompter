@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v48.9 Entry Review</title>
+    <title>Signal Predator AI v49.0 Reliability Candidate</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,8 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v48.9 // Manual Entry Review & Safety // Screening rules unchanged // manual quotes not live-verified</div>
+    <div class="subtitle">v49.0 // Reliability & Quote Provenance // Monthly calls and puts // manual review</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.0 • Development candidate • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -304,12 +305,12 @@ body.advanced-on .scan-support{display:block}
     <div class="metric">Position Hold Duration Guide <span class="green">ACTIVE</span></div>
     <div class="metric">Predator Command Center <span class="green">ACTIVE</span></div>
     <div class="metric">Unified Final Decision Layer <span class="green">ACTIVE</span></div>
-    <div class="metric muted">Security audit passed, public API secret removed, scan guards active, and the final BUY / WAIT / NO TRADE authority remains unified.</div>
+    <div class="metric muted">Core scan safeguards active. Embedded API key remains in public source by owner request; do not use a public embedded key for a subscription launch.</div>
   </div>
 
   <div class="card">
     <div class="section-title">API Status / Security</div>
-    <div class="metric muted">Your Alpha Vantage key is no longer stored in the public GitHub source. It is saved only in this browser on this device.</div>
+    <div class="metric muted">Development configuration: an API key is embedded in this public page by owner request. Anyone viewing the page source may copy it. Replace with server-side secrets before a public launch.</div>
     <div id="apiKeyStatus" class="metric">API Key: checking...</div>
     <input id="alphaVantageKeyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter Alpha Vantage API Key">
     <div class="grid-2">
@@ -630,7 +631,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v48.9";
+      const PREDATOR_BUILD_ID = "v49.0";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -5759,9 +5760,13 @@ function normalizeLongOptionGreeks(deltaInput, thetaInput, direction){
 
 // v48.9: Fail-closed two-stage entry confirmation. Manual Robinhood quotes
 // are user-supplied, NOT independently verified or continuously monitored.
+// v49: strict manual provenance checks. A checkbox is an acknowledgement, not independent data verification.
 function evaluateManualEntryGate(p){
   const fail=(state,why)=>({state,why});
   if(!p || !["BUY CALL","BUY PUT"].includes(p.direction)) return fail("NO TRADE","No qualified directional setup.");
+  if(!p.quoteAcknowledged) return fail("WAIT","Confirm that both prices and quote times were copied from the current Robinhood contract screen.");
+  if(!p.contractTicker || String(p.contractTicker).trim().toUpperCase() !== String(p.ticker||"").trim().toUpperCase()) return fail("NO TRADE","The option contract ticker must match the analyzed stock ticker.");
+  if(!p.contractType || p.contractType !== (p.direction==="BUY CALL" ? "CALL" : "PUT")) return fail("NO TRADE","The option contract type does not match the qualified stock direction.");
   // Stage 2 cannot override any stage-1 risk blocker except a missing trigger confirmation.
   if(p.screenState!=="WAIT" || p.screenBlocker!=="PRICE CONFIRMATION" || p.swingValidation!=="WAIT" || !["ELITE","STRONG"].includes(p.monthlyThesis)) return fail("NO TRADE","The screening engine has not cleared every condition except price confirmation.");
   if(!Number.isFinite(p.trigger)||p.trigger<=0||!Number.isFinite(p.invalidation)||p.invalidation<=0) return fail("NO TRADE","Invalid structural levels.");
@@ -5801,7 +5806,7 @@ function confirmPredatorEntry(){
   const val=id=>document.getElementById(id)?.value||"";
   const quoteTime=val("entryUnderlyingTime") ? Date.parse(val("entryUnderlyingTime")) : NaN, contractTime=val("entryContractTime") ? Date.parse(val("entryContractTime")) : NaN;
   const now=Date.now();
-  const p={direction:d.direction,screenState:d.decision,screenBlocker:String(s.blocker||""),swingValidation:s.validation,monthlyThesis:s.monthlyThesis,trigger:Number(s.trigger),invalidation:Number(s.invalidation),quoteTime,contractTime,now,price:Number(val("entryUnderlyingPrice")),contractStatus:integrity.status,strike:c.strike,sharePrice:c.sharePrice,mark:c.mark,dte:c.dte,bid:c.bid,ask:c.ask,delta:c.delta,theta:c.theta,iv:c.iv,volume:c.volume,openInterest:c.openInterest,maxPremium:Number(coach.maxPremiumPerContract)};
+  const p={ticker,contractTicker:val("entryContractTicker"),contractType:val("entryContractType"),quoteAcknowledged:!!document.getElementById("entryQuoteAcknowledged")?.checked,direction:d.direction,screenState:d.decision,screenBlocker:String(s.blocker||""),swingValidation:s.validation,monthlyThesis:s.monthlyThesis,trigger:Number(s.trigger),invalidation:Number(s.invalidation),quoteTime,contractTime,now,price:Number(val("entryUnderlyingPrice")),contractStatus:integrity.status,strike:c.strike,sharePrice:c.sharePrice,mark:c.mark,dte:c.dte,bid:c.bid,ask:c.ask,delta:c.delta,theta:c.theta,iv:c.iv,volume:c.volume,openInterest:c.openInterest,maxPremium:Number(coach.maxPremiumPerContract)};
   const r=evaluateManualEntryGate(p);
   const tone=r.state==="READY FOR REVIEW"?"yellow":r.state==="NO TRADE"?"red":"yellow";
   out.innerHTML=`<div class="card"><div class="section-title">Manual Entry Review</div><div class="metric ${tone}"><b>${escapeHtml(r.state)}</b></div><div class="metric">${escapeHtml(r.why)}</div><div class="metric muted">Manual quotes are not independently verified. This is NOT an order approval and no order is placed.</div></div>`;
@@ -7611,7 +7616,12 @@ function renderFull(ticker, a){
       <input id="entryUnderlyingTime" type="datetime-local">
       <label for="entryContractTime">Time of Robinhood option quote (local time)</label>
       <input id="entryContractTime" type="datetime-local">
-      <div class="metric muted">Also fill out the complete Robinhood contract fields above. Entry review requires a recent quote for BOTH the stock and the option.</div>
+      <label for="entryContractTicker">Contract ticker (must match analyzed stock)</label>
+      <input id="entryContractTicker" type="text" autocapitalize="characters" placeholder="e.g. HOOD" maxlength="12">
+      <label for="entryContractType">Contract type shown in Robinhood</label>
+      <select id="entryContractType"><option value="">Select CALL or PUT</option><option value="CALL">CALL</option><option value="PUT">PUT</option></select>
+      <label class="metric muted"><input id="entryQuoteAcknowledged" type="checkbox" style="width:auto;display:inline-block;margin-right:8px;">I checked the exact ticker, option type, prices, and displayed quote times in Robinhood.</label>
+      <div class="metric muted">This is a manual acknowledgement, not an independently verified live feed. Also fill out the complete contract fields above.</div>
       <button onclick="safeAction('Verify Entry', confirmPredatorEntry)">REVIEW MANUAL ENTRY</button>
       <div id="entryGateResult"></div>
     </div>
