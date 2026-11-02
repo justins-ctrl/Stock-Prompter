@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.0 Reliability Candidate</title>
+    <title>Signal Predator AI v49.14 Quote Authority Candidate</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,8 +274,8 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v49.0 // Reliability & Quote Provenance // Monthly calls and puts // manual review</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.0 • Development candidate • Manual quotes are not live-verified</div>
+    <div class="subtitle">v49.14 // Manual Contract Quote Review // Monthly calls and puts // manual review</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.3 • Development candidate • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -631,7 +631,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v49.0";
+      const PREDATOR_BUILD_ID = "v49.3";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -1636,6 +1636,7 @@ function closeSavedPosition(index, result){
 
   savedPositions.splice(index,1);
   setStore("ai_options_positions", savedPositions);
+  invalidatePositionScanCacheV492();
 
   renderPositions();
   syncClosedJournalToPerformance();
@@ -1658,6 +1659,27 @@ function renderClosedTradeJournal(){
   `).join("");
 }
 
+// v49.8: Manually entered broker quotes are local, contract-specific and short-lived.
+const PREDATOR_QUOTE_MAX_AGE_MS=15*60*1000;
+function predatorQuoteStore(){try{return JSON.parse(localStorage.getItem('predator_manual_contract_quotes_v498')||'{}')||{};}catch(e){return {};}}
+function predatorQuoteKey(p){return positionIdentityV492(p);}
+function predatorVerifiedQuote(p){
+  const q=predatorQuoteStore()[predatorQuoteKey(p)];
+  if(!q || !Number.isFinite(q.bid) || !Number.isFinite(q.ask) || q.bid<=0 || q.ask<q.bid || !Number.isFinite(q.checkedAt) || Date.now()-q.checkedAt>PREDATOR_QUOTE_MAX_AGE_MS || q.checkedAt>Date.now()+60000)return null;
+  return q;
+}
+function saveManualContractQuote(index){
+  const p=savedPositions[index]; if(!p)return;
+  const bidText=document.getElementById('predatorBid'+index)?.value?.trim();
+  const askText=document.getElementById('predatorAsk'+index)?.value?.trim();
+  const bid=Number(bidText),ask=Number(askText);
+  const confirmed=document.getElementById('predatorQuoteConfirmed'+index)?.checked;
+  if(!bidText||!askText||!Number.isFinite(bid)||!Number.isFinite(ask)||bid<=0||ask<bid||!confirmed){alert('Enter valid Robinhood bid and ask (ask must be at least bid) and confirm the contract details.');return;}
+  const store=predatorQuoteStore();store[predatorQuoteKey(p)]={bid,ask,checkedAt:Date.now()};
+  localStorage.setItem('predator_manual_contract_quotes_v498',JSON.stringify(store));
+  invalidatePositionScanCacheV492();renderPositions();
+  alert('Contract quote recorded locally. Run a fresh Live Position Scan. Quote expires after 15 minutes.');
+}
 function renderPositions(){
   const c = document.getElementById("positionsContainer");
   if(!savedPositions.length){
@@ -1670,6 +1692,11 @@ function renderPositions(){
       <div class="metric"><b>${p.ticker}</b> ${p.strike} ${p.type}</div>
       <div class="metric">BE ${p.breakeven}${p.expiration ? " - Exp " + p.expiration : ""}</div>
       <div class="metric muted">Saved: ${p.entryDate ? new Date(p.entryDate).toLocaleDateString() : "N/A"}</div>
+      ${(p.type==='CALL'||p.type==='PUT')?`<div class="metric"><b>Robinhood contract quote (manual, expires in 15 minutes)</b></div>
+      <div class="grid-2"><input id="predatorBid${index}" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Bid per share"><input id="predatorAsk${index}" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Ask per share"></div>
+      <label class="metric"><input type="checkbox" id="predatorQuoteConfirmed${index}"> I checked this exact ticker, type, strike and expiration in Robinhood.</label>
+      <button class="small-btn secondary" onclick="saveManualContractQuote(${index})">Save Contract Quote</button>
+      <div class="metric muted">${(()=>{const q=predatorVerifiedQuote(p);return q?'Quote verified locally at '+new Date(q.checkedAt).toLocaleTimeString()+' · Bid $'+q.bid.toFixed(2)+' / Ask $'+q.ask.toFixed(2):'No current verified contract quote';})()}</div>`:''}
       <div class="metric"><b>Entry Thesis:</b> ${p.entryThesisLinked ? "<span class='green'>LINKED TO PREDATOR BUY</span>" : "<span class='yellow'>NOT LINKED</span>"}</div>
       ${!p.entryThesisLinked && findRecentApprovedBuyAnalysis(p.ticker,72) ? `<button class="small-btn" style="margin-top:8px;" onclick="relinkPositionToRecentBuyThesis('${p.ticker}')">Link Recent Predator BUY Thesis</button>` : ""}
       <div class="row" style="margin-top:10px;">
@@ -1704,6 +1731,7 @@ function addPosition(){
   }
   savedPositions.push(newPosition);
   setStore("ai_options_positions", savedPositions);
+  invalidatePositionScanCacheV492();
   renderPositions();
   if(recentBuy && newPosition.entryThesisLinked){
     alert(`${ticker} saved with its original Predator BUY thesis linked. Future position scans will compare against that entry thesis.`);
@@ -1716,6 +1744,7 @@ function addPosition(){
 function removePosition(index){
   savedPositions.splice(index,1);
   setStore("ai_options_positions", savedPositions);
+  invalidatePositionScanCacheV492();
   renderPositions();
   renderJournalSummary();
   renderRiskControlSummary();
@@ -4486,6 +4515,21 @@ function getSwingValidationEngine(a){
 
 const PREDATOR_POSITION_THESIS_KEY = "signal_predator_position_theses_v47_7";
 
+// v49.14: Thesis baselines belong to an exact saved contract, never to a ticker.
+// Legacy ticker-keyed snapshots are deliberately not promoted: their ownership
+// cannot be proven when multiple contracts share an underlying.
+function thesisContractKeyV4913(position){
+  if(!position || !position.ticker || !position.type || !position.expiration ||
+     !Number.isFinite(Number(position.strike)) || Number(position.strike)<=0 ||
+     !position.entryDate) return null;
+  return 'contract:' + positionIdentityV492(position);
+}
+function resolveThesisPositionV4913(ticker, position){
+  const symbol=normalizeTicker(ticker);
+  if(position && thesisContractKeyV4913(position) && normalizeTicker(position.ticker)===symbol) return position;
+  const matches=(Array.isArray(savedPositions)?savedPositions:[]).filter(p=>normalizeTicker(p?.ticker)===symbol);
+  return matches.length===1 && thesisContractKeyV4913(matches[0]) ? matches[0] : null;
+}
 function getPositionThesisStore(){
   const store = getStore(PREDATOR_POSITION_THESIS_KEY, {});
   return store && typeof store === "object" ? store : {};
@@ -4500,8 +4544,11 @@ function savePositionThesisSnapshot(ticker, a, position={}){
     const d = getSimplePredatorDecision(a);
     const swing = d.swingValidation || getSwingValidationEngine(a);
 
+    const resolved = resolveThesisPositionV4913(symbol, position);
+    const contractKey = thesisContractKeyV4913(resolved);
+    if(!contractKey) return null;
     const store = getPositionThesisStore();
-    const existing = store[symbol] || {};
+    const existing = store[contractKey] || {};
     const now = new Date().toISOString();
 
     const thesisScore = safeNum(
@@ -4559,7 +4606,8 @@ originalStructureValid:
       latestDecision:d.decision
     };
 
-    store[symbol] = snapshot;
+    snapshot.contractIdentity = contractKey;
+    store[contractKey] = snapshot;
     setStore(PREDATOR_POSITION_THESIS_KEY, store);
     return snapshot;
   }catch(e){
@@ -4568,39 +4616,29 @@ originalStructureValid:
   }
 }
 
-function getPositionThesisSnapshot(ticker){
+function getPositionThesisSnapshot(ticker, position={}){
   try{
-    const symbol = normalizeTicker(ticker);
-    const store = getPositionThesisStore();
-    return store[symbol] || null;
-  }catch(e){
-    return null;
-  }
+    const resolved=resolveThesisPositionV4913(ticker,position);
+    const key=thesisContractKeyV4913(resolved);
+    if(!key)return null;
+    const snapshot=getPositionThesisStore()[key];
+    return snapshot?.contractIdentity===key ? snapshot : null;
+  }catch(e){return null;}
 }
-
-function clearPositionThesisSnapshot(ticker){
-  const symbol = normalizeTicker(ticker);
-  if(!symbol) return false;
+function clearPositionThesisSnapshot(ticker, position={}){
+  const resolved=resolveThesisPositionV4913(ticker,position);
+  const key=thesisContractKeyV4913(resolved);
+  if(!key)return false;
   try{
-    // Use the same canonical store/helper already used everywhere else.
-    removePositionThesisSnapshot(symbol);
-    return getPositionThesisSnapshot(symbol) === null;
-  }catch(e){
-    console.error("clearPositionThesisSnapshot failed", e);
-    return false;
-  }
+    const store=getPositionThesisStore();
+    delete store[key];
+    setStore(PREDATOR_POSITION_THESIS_KEY,store);
+    return !Object.prototype.hasOwnProperty.call(getPositionThesisStore(),key);
+  }catch(e){console.error('clearPositionThesisSnapshot failed',e);return false;}
 }
-
-
-function removePositionThesisSnapshot(ticker){
-  try{
-    const symbol = normalizeTicker(ticker);
-    const store = getPositionThesisStore();
-    delete store[symbol];
-    setStore(PREDATOR_POSITION_THESIS_KEY, store);
-  }catch(e){}
+function removePositionThesisSnapshot(ticker,position={}){
+  return clearPositionThesisSnapshot(ticker,position);
 }
-
 
 function getPositionCommandAuthority(ticker, a, position={}, scanContext={}){
   const p = getPersistentPositionRead(ticker, a, position, scanContext);
@@ -4682,6 +4720,11 @@ function getPositionCommandAuthority(ticker, a, position={}, scanContext={}){
 
 function renderPersistentCommandCenter(ticker, a, position={}){
   const c = getPositionCommandAuthority(ticker, a, position);
+  // v49.9: This renderer receives a position, not a scan-result variable.
+  const manualQuote = predatorVerifiedQuote(position);
+  const entryPremium = Number(position.entryPremium);
+  const manualPnL = manualQuote && Number.isFinite(entryPremium) && entryPremium>0
+    ? (manualQuote.bid-entryPremium)/entryPremium*100 : null;
   const cmdColor =
     c.title.includes("EXIT") ? "red" :
     c.title.includes("WATCH") || c.title.includes("CAUTION") || c.title.includes("LOCK") ? "yellow" :
@@ -4689,6 +4732,7 @@ function renderPersistentCommandCenter(ticker, a, position={}){
 
   return `
     <div class="card">
+      ${manualQuote?`<div class="metric"><b>Robinhood manual bid/ask:</b> $${escapeHtml(manualQuote.bid.toFixed(2))} / $${escapeHtml(manualQuote.ask.toFixed(2))} · Checked ${escapeHtml(new Date(manualQuote.checkedAt).toLocaleTimeString())}. <b>Estimated liquidation P/L:</b> ${manualPnL==null?'N/A':escapeHtml(manualPnL.toFixed(1))+'%'} (bid-based, excludes fees; not a guaranteed fill). Reconfirm in Robinhood before acting.</div>`:`<div class="metric yellow">No recent verified option bid/ask. Contract P/L unknown. Verify in Robinhood.</div>`}
       <div class="section-title">Predator Command Center</div>
 
       <div class="card" style="padding:14px;">
@@ -4747,7 +4791,17 @@ function buildBaselineAuditSnapshot(a){
 }
 function getExitConfirmationStore(){const v=getStore("signal_predator_exit_confirmations_v47_7_10_1",{});return v&&typeof v==="object"?v:{};}
 function saveExitConfirmationStore(v){setStore("signal_predator_exit_confirmations_v47_7_10_1",v||{});}
-function clearExitConfirmation(ticker){const s=getExitConfirmationStore();delete s[normalizeTicker(ticker)];saveExitConfirmationStore(s);}
+function clearExitConfirmation(ticker, position=null){
+  const s=getExitConfirmationStore(), symbol=normalizeTicker(ticker);
+  const exactKey=position && thesisContractKeyV4913(position) ? positionIdentityV492(position) : null;
+  // A contract-specific baseline update must not erase another contract's exit history.
+  if(exactKey){ delete s[exactKey]; }
+  else if((savedPositions||[]).filter(p=>normalizeTicker(p?.ticker)===symbol).length===0){
+    // Legacy ticker-only history may be cleared only when no saved contract can be affected.
+    delete s[symbol];
+  }
+  saveExitConfirmationStore(s);
+}
 
 function makeLivePositionScanId(){
   return "LPS-" + new Date().toISOString() + "-" + Math.random().toString(36).slice(2,10);
@@ -4755,12 +4809,14 @@ function makeLivePositionScanId(){
 
 function evaluateExitSafetyLock(ticker,thesis,current,structuralInvalidationHit,candidateExit,scanContext={}){
   const symbol=normalizeTicker(ticker);
+  const confirmationKey=String(scanContext.positionIdentity||symbol);
+  const clearThisConfirmation=()=>{const state=getExitConfirmationStore();delete state[confirmationKey];saveExitConfirmationStore(state);};
   if(structuralInvalidationHit){
-    clearExitConfirmation(symbol);
+    clearThisConfirmation();
     return {confirmed:true,state:"HARD INVALIDATION",count:0,required:0,giantCollapse:false,scanId:scanContext.scanId||"HARD"};
   }
   if(!candidateExit){
-    clearExitConfirmation(symbol);
+    clearThisConfirmation();
     return {confirmed:false,state:"CLEAR",count:0,required:2,giantCollapse:false,scanId:scanContext.scanId||"NONE"};
   }
 
@@ -4769,7 +4825,7 @@ function evaluateExitSafetyLock(ticker,thesis,current,structuralInvalidationHit,
   const drop=safeNum(thesis?.originalThesisScore,current.currentThesisScore)-current.currentThesisScore;
   const signature=(current.newFailureIds||[]).slice().sort().join("|");
   const baselineKey=String(thesis?.createdAt||"");
-  const store=getExitConfirmationStore(), prev=store[symbol];
+  const store=getExitConfirmationStore(), prev=store[confirmationKey];
 
   // Cached render / Quick Recheck / duplicate function evaluation must be pure.
   // They may read the current confirmation state but may NEVER advance it.
@@ -4791,7 +4847,7 @@ function evaluateExitSafetyLock(ticker,thesis,current,structuralInvalidationHit,
     count=Math.min(2,safeNum(prev.count,1)+1);
   }
 
-  store[symbol]={
+  store[confirmationKey]={
     signature,count,baselineKey,
     firstSeen:prev?.firstSeen||new Date().toISOString(),
     lastSeen:new Date().toISOString(),
@@ -4806,8 +4862,9 @@ function evaluateExitSafetyLock(ticker,thesis,current,structuralInvalidationHit,
 function relinkPositionToRecentBuyThesis(ticker){
   try{
     const symbol=normalizeTicker(ticker);
-    const saved=savedPositions.find(p=>normalizeTicker(p.ticker)===symbol);
-    if(!saved){alert("Saved position not found.");return;}
+    const matches=savedPositions.filter(p=>normalizeTicker(p.ticker)===symbol);
+    if(matches.length!==1){alert("Choose one exact saved contract before linking an archived BUY thesis.");return;}
+    const saved=matches[0];
     const buy=findRecentApprovedBuyAnalysis(symbol,72);
     if(!buy){
       alert("No archived Predator BUY for "+symbol+" was found in the last 72 hours. Do not fabricate an entry thesis.");
@@ -4829,23 +4886,24 @@ function establishLegacyManagementBaseline(ticker){
   try{
     const symbol = normalizeTicker(ticker);
     if(!symbol){ alert("Could not identify this saved position."); return; }
-    const saved = (savedPositions || []).find(p => normalizeTicker(p?.ticker) === symbol);
-    if(!saved){ alert("Saved position not found."); return; }
+    const matches = (savedPositions || []).filter(p => normalizeTicker(p?.ticker) === symbol);
+    if(matches.length!==1){ alert("Select one exact saved contract before establishing a baseline. Multiple or missing contracts cannot be matched safely."); return; }
+    const saved=matches[0];
 
-    const existing = getPositionThesisSnapshot(symbol);
+    const existing = getPositionThesisSnapshot(symbol,saved);
     if(existing?.baselineProvenance === "MANAGEMENT_BASELINE"){
       alert("A verified management baseline already exists for " + symbol + ". Predator will keep the existing baseline instead of replacing it.");
       return;
     }
 
     const cache = getStore("ai_options_last_scan_cache", null);
-    const row = cache?.results?.find(r => normalizeTicker(r?.ticker) === symbol && r?._analysisData);
+    const row = cache?.results?.find(r => r?.positionIdentity===positionIdentityV492(saved) && r?._analysisData);
     if(!row || !row._analysisData){
       alert("Run LIVE POSITION SCAN first. Predator needs a fresh position analysis before it can establish a management baseline.");
       return;
     }
 
-    const cleared = clearPositionThesisSnapshot(symbol);
+    const cleared = clearPositionThesisSnapshot(symbol,saved);
     if(!cleared){
       alert("Predator could not safely clear the old reconstructed thesis snapshot. No management baseline was created.");
       return;
@@ -4858,14 +4916,15 @@ function establishLegacyManagementBaseline(ticker){
     if(snapshot){
       const store=getPositionThesisStore();
       const audit=buildBaselineAuditSnapshot(row._analysisData);
-      store[symbol]={...store[symbol],managementBaselineAudit:audit,baselineFailureIds:[...(audit.failureIds||[])],baselineEvidencePoints:safeNum(audit.evidencePoints,0),baselinePrice:safeNum(audit.price,0),baselineCapturedAt:audit.capturedAt};
+      const key=thesisContractKeyV4913(saved);
+      store[key]={...store[key],managementBaselineAudit:audit,baselineFailureIds:[...(audit.failureIds||[])],baselineEvidencePoints:safeNum(audit.evidencePoints,0),baselinePrice:safeNum(audit.price,0),baselineCapturedAt:audit.capturedAt};
       setStore(PREDATOR_POSITION_THESIS_KEY,store);
-      clearExitConfirmation(symbol);
+      clearExitConfirmation(symbol,saved);
     }
 
-    const verify = getPositionThesisSnapshot(symbol);
+    const verify = getPositionThesisSnapshot(symbol,saved);
     if(!snapshot || !verify || verify.baselineProvenance !== "MANAGEMENT_BASELINE"){
-      clearPositionThesisSnapshot(symbol);
+      clearPositionThesisSnapshot(symbol,saved);
       alert("Predator could not verify the management baseline save. The EXIT gate remains protected. Please run Live Position Scan and try again.");
       return;
     }
@@ -4940,7 +4999,7 @@ function getPersistentPositionRead(ticker, a, position={}, scanContext={}){
 
   const d = getSimplePredatorDecision(a);
   const swing = d.swingValidation || getSwingValidationEngine(a);
-  let thesis = getPositionThesisSnapshot(ticker);
+  let thesis = getPositionThesisSnapshot(ticker, position);
   const hadExistingThesis = !!thesis;
 
   if(!thesis){
@@ -5855,7 +5914,10 @@ function saveCurrentAnalysisAsPositionThesis(){
   const optionCurrentPrice = safeNum(document.getElementById("positionOptionCurrent")?.value, 0);
   const contracts = Math.max(1, Math.floor(safeNum(document.getElementById("positionContracts")?.value, 1)));
 
+  const exactPosition=resolveThesisPositionV4913(ticker,null);
+  if(!exactPosition){alert('Save and identify one exact contract first. Cannot attach a thesis to a ticker alone.');return;}
   savePositionThesisSnapshot(ticker, a, {
+    ...exactPosition,
     ticker,
     direction:d.direction,
     entryUnderlying,
@@ -7274,14 +7336,47 @@ function getThesisIntegrityEngine(position, livePrice, ai, approxPnLPercent, dte
   };
 }
 
+
+// v49.8: Fail-safe qualification of position commands; never infer an option mark from stock price.
+function qualifyPositionCommandV497(command, position, analysis, dte, optionMark=null){
+  const c={...command};
+  const action=String(c.action||'');
+  const momentum=String(analysis?.momentumEngine||'').toUpperCase();
+  const type=String(position?.type||'').toUpperCase();
+  const contradictory=(type==='CALL' && momentum.includes('BEARISH')) || (type==='PUT' && momentum.includes('BULLISH'));
+  const expiring=Number.isFinite(dte) && dte<=3;
+  const quoteValid=Number.isFinite(optionMark) && optionMark>0;
+  const profitAction=/TAKE PROFIT|LOCK PROFIT|REDUCE/.test(action);
+  const holdAction=/^HOLD/.test(action);
+  const flags=[];
+  if(expiring)flags.push('Contract expires in '+dte+' day(s); verify exercise, assignment and broker cutoff risks.');
+  if(contradictory)flags.push('Momentum contradicts the saved '+type+' direction.');
+  if(!quoteValid)flags.push('Current option bid/ask or executable quote not verified; contract P/L is unknown.');
+  c.positionSafetyFlags=flags;
+  if(profitAction && !quoteValid){
+    c.action='VERIFY OPTION QUOTE — '+action;
+    c.botInstruction='No actionable profit-taking or reduction instruction without a verified contract quote. '+String(c.botInstruction||'');
+    c.color='yellow';
+  }
+  if(holdAction && (expiring||contradictory)){
+    c.action='WATCH / VERIFY — HOLD NOT CONFIRMED';
+    c.botInstruction='Review expiring-contract and contradictory-signal risks before deciding to hold. '+String(c.botInstruction||'');
+    c.color='yellow';
+  }
+  // Preserve canonical EXIT authority and the existing two-scan gate.
+  return c;
+}
+
 function analyzePosition(position, livePrice, ai, priceSource, scanContext={}){
   if(position.type === "SELL_CALL" || position.type === "SELL_PUT"){
     return analyzeShortOptionPosition(position, livePrice, ai, priceSource);
   }
   const price = livePrice, type = position.type, strike = position.strike, breakeven = position.breakeven, entryPremium = position.entryPremium || 0, dte = getDTE(position.expiration);
   const intrinsic = type === "CALL" ? Math.max(0, price - strike) : Math.max(0, strike - price);
-  const approxOptionValue = null; // No actual option bid/ask quote; do not fabricate a current option price.
-  const approxPnLPercent = null; // Cannot infer an option position P/L from stock price plus an arbitrary time-value estimate. Broker mark required.
+  const brokerQuote = predatorVerifiedQuote(position);
+  // Bid-based liquidation estimate, not a guaranteed executable fill; excludes commissions and fees.
+  const approxOptionValue = brokerQuote ? brokerQuote.bid : null;
+  const approxPnLPercent = brokerQuote && Number(entryPremium)>0 ? ((brokerQuote.bid-Number(entryPremium))/Number(entryPremium))*100 : null;
   const distanceToBE = Math.abs(breakeven - price), expectedMoveNum = parseFloat(ai.expectedMove), closeToBE = distanceToBE <= expectedMoveNum * 0.35, throughTargetCall = type === "CALL" && price >= breakeven + expectedMoveNum * 0.35, throughTargetPut = type === "PUT" && price <= breakeven - expectedMoveNum * 0.35;
   let timeRisk = "Unknown", expirationFit = "Unknown";
   if(dte !== null){ if(dte <= 1){ timeRisk = "Extreme"; expirationFit = "Very Short"; } else if(dte <= 3){ timeRisk = "High"; expirationFit = "Tight"; } else if(dte <= 7){ timeRisk = "Moderate"; expirationFit = "Good"; } else { timeRisk = "Low"; expirationFit = "Good"; } }
@@ -7314,6 +7409,8 @@ function analyzePosition(position, livePrice, ai, priceSource, scanContext={}){
     baseResult._canonicalPositionAuthority = canonicalAuthority;
     baseResult.positionIntelligence = getPositionIntelligenceEngine(position, baseResult, canonicalAuthority);
     baseResult.predatorCommand = getPredatorCommandCenter(position, baseResult, canonicalAuthority);
+    baseResult.predatorCommand = qualifyPositionCommandV497(baseResult.predatorCommand, position, ai, dte, approxOptionValue);
+    baseResult.manualQuote = brokerQuote ? {bid:brokerQuote.bid,ask:brokerQuote.ask,checkedAt:brokerQuote.checkedAt,pnlPercent:approxPnLPercent} : null;
   }else{
     baseResult.positionIntelligence = getPositionIntelligenceEngine(position, baseResult);
     baseResult.predatorCommand = getPredatorCommandCenter(position, baseResult);
@@ -7345,6 +7442,7 @@ function renderPositionCards(results){
   results = Array.isArray(results) ? results : [];
   return results.map(r=>`
     <div class="card ${r.cardClass}">
+      ${r.status === "UNAVAILABLE" ? `<div class="card sell-alert"><div class="section-title">DATA UNAVAILABLE — NO POSITION RECOMMENDATION</div><div class="metric">Predator could not verify market data for this contract. HOLD, REDUCE, TAKE PROFIT, and EXIT have not been evaluated. Check your broker and run a fresh Live Position Scan.</div><div class="metric">Reason: ${escapeHtml(r.reason || "Missing data")}</div></div>` : ""}
       <div class="section-title">Predator Command Center</div>
       <div class="card" style="margin:10px 0 16px 0;padding:14px;">
         <div class="section-title">Position Identity</div>
@@ -7352,78 +7450,105 @@ function renderPositionCards(results){
         <div class="metric"><b>Expiration:</b> ${escapeHtml(r.expiration || "Not set")}</div>
         <div class="metric"><b>Breakeven:</b> ${r.breakeven === "N/A" || r.breakeven == null ? "N/A" : "$" + escapeHtml(r.breakeven)}</div>
       </div>
-      ${(()=>{ const cmd = r.predatorCommand || {
+      ${(()=>{ const cmd = r.status === "UNAVAILABLE" ? {action:"NO GUIDANCE — DATA UNAVAILABLE",confidence:0,botInstruction:"Verify the contract and market data with your broker. Do not rely on a cached HOLD or EXIT instruction.",reason:r.reason||"Market data unavailable",nextCheckpoint:"Run a new Live Position Scan when data is available.",color:"yellow",exitGate:"BLOCKED",independentFailures:0,evidencePoints:0,baselineDisplayType:"LEGACY",baselineFailureCount:0,currentFailureCount:0,newFailureCount:0,resolvedFailureCount:0,postBaselineEvidencePoints:0,newFailureIds:[],resolvedFailureIds:[],exitCandidate:false,exitSafety:{state:"DATA UNAVAILABLE",count:0,required:2},baselineReliable:false,baselineProvenance:"UNKNOWN",authorityConflict:true,originalInvalidation:"N/A",invalidationHit:false,originalThesisScore:0,currentThesisScore:0} : r.predatorCommand || {
         action:"HOLD / RECHECK",confidence:50,botInstruction:"Canonical position authority is unavailable. Do not act on an EXIT signal.",reason:"Rendering is fail-closed because this result has no precomputed authority object.",nextCheckpoint:"Run a new Live Position Scan.",color:"yellow",exitGate:"BLOCKED",independentFailures:0,evidencePoints:0,baselineDisplayType:"LEGACY",baselineFailureCount:0,currentFailureCount:0,newFailureCount:0,resolvedFailureCount:0,postBaselineEvidencePoints:0,newFailureIds:[],resolvedFailureIds:[],exitCandidate:false,exitSafety:{state:"AUTHORITY UNAVAILABLE",count:0,required:2},baselineReliable:false,baselineProvenance:"UNKNOWN",authorityConflict:true,originalInvalidation:"N/A",invalidationHit:false,originalThesisScore:0,currentThesisScore:0
-      }; return `
+      };
+      // v49.14: Recheck the broker quote at DISPLAY time, not only scan time.
+      // An expired quote or cached result must never retain an actionable reduction/profit command.
+      const saved = savedPositions.find(p=>positionIdentityV492(p)===r.positionIdentity);
+      const liveQuote = saved ? predatorVerifiedQuote(saved) : null;
+      const quoteExpired = !!r.manualQuote && (!liveQuote || liveQuote.checkedAt !== r.manualQuote.checkedAt);
+      const isCache = r._scanContext?.mode === 'CACHE' || String(r.priceSource||'').includes('NOT LIVE');
+      const originalAction = String(cmd.action||'');
+      const isProfitOrReduce = /TAKE PROFIT|LOCK PROFIT|REDUCE/.test(originalAction);
+      // v49.14: A scan-time quote is not enough. A newer saved quote also
+      // requires a new scan, because the position calculation used the old bid.
+      const quoteMismatch = !!r.manualQuote && (!liveQuote || liveQuote.checkedAt !== r.manualQuote.checkedAt || liveQuote.bid !== r.manualQuote.bid || liveQuote.ask !== r.manualQuote.ask);
+      const quoteUnverified = !liveQuote || !r.manualQuote || quoteMismatch;
+      const quoteSensitive = /TAKE PROFIT|LOCK PROFIT|REDUCE/.test(originalAction);
+      const safeCmd = {...cmd};
+      if(r.status !== 'UNAVAILABLE' && quoteUnverified && quoteSensitive){
+        safeCmd.action = 'VERIFY OPTION QUOTE — ' + originalAction;
+        safeCmd.botInstruction = 'Option quote is missing, changed or expired. Verify current bid/ask in Robinhood and run a new Live Position Scan before considering this action.';
+        safeCmd.color = 'yellow';
+        safeCmd.positionSafetyFlags = [...(safeCmd.positionSafetyFlags||[]), 'Option quote not current at display time.'];
+      }
+      if(r.status !== 'UNAVAILABLE' && isCache){
+        safeCmd.action = 'CACHED REFERENCE — NOT LIVE';
+        safeCmd.botInstruction = 'This is cached information, not an actionable position instruction. Run Live Position Scan and verify the contract in Robinhood.';
+        safeCmd.color = 'yellow';
+      }
+      return `
         <div class="command-box">
-          <div class="command-action ${cmd.color}">${escapeHtml(cmd.action)}</div>
-          <div class="metric"><b>Position Command Confidence:</b> ${cmd.confidence}/100</div>
-          <div class="metric"><b>Instruction:</b> ${escapeHtml(cmd.botInstruction)}</div>
-          <div class="metric"><b>Reason:</b> ${escapeHtml(cmd.reason)}</div>
-          <div class="metric"><b>Next Checkpoint:</b> ${escapeHtml(cmd.nextCheckpoint)}</div>
+          <div class="command-action ${safeCmd.color}">${escapeHtml(safeCmd.action)}</div>
+          <div class="metric"><b>Position Command Confidence:</b> ${safeCmd.confidence}/100</div>
+          <div class="metric"><b>Instruction:</b> ${escapeHtml(safeCmd.botInstruction)}</div>
+          ${Array.isArray(safeCmd.positionSafetyFlags)&&safeCmd.positionSafetyFlags.length?`<div class="metric yellow"><b>Contract safety:</b> ${safeCmd.positionSafetyFlags.map(escapeHtml).join(" ")}</div>`:""}
+          <div class="metric"><b>Reason:</b> ${escapeHtml(safeCmd.reason)}</div>
+          <div class="metric"><b>Next Checkpoint:</b> ${escapeHtml(safeCmd.nextCheckpoint)}</div>
           ${(r.type === "CALL" || r.type === "PUT") ? `
           <div class="divider"></div>
           <div class="section-title">Exit Evidence Summary</div>
-          <div class="metric"><b>EXIT Gate:</b> <span class="${cmd.exitGate === "OPEN" ? "red" : "green"}">${cmd.exitGate}</span></div>
-          <div class="metric"><b>Independent Failures:</b> ${cmd.independentFailures}</div>
-          <div class="metric"><b>Evidence Points:</b> ${cmd.evidencePoints}</div>
+          <div class="metric"><b>EXIT Gate:</b> <span class="${safeCmd.exitGate === "OPEN" ? "red" : "green"}">${safeCmd.exitGate}</span></div>
+          <div class="metric"><b>Independent Failures:</b> ${safeCmd.independentFailures}</div>
+          <div class="metric"><b>Evidence Points:</b> ${safeCmd.evidencePoints}</div>
           ${
-            cmd.baselineDisplayType === "MANAGEMENT"
-              ? `<div class="metric"><b>Baseline Failures:</b> ${cmd.baselineFailureCount}</div>
-                 <div class="metric"><b>Current Failures:</b> ${cmd.currentFailureCount}</div>
-                 <div class="metric"><b>New Failures Since Baseline:</b> ${cmd.newFailureCount}</div>
-                 <div class="metric"><b>Resolved Failures:</b> ${cmd.resolvedFailureCount}</div>
-                 <div class="metric"><b>Post-Baseline Evidence Points:</b> ${cmd.postBaselineEvidencePoints}</div>
-                 <div class="metric"><b>Deterioration Since Baseline:</b> <span class="${cmd.newFailureCount > 0 || cmd.postBaselineEvidencePoints > 0 ? "yellow" : "green"}">${cmd.newFailureCount > 0 || cmd.postBaselineEvidencePoints > 0 ? "YES" : "NONE"}</span></div>
-                 <div class="metric"><b>Exit Safety Lock:</b> <span class="${cmd.exitGate === "OPEN" ? "red" : cmd.exitCandidate ? "yellow" : "green"}">${escapeHtml(cmd.exitSafety?.state||"CLEAR")}</span></div>
-                 <div class="metric"><b>Confirmation:</b> ${cmd.exitCandidate ? `${cmd.exitSafety?.count||0}/${cmd.exitSafety?.required||2} scans` : "Not required"}</div>`
+            safeCmd.baselineDisplayType === "MANAGEMENT"
+              ? `<div class="metric"><b>Baseline Failures:</b> ${safeCmd.baselineFailureCount}</div>
+                 <div class="metric"><b>Current Failures:</b> ${safeCmd.currentFailureCount}</div>
+                 <div class="metric"><b>New Failures Since Baseline:</b> ${safeCmd.newFailureCount}</div>
+                 <div class="metric"><b>Resolved Failures:</b> ${safeCmd.resolvedFailureCount}</div>
+                 <div class="metric"><b>Post-Baseline Evidence Points:</b> ${safeCmd.postBaselineEvidencePoints}</div>
+                 <div class="metric"><b>Deterioration Since Baseline:</b> <span class="${safeCmd.newFailureCount > 0 || safeCmd.postBaselineEvidencePoints > 0 ? "yellow" : "green"}">${safeCmd.newFailureCount > 0 || safeCmd.postBaselineEvidencePoints > 0 ? "YES" : "NONE"}</span></div>
+                 <div class="metric"><b>Exit Safety Lock:</b> <span class="${safeCmd.exitGate === "OPEN" ? "red" : safeCmd.exitCandidate ? "yellow" : "green"}">${escapeHtml(safeCmd.exitSafety?.state||"CLEAR")}</span></div>
+                 <div class="metric"><b>Confirmation:</b> ${safeCmd.exitCandidate ? `${safeCmd.exitSafety?.count||0}/${safeCmd.exitSafety?.required||2} scans` : "Not required"}</div>`
               : ""
           }
-          <div class="metric"><b>Baseline Integrity:</b> <span class="${cmd.baselineReliable ? "green" : "yellow"}">${
-            cmd.baselineDisplayType === "MANAGEMENT"
+          <div class="metric"><b>Baseline Integrity:</b> <span class="${safeCmd.baselineReliable ? "green" : "yellow"}">${
+            safeCmd.baselineDisplayType === "MANAGEMENT"
               ? "VERIFIED MANAGEMENT BASELINE"
-              : cmd.baselineDisplayType === "ENTRY"
+              : safeCmd.baselineDisplayType === "ENTRY"
                 ? "VERIFIED ENTRY BASELINE"
                 : "LEGACY / RECONSTRUCTED"
           }</span></div>
-          <div class="metric"><b>Baseline Source:</b> ${escapeHtml(cmd.baselineProvenance || "UNKNOWN")}</div>
+          <div class="metric"><b>Baseline Source:</b> ${escapeHtml(safeCmd.baselineProvenance || "UNKNOWN")}</div>
           ${
-            cmd.baselineDisplayType === "LEGACY"
+            safeCmd.baselineDisplayType === "LEGACY"
               ? `<div class="metric"><b>Entry Thesis:</b> NOT RECORDED</div>
-                 <div class="metric"><b>Reconstructed Baseline:</b> ${cmd.originalThesisScore}/100</div>
+                 <div class="metric"><b>Reconstructed Baseline:</b> ${safeCmd.originalThesisScore}/100</div>
                  <div class="metric muted">This reconstructed score is not treated as your original entry thesis.</div>
                  <button class="secondary-btn" onclick="establishLegacyManagementBaseline('${escapeHtml(r.ticker)}')">ESTABLISH MANAGEMENT BASELINE</button>
                  <div class="metric muted">One-time onboarding: once verified, Predator will not silently replace this management baseline.</div>`
-              : cmd.baselineDisplayType === "MANAGEMENT"
+              : safeCmd.baselineDisplayType === "MANAGEMENT"
                 ? `<div class="metric"><b>Entry Thesis:</b> NOT RECORDED</div>
-                   <div class="metric"><b>${cmd.entryThesisRecorded ? "Entry Thesis" : "Management Baseline"}:</b> ${cmd.originalThesisScore}/100</div>
-                   ${cmd.entryThesisRecorded ? `
+                   <div class="metric"><b>${safeCmd.entryThesisRecorded ? "Entry Thesis" : "Management Baseline"}:</b> ${safeCmd.originalThesisScore}/100</div>
+                   ${safeCmd.entryThesisRecorded ? `
                      <div class="metric green"><b>Entry Thesis Link:</b> VERIFIED PREDATOR BUY</div>
-                     <div class="metric"><b>Entry Thesis Source:</b> ${escapeHtml(cmd.entryThesisSource||"Predator BUY")}</div>
-                     <div class="metric"><b>Entry Thesis Captured:</b> ${escapeHtml(cmd.entryThesisCapturedAt||cmd.baselineCapturedAt||"N/A")}</div>
-                     <div class="metric"><b>Entry Invalidation:</b> ${Number.isFinite(Number(cmd.entryInvalidation)) ? "$"+Number(cmd.entryInvalidation).toFixed(2) : "N/A"}</div>
+                     <div class="metric"><b>Entry Thesis Source:</b> ${escapeHtml(safeCmd.entryThesisSource||"Predator BUY")}</div>
+                     <div class="metric"><b>Entry Thesis Captured:</b> ${escapeHtml(safeCmd.entryThesisCapturedAt||safeCmd.baselineCapturedAt||"N/A")}</div>
+                     <div class="metric"><b>Entry Invalidation:</b> ${Number.isFinite(Number(safeCmd.entryInvalidation)) ? "$"+Number(safeCmd.entryInvalidation).toFixed(2) : "N/A"}</div>
                    ` : ""}
-                   <div class="metric"><b>Baseline Captured:</b> ${escapeHtml(cmd.baselineCapturedAt||"N/A")}</div>
-                   <div class="metric"><b>Baseline Price:</b> ${cmd.baselinePrice>0?"$"+Number(cmd.baselinePrice).toFixed(2):"N/A"}</div>
-                   ${cmd.baselineAudit?.components ? `
+                   <div class="metric"><b>Baseline Captured:</b> ${escapeHtml(safeCmd.baselineCapturedAt||"N/A")}</div>
+                   <div class="metric"><b>Baseline Price:</b> ${safeCmd.baselinePrice>0?"$"+Number(safeCmd.baselinePrice).toFixed(2):"N/A"}</div>
+                   ${safeCmd.baselineAudit?.components ? `
                      <div class="divider"></div><div class="section-title">Baseline Audit Trail</div>
-                     <div class="metric"><b>Trend:</b> ${Math.round(cmd.baselineAudit.components.trend)}/100 &rarr; ${Math.round(cmd.currentTrend)}/100</div>
-                     <div class="metric"><b>Momentum:</b> ${Math.round(cmd.baselineAudit.components.momentum)}/100 &rarr; ${Math.round(cmd.currentMomentum)}/100</div>
-                     <div class="metric"><b>Conviction:</b> ${Math.round(cmd.baselineAudit.components.conviction)}/100 &rarr; ${Math.round(cmd.currentConviction)}/100</div>
-                     <div class="metric"><b>Alignment:</b> ${Math.round(cmd.baselineAudit.components.alignment)}/100 &rarr; ${Math.round(cmd.currentAlignment)}/100</div>
-                     <div class="metric"><b>Market:</b> ${Math.round(cmd.baselineAudit.components.market)}/100 &rarr; ${Math.round(cmd.currentMarket)}/100</div>
-                     <div class="metric"><b>Baseline Failure IDs:</b> ${escapeHtml((cmd.baselineAudit.failureIds||[]).join(", ")||"NONE")}</div>
-                     <div class="metric"><b>New Failure IDs:</b> ${escapeHtml((cmd.newFailureIds||[]).join(", ")||"NONE")}</div>
+                     <div class="metric"><b>Trend:</b> ${Math.round(safeCmd.baselineAudit.components.trend)}/100 &rarr; ${Math.round(safeCmd.currentTrend)}/100</div>
+                     <div class="metric"><b>Momentum:</b> ${Math.round(safeCmd.baselineAudit.components.momentum)}/100 &rarr; ${Math.round(safeCmd.currentMomentum)}/100</div>
+                     <div class="metric"><b>Conviction:</b> ${Math.round(safeCmd.baselineAudit.components.conviction)}/100 &rarr; ${Math.round(safeCmd.currentConviction)}/100</div>
+                     <div class="metric"><b>Alignment:</b> ${Math.round(safeCmd.baselineAudit.components.alignment)}/100 &rarr; ${Math.round(safeCmd.currentAlignment)}/100</div>
+                     <div class="metric"><b>Market:</b> ${Math.round(safeCmd.baselineAudit.components.market)}/100 &rarr; ${Math.round(safeCmd.currentMarket)}/100</div>
+                     <div class="metric"><b>Baseline Failure IDs:</b> ${escapeHtml((safeCmd.baselineAudit.failureIds||[]).join(", ")||"NONE")}</div>
+                     <div class="metric"><b>New Failure IDs:</b> ${escapeHtml((safeCmd.newFailureIds||[]).join(", ")||"NONE")}</div>
                    ` : `<div class="metric yellow"><b>Audit Trail:</b> This baseline predates v47.7.10 component capture. The new EXIT confirmation lock still applies.</div>`}
                    <div class="metric muted">This verified snapshot remains fixed. Do not reset it to make a later scan look better or worse.</div>`
-                : `<div class="metric"><b>Entry Thesis:</b> ${cmd.originalThesisScore}/100</div>`
+                : `<div class="metric"><b>Entry Thesis:</b> ${safeCmd.originalThesisScore}/100</div>`
           }
-          <div class="metric"><b>Authority Conflict:</b> <span class="${cmd.authorityConflict ? "red" : "green"}">${cmd.authorityConflict ? "YES - FAIL CLOSED" : "NO"}</span></div>
-          <div class="metric"><b>Original Invalidation:</b> ${cmd.originalInvalidation === "N/A" ? "N/A" : "$"+cmd.originalInvalidation}</div>
-          <div class="metric"><b>Invalidation Hit:</b> ${cmd.invalidationHit ? "YES" : "NO"}</div>
+          <div class="metric"><b>Authority Conflict:</b> <span class="${safeCmd.authorityConflict ? "red" : "green"}">${safeCmd.authorityConflict ? "YES - FAIL CLOSED" : "NO"}</span></div>
+          <div class="metric"><b>Original Invalidation:</b> ${safeCmd.originalInvalidation === "N/A" ? "N/A" : "$"+safeCmd.originalInvalidation}</div>
+          <div class="metric"><b>Invalidation Hit:</b> ${safeCmd.invalidationHit ? "YES" : "NO"}</div>
           ` : ""}
         </div>`; })()}
-      ${r.positionIntelligence ? `
+      ${r.status !== "UNAVAILABLE" && r.positionIntelligence ? `
       <div class="divider"></div>
       <div class="section-title">Position Intelligence</div>
       <div class="metric"><b>Fresh Entry Read:</b> <span class="${signalClass(r.positionIntelligence.newEntryDecision)}">${escapeHtml(r.positionIntelligence.newEntryDecision)}</span></div>
@@ -7452,7 +7577,7 @@ function renderPositionCards(results){
       <div class="metric"><b>Position Rule:</b> ${escapeHtml(r.positionIntelligence.positionRule)}</div>
       <div class="metric"><b>Noise Read:</b> ${escapeHtml(r.positionIntelligence.normalNoiseRead)}</div>
       ` : ""}
-      <div class="advanced-panel">
+      <div class="advanced-panel" ${r.status === "UNAVAILABLE" ? "style=\"display:none!important\" aria-hidden=\"true\"" : ""}>
       <div class="divider"></div>
       <div class="section-title">Advanced Position Readout</div>
       <div class="metric"><b>${r.ticker}</b> ${r.strike} ${r.type}</div>
@@ -8097,7 +8222,7 @@ function findRecentApprovedBuyAnalysis(ticker, maxAgeHours=72){
 function attachEntryThesisFromBuy(position,buy){
   if(!position||!buy?.analysisData) return null;
   const symbol=normalizeTicker(position.ticker);
-  const cleared=clearPositionThesisSnapshot(symbol);
+  const cleared=clearPositionThesisSnapshot(symbol,position);
   if(!cleared) return null;
   const snapshot=savePositionThesisSnapshot(symbol,buy.analysisData,{
     ...position,
@@ -8108,8 +8233,10 @@ function attachEntryThesisFromBuy(position,buy){
 
   const store=getPositionThesisStore();
   const audit=buy.audit||buildBaselineAuditSnapshot(buy.analysisData);
-  store[symbol]={
-    ...store[symbol],
+  const key=thesisContractKeyV4913(position);
+  if(!key)return null;
+  store[key]={
+    ...store[key],
     baselineProvenance:"ENTRY_THESIS",
     entryThesisRecorded:true,
     entryThesisCapturedAt:buy.capturedAt,
@@ -8126,8 +8253,8 @@ function attachEntryThesisFromBuy(position,buy){
     baselineCapturedAt:buy.capturedAt
   };
   setStore(PREDATOR_POSITION_THESIS_KEY,store);
-  clearExitConfirmation(symbol);
-  return store[symbol];
+  clearExitConfirmation(symbol,position);
+  return store[key];
 }
 
 function saveLastAnalysis(ticker, analysisHtml, compactHtml, analysisData){
@@ -8529,6 +8656,33 @@ async function findBestTrade(){
     </div>`;
 }
 
+// v49.3: A cache belongs to the exact contract portfolio, not merely to a ticker.
+function positionIdentityV492(p){
+  return [normalizeTicker(p?.ticker),String(p?.type||"").toUpperCase(),
+    Number(p?.strike),String(p?.expiration||""),String(p?.entryDate||"")].join("|");
+}
+function positionPortfolioFingerprintV492(positions){
+  // v49.4: Include the saved economic inputs, not just contract identity.
+  // A premium, breakeven, or contract-size edit must invalidate prior scan output.
+  return JSON.stringify((Array.isArray(positions)?positions:[]).map(p=>({
+    identity:positionIdentityV492(p),
+    entryPremium:p?.entryPremium ?? null,
+    breakeven:p?.breakeven ?? null,
+    contracts:p?.contracts ?? null,
+    entryThesisLinked:p?.entryThesisLinked ?? null,
+    entryThesis:p?.entryThesis ?? null
+  })));
+}
+function positionCacheValidV492(cache,positions){
+  if(!cache || !Array.isArray(cache.results) || !Array.isArray(positions))return false;
+  if(cache.portfolioFingerprint !== positionPortfolioFingerprintV492(positions))return false;
+  if(cache.results.length !== positions.length)return false;
+  return cache.results.every((r,i)=>r && r.positionIdentity===positionIdentityV492(positions[i]));
+}
+function invalidatePositionScanCacheV492(){
+  lastScanCache=null;
+  setStore("ai_options_last_scan_cache",null);
+}
 async function scanMyPositions(){
   const manualEntryUnderlying = safeNum(document.getElementById("positionEntryUnderlying")?.value, 0);
   const manualOptionEntry = safeNum(document.getElementById("positionOptionEntry")?.value, 0);
@@ -8540,26 +8694,37 @@ async function scanMyPositions(){
   let results = [];
   const liveScanId = makeLivePositionScanId();
   const liveScanContext = {scanId:liveScanId,mode:"LIVE"};
-  let cache = { scannedAt: new Date().toISOString(), scanId:liveScanId, results: [] };
+  let cache = { scannedAt: new Date().toISOString(), scanId:liveScanId, portfolioFingerprint:positionPortfolioFingerprintV492(savedPositions), results: [] };
 
   for(let i=0; i<savedPositions.length; i++){
     const p = savedPositions[i], ticker = normalizeTicker(p.ticker);
     const closes = await getHistory(ticker);
     if(!closes){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
-      results.push(item); cache.results.push(item); continue;
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load historical data",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"DATA UNAVAILABLE",reason:"Position guidance cannot be calculated without valid market data.",runnerPlan:"Check the contract in your broker and retry a Live Position Scan.",color:"yellow"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
+      item.positionIdentity=positionIdentityV492(p); results.push(item); cache.results.push(item); continue;
+    }
+    // v49.6: a current quote cannot rehabilitate stale or undated analysis candles.
+    // The position engine depends on indicators derived from this history.
+    const candleStatus = predatorCandleStatus(ticker);
+    if(!candleStatus.current){
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Daily analysis history is stale or unverified. " + predatorFreshnessLabel(candleStatus),approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Stale / Unverified",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"DATA UNAVAILABLE",reason:"Current analysis history required for position guidance.",runnerPlan:"Verify contract in broker and retry after the daily feed updates.",color:"yellow"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
+      item.positionIdentity=positionIdentityV492(p); results.push(item); cache.results.push(item); continue;
     }
     const pricePack = await getBestAvailablePrice(ticker, closes);
     if(pricePack.price === null){
-      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"HOLD / REASSESS",reason:"No specific scale signal is active.",runnerPlan:"Recheck on the next scan.",color:"blue"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
-      results.push(item); cache.results.push(item); continue;
+      const item = {ticker,type:p.type,strike:p.strike,breakeven:p.breakeven,expiration:p.expiration || "Not set",dte:"N/A",timeRisk:"Unknown",expirationFit:"Unknown",livePrice:"N/A",status:"UNAVAILABLE",reason:"Could not load quote or fallback price",approxPnLPercent:null,cardClass:"sell-alert",priceSource:"Unavailable",timeTarget:{probability:"N/A",window:"Unknown",bias:"Unknown"},trapWarning:"CLEAR",predictiveEngine:{likelyMove:"N/A",moveStrength:"N/A",timingWindow:"N/A"},profitScaling:{action:"DATA UNAVAILABLE",reason:"Position guidance cannot be calculated without valid market data.",runnerPlan:"Check the contract in your broker and retry a Live Position Scan.",color:"yellow"},incomeMode:{strategy:"BUY PREMIUM",incomeSignal:"OFF",spreadType:"NONE",rationale:"No income setup.",maxRisk:"N/A",maxProfit:"N/A",pop:"N/A",shortStrike:"N/A",longStrike:"N/A"},nextDay:{tomorrowRead:"N/A",chaseRisk:"N/A",overnightRisk:"N/A",reversalTrap:"N/A",buyTrigger:"N/A",invalidation:"N/A",morningChecklist:"N/A",oneDayMovePct:"N/A",fiveDayMovePct:"N/A"},qualityDecision:{decision:"N/A",reason:"N/A"},alignmentScore:{score:"N/A",label:"N/A"},marketRegimeFilter:{state:"N/A",action:"N/A",reason:"N/A"},noTradeZone:{zone:"N/A",reason:"N/A",rangeLocation:"N/A"},tradeManagement:{decision:"N/A",holdTime:"N/A",overnight:"N/A",profitRisk:"N/A",scalePlan:"N/A",reason:"N/A"}};
+      item.positionIdentity=positionIdentityV492(p); results.push(item); cache.results.push(item); continue;
     }
     const ai = analyze(closes, pricePack.price);
-    const monitor = analyzePosition(p, pricePack.price, ai, pricePack.source, liveScanContext);
-    results.push(monitor); cache.results.push(monitor);
-    await new Promise(r => setTimeout(r, 5000));
+    const monitor = analyzePosition(p, pricePack.price, ai, pricePack.source, {...liveScanContext,positionIdentity:positionIdentityV492(p)});
+    monitor.positionIdentity=positionIdentityV492(p); results.push(monitor); cache.results.push(monitor);
+    if(i < savedPositions.length - 1) await new Promise(r => setTimeout(r, 5000));
   }
 
+  if(cache.portfolioFingerprint !== positionPortfolioFingerprintV492(savedPositions)){
+    output.innerHTML="<div class='card sell-alert'>Saved positions changed during the scan. Results discarded. Run a fresh Live Position Scan.</div>";
+    invalidatePositionScanCacheV492(); return;
+  }
   lastScanCache = cache;
   setStore("ai_options_last_scan_cache", lastScanCache);
   applyPortfolioAlertSummary(results, "TACTICAL LIVE SCAN");
@@ -8569,8 +8734,8 @@ async function scanMyPositions(){
 function quickRecheckPositions(){
   const output = document.getElementById("output");
   const cache = getStore("ai_options_last_scan_cache", null);
-  if(!cache || !cache.results || !cache.results.length){
-    output.innerHTML = "<div class='card'>No recent live scan found yet. Run <b>Live Position Scan</b> once first, then Quick Recheck will work without API calls.</div>";
+  if(!positionCacheValidV492(cache,savedPositions)){
+    output.innerHTML = "<div class='card'>No valid scan exists for these exact saved contracts. Run <b>Live Position Scan</b> again. Cached readings cannot be reused after a position is added, closed, removed, or changed.</div>";
     clearActiveAlertsPanel();
     return;
   }
@@ -8593,18 +8758,19 @@ function quickRecheckPositions(){
       }
     }
     if((copy.type === "CALL" || copy.type === "PUT") && copy._analysisData){
-      const saved = savedPositions.find(p=>normalizeTicker(p.ticker)===normalizeTicker(copy.ticker)) || {ticker:copy.ticker,type:copy.type};
+      const saved = savedPositions.find(p=>positionIdentityV492(p)===copy.positionIdentity);
+      if(!saved){ copy.status="UNAVAILABLE"; copy.reason="Saved contract identity changed; new live scan required."; return copy; }
       copy._scanContext = {scanId:String(cache.scanId || cache.scannedAt || "CACHE"),mode:"CACHE"};
       const canonicalAuthority = getPositionCommandAuthority(saved.ticker, copy._analysisData, saved, copy._scanContext);
       copy._canonicalPositionAuthority = canonicalAuthority;
       copy.positionIntelligence = getPositionIntelligenceEngine(saved, copy, canonicalAuthority);
       copy.predatorCommand = getPredatorCommandCenter(saved, copy, canonicalAuthority);
     }
-    copy.priceSource = String(copy.priceSource || "Cached") + " / Quick Recheck";
+    copy.priceSource = String(copy.priceSource || "Cached") + " / Quick Recheck (NOT LIVE)";
     return copy;
   });
   applyPortfolioAlertSummary(refreshed, "TACTICAL QUICK RECHECK");
-  output.innerHTML = `<div class='card'><div class='section-title'>Quick Recheck</div><div class='metric'>Using your most recent live scan from ${new Date(cache.scannedAt).toLocaleString()}.</div><div class='metric muted'>No new API calls were used.</div><div class="pill blue">CACHE MODE</div><div class="pill green">API SAFE</div></div>` + renderPositionCards(refreshed);
+  output.innerHTML = `<div class='card weak-alert'><div class='section-title'>Quick Recheck — CACHED REFERENCE ONLY</div><div class='metric'>Original scan: ${new Date(cache.scannedAt).toLocaleString()}.</div><div class='metric yellow'><b>Not a fresh HOLD / REDUCE / TAKE PROFIT / EXIT instruction.</b> Prices and contract conditions have not been refreshed. Confirm with your broker and run Live Position Scan for a new decision.</div><div class='metric muted'>No new API calls were used.</div><div class="pill blue">CACHE MODE</div><div class="pill yellow">NOT LIVE</div></div>` + renderPositionCards(refreshed);
 }
 // v48.0 - Contract Intelligence Layer. BUY/WAIT/NO TRADE authority remains v47.9.2.
 const PREDATOR_CONTRACT_ENGINE_VERSION = "v48.0";
