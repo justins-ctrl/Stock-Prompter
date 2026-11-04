@@ -6342,27 +6342,31 @@ function getBuyFunnelDiagnostics(a){
     {name:"Entry Location", state:entryLocationApplicable ? (integrityPass ? "PASS" : "BLOCK") : "N/A", detail:entryLocationApplicable ? (swing.entryIntegrity?.status || "N/A") : "NOT EVALUATED"},
     {name:"Price Trigger", state:triggerApplicable ? (swing.triggerConfirmed ? "PASS" : "BLOCK") : "N/A",
       detail:triggerApplicable ? (swing.triggerConfirmed ? "CONFIRMED" : `WAITING FOR $${swing.trigger}`) : "NOT APPLICABLE"},
-    {name:"Final BUY Authority", state:finalBuyApproved ? "PASS" : "BLOCK",
+    {name:"Execution BUY Authority", state:finalBuyApproved ? "PASS" : "BLOCK",
       detail:finalBuyApproved ? "BUY APPROVED" : simple.decision === "WAIT" ? "WAIT - NOT APPROVED YET" : "NO TRADE - BLOCKED"}
   ];
-  const remaining = gates.filter(g=>g.state === "BLOCK" && g.name !== "Final BUY Authority").length;
+  const remaining = gates.filter(g=>g.state === "BLOCK" && g.name !== "Execution BUY Authority").length;
   return {gates,remaining,swing,finalBuyApproved};
 }
 
-function renderBuyFunnelDiagnostics(a){
+function renderBuyFunnelDiagnostics(a, source=""){
   const d = getBuyFunnelDiagnostics(a);
-  return `<div class="card"><div class="section-title">BUY Funnel Diagnostics</div>
+  const dailyClose = /completed daily close/i.test(String(source)) ? getDailyCloseScanDecision(a) : null;
+  return `<div class="card"><div class="section-title">BUY Funnel Diagnostics — Execution Confirmation</div>
+    ${dailyClose ? `<div class="metric ${dailyClose.screeningCandidate ? "green" : "yellow"}"><b>Separate daily-close authority:</b> ${escapeHtml(dailyClose.screeningStatus)} — execution unverified.</div>` : ""}
     <div class="metric"><b>Gates Remaining:</b> ${d.remaining}</div>
     ${d.gates.map(g=>{
       const cls = g.state === "PASS" ? "green" : g.state === "BLOCK" ? "yellow" : "muted";
       return `<div class="metric"><span class="${cls}"><b>${g.state}:</b></span> ${g.name} - ${g.detail}</div>`;
     }).join("")}
-    <div class="metric muted">Final BUY Authority can show PASS only when the actual fresh-entry decision is BUY and every required confirmation is satisfied.</div>
+    <div class="metric muted">Execution BUY Authority can show PASS only when the actual fresh-entry decision is BUY and every required confirmation is satisfied.</div>
   </div>`;
 }
 
 
-function renderSimplePredatorDecision(a){
+function renderSimplePredatorDecision(a, source=""){
+  const dailyCloseSource = /completed daily close/i.test(String(source));
+  const dailyClose = dailyCloseSource ? getDailyCloseScanDecision(a) : null;
   const d = getSimplePredatorDecision(a);
   const directionText = d.direction === "WAIT" ? "No directional buy" : d.direction;
   const displayDecision = d.decision === "PASS" ? "NO TRADE" : d.decision;
@@ -6370,7 +6374,9 @@ function renderSimplePredatorDecision(a){
 
   return `
   <div class="card final-answer-card">
-    <div class="section-title">Predator Final Answer</div>
+    <div class="section-title">Predator Final Answer — Execution Confirmation</div>
+    ${dailyClose ? `<div class="metric ${dailyClose.screeningCandidate ? "green" : "yellow"}"><b>Daily-close directional recommendation:</b> ${escapeHtml(dailyClose.screeningStatus)}. ${dailyClose.screeningCandidate ? "BROKER EXECUTION UNVERIFIED — check current stock price, option premium and spread." : "No daily-close BUY approval."}</div>` : ""}
+    <div class="metric muted">The execution-confirmation decision below is separate from any completed-session directional recommendation. WAIT here does not cancel a daily-close setup; it means a current executable order has not been verified.</div>
     <div class="final-answer-word ${d.color}">${displayDecision}</div>
     <div class="final-answer-sub">${d.reason}</div>
 
@@ -6392,31 +6398,37 @@ function renderSimplePredatorDecision(a){
   </div>`;
 }
 
-// Daily close screens can identify a setup, but cannot confirm a trigger calculated
-// beyond that same close. Never promote a completed-candle scan to an executable BUY.
+// v49.16: End-of-day directional approval. This is NOT a live order authorization.
+// Require the unchanged monthly thesis/quality/structure/affordability gates;
+// waive ONLY the newer-price trigger for a dated, completed-candle assessment.
 function getDailyCloseScanDecision(a){
   const d = getSimplePredatorDecision(a);
   const swing = d.swingValidation || getSwingValidationEngine(a);
   const direction = d.direction;
   const validDirection = direction === "BUY CALL" || direction === "BUY PUT";
-  const validLevels = Number.isFinite(Number(swing.trigger)) && Number(swing.trigger) > 0 &&
-    Number.isFinite(Number(swing.invalidation)) && Number(swing.invalidation) > 0;
-  if(!validDirection || swing.validation === "NO TRADE" || swing.validation === "PASS" || d.decision === "PASS") return d;
-  if(!validLevels) return {...d,decision:"PASS",reason:"Invalid trigger or invalidation levels. No entry permitted.",action:"PASS - investigate price levels.",scanOnly:true};
-  const screeningCandidate = swing.validation === "BUY" && (d.decision === "BUY" || d.decision === "WAIT");
-  return {
-    ...d,
-    decision:"WAIT",
-    screeningCandidate,
-    screeningStatus:screeningCandidate ? "BUY SETUP FOUND — VERIFY LIVE" : "WAIT — SETUP NOT YET QUALIFIED",
-    reason: swing.validation === "BUY"
-      ? "Stock setup passed model gates, but the completed daily candle cannot verify a newer live entry. Check a fresh underlying quote and the actual option chain."
-      : d.reason,
-    action:"WATCH ONLY. Verify a newer price, current contract bid/ask and risk limits before considering an order.",
-    upgrade:"Requires a newer quote confirming the trigger and a verified, liquid monthly option contract.",
-    scanOnly:true,
-    entryStatus:"DAILY-CLOSE SCREEN ONLY - NO LIVE ENTRY CONFIRMATION"
-  };
+  const trigger = Number(swing.trigger), invalidation = Number(swing.invalidation);
+  const validLevels = Number.isFinite(trigger) && trigger > 0 &&
+    Number.isFinite(invalidation) && invalidation > 0 &&
+    (direction === "BUY CALL" ? invalidation < trigger : direction === "BUY PUT" ? invalidation > trigger : false);
+  const thesisQualified = swing.monthlyThesis === "STRONG" || swing.monthlyThesis === "ELITE";
+  const qualityApproved = a.qualityDecision?.decision === "APPROVED";
+  const locationAccepted = swing.entryIntegrity?.status !== "WAIT";
+  const priceOnlyWait = swing.validation === "WAIT" && swing.blocker === "PRICE CONFIRMATION";
+  const qualified = validDirection && validLevels && d.accountFit !== "NO FIT" &&
+    getAccountFit(a, "MOMENTUM").affordable === true &&
+    thesisQualified && qualityApproved && locationAccepted && swing.structureValid === true &&
+    (swing.validation === "BUY" || priceOnlyWait);
+  if(!qualified){
+    return {...d,scanOnly:true,screeningCandidate:false,
+      screeningStatus:d.decision === "WAIT" ? "WAIT — DAILY-CLOSE CONDITIONS INCOMPLETE" : "NO TRADE",
+      entryStatus:"NO END-OF-DAY BUY APPROVAL"};
+  }
+  return {...d,decision:"BUY",color:"green",screeningCandidate:true,
+    screeningStatus:`${direction} — DAILY-CLOSE APPROVED`,
+    reason:"Completed daily candle supports a qualifying monthly directional setup. This is an end-of-day assessment, not a live-price or option-contract verification.",
+    action:"Check today's stock price against the planned trigger/invalidation and verify the exact Robinhood option premium, spread, expiration and risk budget before entering. If price gaps outside the planned range, do not chase; reassess.",
+    upgrade:"Daily-close signal approved; execution requires a current broker check.",
+    scanOnly:true,entryStatus:"DAILY-CLOSE APPROVAL — EXECUTION UNVERIFIED"};
 }
 
 function getOpportunityFunnelRow(a){
@@ -6433,7 +6445,7 @@ function renderOpportunityFunnelSummary(rows, title="Opportunity Funnel"){
   rows.forEach(r=>{ counts[r.decision]=(counts[r.decision]||0)+1; const b=r.blocker === "NO-TRADE ZONE" ? `NO-TRADE ZONE / ${String(r.blockerDetail||"UNKNOWN").split(":")[0]}` : r.blocker||"UNKNOWN"; blockers[b]=(blockers[b]||0)+1; });
   const topBlocker = Object.entries(blockers).sort((a,b)=>b[1]-a[1])[0];
   const nearMisses = rows.filter(r=>r.decision==="WAIT").sort((a,b)=>b.readiness-a.readiness).slice(0,3);
-  return `<div class="card"><div class="section-title">${title}</div><div class="metric"><b>BUY entry verified:</b> 0 (daily-close scan)</div><div class="metric"><b>BUY setups awaiting live verification:</b> ${screeningCandidates}</div><div class="metric"><b>WAIT:</b> ${counts.WAIT||0}</div><div class="metric"><b>NO TRADE:</b> ${counts.PASS||0}</div><div class="metric"><b>Most Common Blocker:</b> ${topBlocker?`${topBlocker[0]} (${topBlocker[1]})`:"NONE"}</div>${nearMisses.length?`<div class="divider"></div><div class="section-title">Closest Near-Misses</div>${nearMisses.map(r=>`<div class="card" style="padding:10px;margin-top:8px;"><div class="metric"><b>${r.ticker||""}</b> ${r.direction} - ${r.readiness}% READY</div><div class="metric"><b>Blocker:</b> ${r.blocker}</div><div class="metric"><b>Blocker detail:</b> ${escapeHtml(String(r.blockerDetail||""))}</div><div class="metric"><b>Preferred Trigger:</b> ${r.trigger==="N/A"?"N/A":"$"+r.trigger}</div><div class="metric"><b>Invalidation:</b> ${r.invalidation==="N/A"?"N/A":"$"+r.invalidation}</div><div class="metric"><b>Why:</b> ${r.reason}</div></div>`).join("")}`:""}</div>`;
+  return `<div class="card"><div class="section-title">${title}</div><div class="metric"><b>Live BUY execution verified:</b> 0 (daily-close scan)</div><div class="metric"><b>Daily-close BUY approvals (execution unverified):</b> ${screeningCandidates}</div><div class="metric"><b>WAIT:</b> ${counts.WAIT||0}</div><div class="metric"><b>NO TRADE:</b> ${counts.PASS||0}</div><div class="metric"><b>Most Common Blocker:</b> ${topBlocker?`${topBlocker[0]} (${topBlocker[1]})`:"NONE"}</div>${nearMisses.length?`<div class="divider"></div><div class="section-title">Closest Near-Misses</div>${nearMisses.map(r=>`<div class="card" style="padding:10px;margin-top:8px;"><div class="metric"><b>${r.ticker||""}</b> ${r.direction} - ${r.readiness}% READY</div><div class="metric"><b>Blocker:</b> ${r.blocker}</div><div class="metric"><b>Blocker detail:</b> ${escapeHtml(String(r.blockerDetail||""))}</div><div class="metric"><b>Preferred Trigger:</b> ${r.trigger==="N/A"?"N/A":"$"+r.trigger}</div><div class="metric"><b>Invalidation:</b> ${r.invalidation==="N/A"?"N/A":"$"+r.invalidation}</div><div class="metric"><b>Why:</b> ${r.reason}</div></div>`).join("")}`:""}</div>`;
 }
 
 function renderSimpleDecisionSnapshot(a){
@@ -7707,14 +7719,14 @@ function toggleAdvancedScanDetails(button){
   }
 }
 
-function renderFull(ticker, a){
+function renderFull(ticker, a, source=""){
   a = ensureEngineDefaults(a);
   if(!a.multiTimeframeEntry && typeof getMultiTimeframeEntryEngine === 'function'){
     a.multiTimeframeEntry = getMultiTimeframeEntryEngine(a);
   }
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
-  return `${renderSimplePredatorDecision(a)}
+  return `${renderSimplePredatorDecision(a, source)}
   ${renderUniversalWheelAnalysis(a)}
   ${renderContractSelectionCoach(a)}
   <div class="card">
@@ -7769,7 +7781,7 @@ function renderFull(ticker, a){
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
   ${(()=>{ const s=getSwingValidationEngine(a); return `<div class="card"><div class="section-title">Monthly Swing Validation</div><div class="metric"><b>Validation:</b> <span class="${signalClass(s.validation)}">${s.validation}</span></div><div class="metric"><b>Entry Mode:</b> ${s.entryMode}</div><div class="metric"><b>Monthly Thesis:</b> ${s.monthlyThesis}</div><div class="metric"><b>Readiness:</b> ${s.readiness}/100</div><div class="metric"><b>Blocker:</b> ${s.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${s.trigger==="N/A"?"N/A":"$"+s.trigger}</div><div class="metric"><b>Structural Invalidation:</b> ${s.invalidation==="N/A"?"N/A":"$"+s.invalidation}</div><div class="metric"><b>Trigger Confirmed:</b> ${s.triggerConfirmed?"YES":"NO"}</div><div class="metric"><b>Structure Valid:</b> ${s.structureApplicable ? (s.structureValid?"YES":"NO") : "N/A - NOT EVALUATED"}</div><div class="metric"><b>Reason:</b> ${s.reason}</div></div>`; })()}
-  ${renderBuyFunnelDiagnostics(a)}
+  ${renderBuyFunnelDiagnostics(a, source)}
   <div class="scan-support">
     ${renderExpirationPolicyCard(a)}
     ${renderPredatorConvictionCard(a)}
@@ -7985,9 +7997,9 @@ function renderFull(ticker, a){
   </div>`;
 }
 
-function renderCompact(ticker, a){
+function renderCompact(ticker, a, source=""){
   a = ensureEngineDefaults(a);
-  return `${renderSimplePredatorDecision(a)}
+  return `${renderSimplePredatorDecision(a, source)}
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
@@ -8323,8 +8335,8 @@ async function runAI(){
   const fresh = getFreshTickerAnalysis(ticker);
   if(fresh){
     const a = ensureEngineDefaults(fresh.analysisData);
-    const fullHtml = safeRender(()=>renderFull(ticker, a));
-    const compactHtml = safeRender(()=>renderCompact(ticker, a));
+    const fullHtml = safeRender(()=>renderFull(ticker, a, fresh.priceSource || ""));
+    const compactHtml = safeRender(()=>renderCompact(ticker, a, fresh.priceSource || ""));
     saveLastAnalysis(ticker, fullHtml, compactHtml, a);
     output.innerHTML = renderFreshDataNotice(fresh) + (mode === "compact" ? compactHtml : fullHtml);
     updateApiStatus(`Reused fresh ${ticker} scan data. No API request used.`, "green");
@@ -8354,8 +8366,8 @@ async function runAI(){
   saveFreshTickerAnalysis(ticker, a, pricePack.source);
   recordLearningSnapshot(ticker, a, "Individual Fresh Analysis");
 
-  const fullHtml = safeRender(()=>renderFull(ticker, a));
-  const compactHtml = safeRender(()=>renderCompact(ticker, a));
+  const fullHtml = safeRender(()=>renderFull(ticker, a, pricePack.source || ""));
+  const compactHtml = safeRender(()=>renderCompact(ticker, a, pricePack.source || ""));
   saveLastAnalysis(ticker, fullHtml, compactHtml, a);
   output.innerHTML = mode === "compact" ? compactHtml : fullHtml;
 }
@@ -8445,9 +8457,9 @@ async function scanList(list, title){
       ttt: safeNum(a.timeTarget?.probability, 0)
     };
 
-    // A completed-candle candidate is NOT an executable BUY and must not be archived as one.
+    // A daily-close BUY recommendation is NOT an executable BUY and must not be archived as one.
     if(finalDecision.screeningCandidate === true){
-      buys.push(row); // Screening-only collection, never executable authority.
+      buys.push(row); // Daily-close recommendations only, never executable authority.
     }else if(finalDecision.decision === "WAIT"){
       waits.push(row);
     }else{
@@ -8481,7 +8493,7 @@ async function scanList(list, title){
   const apiBudgetText = `API requests this scan: ${scanApiRequests} | Cache hits: ${cacheHits} | Local diagnostic today: ${usageAfter.requests}/${PREDATOR_FREE_DAILY_BUDGET}`;
 
   const freshnessText = `Verified current completed daily candles: ${processed}/${attempted} | Stale or unverified: ${staleRows.length} | Expected completed session: ${predatorExpectedCompletedSession()}`;
-  const scanLimitText = "Daily-close screening only: the entry trigger is projected from the completed candle and cannot be confirmed by that same candle. BUY CALL/PUT execution requires a newer underlying quote and a real, liquid monthly options contract.";
+  const scanLimitText = "Daily-close directional assessments can be approved using the last completed session. These are NOT live execution approvals: check current stock price, planned levels, and a real liquid monthly options contract before ordering.";
 
   // CRITICAL: zero successfully processed tickers is DATA FAILURE, never "NO TRADES".
   if(processed === 0){
@@ -8511,16 +8523,16 @@ async function scanList(list, title){
     output.innerHTML = `
       <div class="card ${partialScan ? "weak-alert" : "sell-alert"}">
         <div class="section-title">${title}</div>
-        <div class="final-answer-word ${partialScan ? "yellow" : "red"}">${partialScan ? "PARTIAL SCAN" : "NO QUALIFIED BUY SETUPS"}</div>
+        <div class="final-answer-word ${partialScan ? "yellow" : "red"}">${partialScan ? "PARTIAL SCAN" : "NO DAILY-CLOSE DIRECTIONAL APPROVALS"}</div>
         <div class="final-answer-sub">
           ${partialScan
             ? `Predator analyzed ${processed} of ${attempted} tickers. None of the successfully analyzed names qualified as a screening candidate, but ${failures.length} ticker(s) could not be evaluated.`
-            : `Predator successfully analyzed the full list. None passed the daily-close screening gate; no live option entry has been verified.`}
+            : `Predator successfully analyzed the full list. None passed the daily-close approval gate; no live option entry has been verified.`}
         </div>
         <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
         <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div><div class="metric yellow"><b>Entry verification:</b> ${scanLimitText}</div>
         <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
-        <div class="metric"><b>BUY entry verified:</b> 0</div><div class="metric"><b>BUY setups awaiting live verification:</b> 0</div>
+        <div class="metric"><b>BUY entry verified:</b> 0</div><div class="metric"><b>Daily-close BUY approvals:</b> 0</div>
         <div class="metric"><b>WAIT / watch only:</b> ${waits.length}</div>
         <div class="metric"><b>NO TRADE:</b> ${noTrades.length}</div>
         ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length}</div>` : ""}
@@ -8549,22 +8561,22 @@ async function scanList(list, title){
   output.innerHTML = `
     <div class="card hold-alert">
       <div class="section-title">${title}</div>
-      <div class="final-answer-word green">${topBuys.length === 1 ? "1 SCREENING CANDIDATE" : topBuys.length + " SCREENING CANDIDATES"}</div>
+      <div class="final-answer-word green">${topBuys.length === 1 ? "1 DAILY-CLOSE DIRECTIONAL APPROVAL" : topBuys.length + " DAILY-CLOSE DIRECTIONAL APPROVALS"}</div>
       <div class="final-answer-sub">
-        SCREENING ONLY — NOT AN ORDER APPROVAL. These stock setups passed the internal model gate using verified dated daily candles. Options contracts, bid/ask and fills are NOT live-verified. Check the actual broker chain before any order.
+        DAILY-CLOSE DIRECTIONAL APPROVAL — NOT AN ORDER APPROVAL. The completed candle passed the existing monthly thesis gates without requiring a newer trigger. Current price, option contract, bid/ask and fill are NOT verified. Check Robinhood before any order.
       </div>
 
       <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
       <div class="metric"><b>Executable BUY entries verified:</b> 0</div>
-      <div class="metric"><b>Screening candidates requiring live verification:</b> ${buys.length}</div>
+      <div class="metric"><b>Daily-close BUY approvals requiring broker checks:</b> ${buys.length}</div>
       <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div><div class="metric yellow"><b>Entry verification:</b> ${scanLimitText}</div>
       ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length} - failed names were not classified.</div>` : ""}
 
       ${topBuys.map((r,index)=>`
         <div class="card" style="padding:14px;margin-top:12px;">
-          <div class="section-title">#${index+1} SCREENING CANDIDATE</div>
+          <div class="section-title">#${index+1} DAILY-CLOSE DIRECTIONAL APPROVAL</div>
           <div class="metric"><b>${r.ticker}</b> - <span class="green">${r.finalDecision.direction}</span></div>
-          <div class="metric"><b>Stock setup:</b> <span class="yellow">BUY SETUP FOUND — VERIFY NEWER STOCK PRICE AND CONTRACT</span></div>
+          <div class="metric"><b>Stock setup:</b> <span class="yellow">DAILY-CLOSE BUY APPROVED — VERIFY CURRENT PRICE AND CONTRACT</span></div>
           <div class="metric"><b>Bot Confidence:</b> ${r.conviction}/100</div>
           <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
           <div class="metric"><b>Account Fit:</b> ${r.finalDecision.accountFit}</div>
