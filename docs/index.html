@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.14 Quote Authority Candidate</title>
+    <title>Signal Predator AI v49.15 BUY Screening Diagnostics Candidate</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v49.14 // Manual Contract Quote Review // Monthly calls and puts // manual review</div>
+    <div class="subtitle">v49.15 // BUY Screening Diagnostics // Manual Contract Review // Monthly calls and puts // manual review</div>
     <div class="metric muted" id="predatorBuildMarker">Build: v49.3 • Development candidate • Manual quotes are not live-verified</div>
 
   <div class="card">
@@ -834,10 +834,14 @@ function escapeHtml(value){
 
 function exportAppBackup(){
   const backup = {
-    version: "v47.8",
+    version: "v49.14",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
+    // Preserve contract-specific thesis records and manual quotes in user backups.
+    // Do not export the Alpha Vantage API key.
+    positionTheses: getStore("signal_predator_position_theses_v47_7", {}),
+    manualContractQuotes: getStore("predator_manual_contract_quotes_v498", {}),
     closedTradeJournal: typeof closedTradeJournal !== "undefined" ? closedTradeJournal : [],
     performanceTrades,
     riskSettings,
@@ -852,7 +856,7 @@ function exportAppBackup(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "signal-predator-backup-v47-8.json";
+  a.download = "signal-predator-backup-v49-14.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -864,10 +868,14 @@ function exportAppBackup(){
 
 function showBackupText(){
   const backup = {
-    version: "v47.8",
+    version: "v49.14",
     exportedAt: new Date().toISOString(),
     watchlist: customWatchlist,
     savedPositions,
+    // Preserve contract-specific thesis records and manual quotes in user backups.
+    // Do not export the Alpha Vantage API key.
+    positionTheses: getStore("signal_predator_position_theses_v47_7", {}),
+    manualContractQuotes: getStore("predator_manual_contract_quotes_v498", {}),
     closedTradeJournal: typeof closedTradeJournal !== "undefined" ? closedTradeJournal : [],
     performanceTrades,
     riskSettings,
@@ -896,7 +904,7 @@ function showBackupText(){
 
   const note = document.createElement("div");
   note.className = "metric muted";
-  note.textContent = "Copy this text somewhere safe if downloads are difficult on iPhone.";
+  note.textContent = "Copy this text somewhere safe if downloads are difficult on iPhone. This is an export; automatic restore is not yet implemented.";
 
   box.appendChild(label);
   box.appendChild(textarea);
@@ -6395,9 +6403,12 @@ function getDailyCloseScanDecision(a){
     Number.isFinite(Number(swing.invalidation)) && Number(swing.invalidation) > 0;
   if(!validDirection || swing.validation === "NO TRADE" || swing.validation === "PASS" || d.decision === "PASS") return d;
   if(!validLevels) return {...d,decision:"PASS",reason:"Invalid trigger or invalidation levels. No entry permitted.",action:"PASS - investigate price levels.",scanOnly:true};
+  const screeningCandidate = swing.validation === "BUY" && (d.decision === "BUY" || d.decision === "WAIT");
   return {
     ...d,
     decision:"WAIT",
+    screeningCandidate,
+    screeningStatus:screeningCandidate ? "BUY SETUP FOUND — VERIFY LIVE" : "WAIT — SETUP NOT YET QUALIFIED",
     reason: swing.validation === "BUY"
       ? "Stock setup passed model gates, but the completed daily candle cannot verify a newer live entry. Check a fresh underlying quote and the actual option chain."
       : d.reason,
@@ -6417,11 +6428,12 @@ function getOpportunityFunnelRow(a){
 function renderOpportunityFunnelSummary(rows, title="Opportunity Funnel"){
   rows = Array.isArray(rows) ? rows : [];
   const counts = {BUY:0,WAIT:0,PASS:0};
+  const screeningCandidates = rows.filter(r=>r.screeningCandidate === true).length;
   const blockers = {};
   rows.forEach(r=>{ counts[r.decision]=(counts[r.decision]||0)+1; const b=r.blocker === "NO-TRADE ZONE" ? `NO-TRADE ZONE / ${String(r.blockerDetail||"UNKNOWN").split(":")[0]}` : r.blocker||"UNKNOWN"; blockers[b]=(blockers[b]||0)+1; });
   const topBlocker = Object.entries(blockers).sort((a,b)=>b[1]-a[1])[0];
   const nearMisses = rows.filter(r=>r.decision==="WAIT").sort((a,b)=>b.readiness-a.readiness).slice(0,3);
-  return `<div class="card"><div class="section-title">${title}</div><div class="metric"><b>BUY-ready:</b> ${counts.BUY||0}</div><div class="metric"><b>WAIT:</b> ${counts.WAIT||0}</div><div class="metric"><b>NO TRADE:</b> ${counts.PASS||0}</div><div class="metric"><b>Most Common Blocker:</b> ${topBlocker?`${topBlocker[0]} (${topBlocker[1]})`:"NONE"}</div>${nearMisses.length?`<div class="divider"></div><div class="section-title">Closest Near-Misses</div>${nearMisses.map(r=>`<div class="card" style="padding:10px;margin-top:8px;"><div class="metric"><b>${r.ticker||""}</b> ${r.direction} - ${r.readiness}% READY</div><div class="metric"><b>Blocker:</b> ${r.blocker}</div><div class="metric"><b>Blocker detail:</b> ${escapeHtml(String(r.blockerDetail||""))}</div><div class="metric"><b>Preferred Trigger:</b> ${r.trigger==="N/A"?"N/A":"$"+r.trigger}</div><div class="metric"><b>Invalidation:</b> ${r.invalidation==="N/A"?"N/A":"$"+r.invalidation}</div><div class="metric"><b>Why:</b> ${r.reason}</div></div>`).join("")}`:""}</div>`;
+  return `<div class="card"><div class="section-title">${title}</div><div class="metric"><b>BUY entry verified:</b> 0 (daily-close scan)</div><div class="metric"><b>BUY setups awaiting live verification:</b> ${screeningCandidates}</div><div class="metric"><b>WAIT:</b> ${counts.WAIT||0}</div><div class="metric"><b>NO TRADE:</b> ${counts.PASS||0}</div><div class="metric"><b>Most Common Blocker:</b> ${topBlocker?`${topBlocker[0]} (${topBlocker[1]})`:"NONE"}</div>${nearMisses.length?`<div class="divider"></div><div class="section-title">Closest Near-Misses</div>${nearMisses.map(r=>`<div class="card" style="padding:10px;margin-top:8px;"><div class="metric"><b>${r.ticker||""}</b> ${r.direction} - ${r.readiness}% READY</div><div class="metric"><b>Blocker:</b> ${r.blocker}</div><div class="metric"><b>Blocker detail:</b> ${escapeHtml(String(r.blockerDetail||""))}</div><div class="metric"><b>Preferred Trigger:</b> ${r.trigger==="N/A"?"N/A":"$"+r.trigger}</div><div class="metric"><b>Invalidation:</b> ${r.invalidation==="N/A"?"N/A":"$"+r.invalidation}</div><div class="metric"><b>Why:</b> ${r.reason}</div></div>`).join("")}`:""}</div>`;
 }
 
 function renderSimpleDecisionSnapshot(a){
@@ -8416,6 +8428,7 @@ async function scanList(list, title){
     recordLearningSnapshot(ticker, a, `${title} Screening Scan`);
     const finalDecision = getDailyCloseScanDecision(a);
     const funnel = getOpportunityFunnelRow(a);
+    funnel.screeningCandidate = finalDecision.screeningCandidate === true;
     funnel.decision = finalDecision.decision;
     funnel.reason = finalDecision.reason;
     funnel.scanOnly = true;
@@ -8432,9 +8445,9 @@ async function scanList(list, title){
       ttt: safeNum(a.timeTarget?.probability, 0)
     };
 
-    if(finalDecision.decision === "BUY"){
-      archiveApprovedBuyAnalysis(ticker,a,`${title} BUY Scan`);
-      buys.push(row);
+    // A completed-candle candidate is NOT an executable BUY and must not be archived as one.
+    if(finalDecision.screeningCandidate === true){
+      buys.push(row); // Screening-only collection, never executable authority.
     }else if(finalDecision.decision === "WAIT"){
       waits.push(row);
     }else{
@@ -8498,16 +8511,16 @@ async function scanList(list, title){
     output.innerHTML = `
       <div class="card ${partialScan ? "weak-alert" : "sell-alert"}">
         <div class="section-title">${title}</div>
-        <div class="final-answer-word ${partialScan ? "yellow" : "red"}">${partialScan ? "PARTIAL SCAN" : "NO TRADES"}</div>
+        <div class="final-answer-word ${partialScan ? "yellow" : "red"}">${partialScan ? "PARTIAL SCAN" : "NO QUALIFIED BUY SETUPS"}</div>
         <div class="final-answer-sub">
           ${partialScan
-            ? `Predator analyzed ${processed} of ${attempted} tickers. None of the successfully analyzed names is BUY-ready, but ${failures.length} ticker(s) could not be evaluated.`
-            : `Predator successfully analyzed the full list. None has a BUY-approved monthly option entry right now.`}
+            ? `Predator analyzed ${processed} of ${attempted} tickers. None of the successfully analyzed names qualified as a screening candidate, but ${failures.length} ticker(s) could not be evaluated.`
+            : `Predator successfully analyzed the full list. None passed the daily-close screening gate; no live option entry has been verified.`}
         </div>
         <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
         <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div><div class="metric yellow"><b>Entry verification:</b> ${scanLimitText}</div>
         <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
-        <div class="metric"><b>BUY-ready:</b> 0</div>
+        <div class="metric"><b>BUY entry verified:</b> 0</div><div class="metric"><b>BUY setups awaiting live verification:</b> 0</div>
         <div class="metric"><b>WAIT / watch only:</b> ${waits.length}</div>
         <div class="metric"><b>NO TRADE:</b> ${noTrades.length}</div>
         ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length}</div>` : ""}
@@ -8538,10 +8551,12 @@ async function scanList(list, title){
       <div class="section-title">${title}</div>
       <div class="final-answer-word green">${topBuys.length === 1 ? "1 SCREENING CANDIDATE" : topBuys.length + " SCREENING CANDIDATES"}</div>
       <div class="final-answer-sub">
-        These stock setups passed the internal model gate using verified dated daily candles. Options contracts, bid/ask and fills are NOT live-verified. Check the actual broker chain before any order.
+        SCREENING ONLY — NOT AN ORDER APPROVAL. These stock setups passed the internal model gate using verified dated daily candles. Options contracts, bid/ask and fills are NOT live-verified. Check the actual broker chain before any order.
       </div>
 
       <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
+      <div class="metric"><b>Executable BUY entries verified:</b> 0</div>
+      <div class="metric"><b>Screening candidates requiring live verification:</b> ${buys.length}</div>
       <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div><div class="metric yellow"><b>Entry verification:</b> ${scanLimitText}</div>
       ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length} - failed names were not classified.</div>` : ""}
 
@@ -8549,7 +8564,7 @@ async function scanList(list, title){
         <div class="card" style="padding:14px;margin-top:12px;">
           <div class="section-title">#${index+1} SCREENING CANDIDATE</div>
           <div class="metric"><b>${r.ticker}</b> - <span class="green">${r.finalDecision.direction}</span></div>
-          <div class="metric"><b>Stock setup:</b> <span class="yellow">CONDITIONAL — VERIFY CONTRACT</span></div>
+          <div class="metric"><b>Stock setup:</b> <span class="yellow">BUY SETUP FOUND — VERIFY NEWER STOCK PRICE AND CONTRACT</span></div>
           <div class="metric"><b>Bot Confidence:</b> ${r.conviction}/100</div>
           <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
           <div class="metric"><b>Account Fit:</b> ${r.finalDecision.accountFit}</div>
