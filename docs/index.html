@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.18 Daily-Close Best Trade Consistency Candidate</title>
+    <title>Signal Predator AI v49.19 Unified Daily-Close Decisions</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v49.18 // Daily-Close Best Trade Consistency // Manual Contract Review // Monthly calls and puts // manual review</div>
+    <div class="subtitle">v49.19 // Daily-Close Best Trade Consistency // Manual Contract Review // Monthly calls and puts // manual review</div>
     <div class="metric muted" id="predatorBuildMarker">Build: v49.18 • Development candidate • Manual quotes are not live-verified</div>
 
   <div class="card">
@@ -6364,20 +6364,32 @@ function renderBuyFunnelDiagnostics(a, source=""){
 }
 
 
+function getUnifiedPredatorPresentation(a, source=""){
+  const execution = getSimplePredatorDecision(a);
+  const isDailyClose = /completed daily close/i.test(String(source));
+  const daily = isDailyClose ? getDailyCloseScanDecision(a) : null;
+  const directional = daily && daily.screeningCandidate === true;
+  return {execution, daily, directional, isDailyClose,
+    headline: directional ? daily.direction : (execution.decision === "PASS" ? "NO TRADE" : execution.decision),
+    headlineColor: directional ? "green" : execution.color,
+    executionLabel: execution.decision === "BUY" ? "ENTRY CONDITIONS PASSED — VERIFY CONTRACT" : "WAIT — CURRENT ENTRY NOT CONFIRMED"};
+}
+
 function renderSimplePredatorDecision(a, source=""){
-  const dailyCloseSource = /completed daily close/i.test(String(source));
-  const dailyClose = dailyCloseSource ? getDailyCloseScanDecision(a) : null;
-  const d = getSimplePredatorDecision(a);
+  const unified = getUnifiedPredatorPresentation(a, source);
+  const dailyClose = unified.daily;
+  const d = unified.execution;
   const directionText = d.direction === "WAIT" ? "No directional buy" : d.direction;
   const displayDecision = d.decision === "PASS" ? "NO TRADE" : d.decision;
   const permissionText = d.decision === "BUY" ? "YES - ENTRY APPROVED" : d.decision === "WAIT" ? "NO - WAIT" : "NO - NO TRADE";
 
   return `
   <div class="card final-answer-card">
-    <div class="section-title">Predator Final Answer — Execution Confirmation</div>
+    <div class="section-title">Predator Final Answer — Directional Setup + Entry Status</div>
+    ${unified.directional ? `<div class="final-answer-word green">${escapeHtml(unified.headline)} — DAILY-CLOSE SETUP</div><div class="metric yellow"><b>Entry status:</b> ${escapeHtml(unified.executionLabel)}. This is not permission to place an order. Verify today's price and Robinhood contract.</div>` : ""}
     ${dailyClose ? `<div class="metric ${dailyClose.screeningCandidate ? "green" : "yellow"}"><b>Daily-close directional recommendation:</b> ${escapeHtml(dailyClose.screeningStatus)}. ${dailyClose.screeningCandidate ? "BROKER EXECUTION UNVERIFIED — check current stock price, option premium and spread." : "No daily-close BUY approval."}</div>` : ""}
     <div class="metric muted">The execution-confirmation decision below is separate from any completed-session directional recommendation. WAIT here does not cancel a daily-close setup; it means a current executable order has not been verified.</div>
-    <div class="final-answer-word ${d.color}">${displayDecision}</div>
+    <div class="final-answer-word ${unified.directional ? "yellow" : d.color}">${unified.directional ? "EXECUTION: " : ""}${displayDecision}</div>
     <div class="final-answer-sub">${d.reason}</div>
 
     <div class="simple-summary-grid">
@@ -6448,19 +6460,20 @@ function renderOpportunityFunnelSummary(rows, title="Opportunity Funnel"){
   return `<div class="card"><div class="section-title">${title}</div><div class="metric"><b>Live BUY execution verified:</b> 0 (daily-close scan)</div><div class="metric"><b>Daily-close BUY approvals (execution unverified):</b> ${screeningCandidates}</div><div class="metric"><b>WAIT:</b> ${counts.WAIT||0}</div><div class="metric"><b>NO TRADE:</b> ${counts.PASS||0}</div><div class="metric"><b>Most Common Blocker:</b> ${topBlocker?`${topBlocker[0]} (${topBlocker[1]})`:"NONE"}</div>${nearMisses.length?`<div class="divider"></div><div class="section-title">Closest Near-Misses</div>${nearMisses.map(r=>`<div class="card" style="padding:10px;margin-top:8px;"><div class="metric"><b>${r.ticker||""}</b> ${r.direction} - ${r.readiness}% READY</div><div class="metric"><b>Blocker:</b> ${r.blocker}</div><div class="metric"><b>Blocker detail:</b> ${escapeHtml(String(r.blockerDetail||""))}</div><div class="metric"><b>Preferred Trigger:</b> ${r.trigger==="N/A"?"N/A":"$"+r.trigger}</div><div class="metric"><b>Invalidation:</b> ${r.invalidation==="N/A"?"N/A":"$"+r.invalidation}</div><div class="metric"><b>Why:</b> ${r.reason}</div></div>`).join("")}`:""}</div>`;
 }
 
-function renderSimpleDecisionSnapshot(a){
+function renderSimpleDecisionSnapshot(a, source=""){
   a = ensureEngineDefaults(a);
 
-  const d = getSimplePredatorDecision(a);
+  const unified = getUnifiedPredatorPresentation(a, source);
+  const d = unified.execution;
   const convictionEngine = typeof getPredatorConvictionEngine === "function"
     ? getPredatorConvictionEngine(a)
     : {conviction:safeNum(d.conviction,50)};
 
   const confidence = safeNum(convictionEngine.conviction, safeNum(d.conviction,50));
-  const displayDecision = d.decision === "PASS" ? "NO TRADE" : d.decision;
+  const displayDecision = unified.headline;
 
   let decisionColor = "red";
-  if(d.decision === "BUY") decisionColor = "green";
+  if(unified.directional || d.decision === "BUY") decisionColor = "green";
   else if(d.decision === "WAIT") decisionColor = "yellow";
 
   let setupLabel = d.setupStatus || "N/A";
@@ -6473,6 +6486,7 @@ function renderSimpleDecisionSnapshot(a){
     plainMeaning = "The setup is worth watching, but entry permission is not complete yet.";
   }
 
+  if(unified.directional) plainMeaning = "Daily-close directional setup approved. Execution is not confirmed; verify the current stock price and exact Robinhood contract.";
   return `
     <div class="card simple-summary-card">
       <div class="section-title">Quick Read</div>
@@ -6491,7 +6505,7 @@ function renderSimpleDecisionSnapshot(a){
         </div>
 
         <div class="simple-summary-tile">
-          <div class="metric"><b>Entry Status</b><br>${entryLabel}</div>
+          <div class="metric"><b>Entry Status</b><br>${unified.directional ? "NOT VERIFIED — CHECK CURRENT PRICE" : entryLabel}</div>
         </div>
       </div>
 
@@ -7693,7 +7707,7 @@ function renderAdvancedScanToggle(){
     <div class="card">
       <div class="section-title">Advanced Details</div>
       <button class="secondary" onclick="toggleAdvancedScanDetails(this)">Show / Hide Advanced Metrics</button>
-      <div class="metric muted">The Final Answer above remains the only BUY / WAIT / NO TRADE authority.</div>
+      <div class="metric muted">Daily-close directional recommendations and execution permission are separate. Never treat a daily-close BUY setup as a verified options order.</div>
     </div>`;
 }
 
@@ -7777,7 +7791,7 @@ function renderFull(ticker, a, source=""){
 
     <div id="contractGradeOutput"></div>
   </div>
-  ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
+  ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a, source) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
   ${(()=>{ const s=getSwingValidationEngine(a); return `<div class="card"><div class="section-title">Monthly Swing Validation</div><div class="metric"><b>Validation:</b> <span class="${signalClass(s.validation)}">${s.validation}</span></div><div class="metric"><b>Entry Mode:</b> ${s.entryMode}</div><div class="metric"><b>Monthly Thesis:</b> ${s.monthlyThesis}</div><div class="metric"><b>Readiness:</b> ${s.readiness}/100</div><div class="metric"><b>Blocker:</b> ${s.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${s.trigger==="N/A"?"N/A":"$"+s.trigger}</div><div class="metric"><b>Structural Invalidation:</b> ${s.invalidation==="N/A"?"N/A":"$"+s.invalidation}</div><div class="metric"><b>Trigger Confirmed:</b> ${s.triggerConfirmed?"YES":"NO"}</div><div class="metric"><b>Structure Valid:</b> ${s.structureApplicable ? (s.structureValid?"YES":"NO") : "N/A - NOT EVALUATED"}</div><div class="metric"><b>Reason:</b> ${s.reason}</div></div>`; })()}
@@ -8000,7 +8014,7 @@ function renderFull(ticker, a, source=""){
 function renderCompact(ticker, a, source=""){
   a = ensureEngineDefaults(a);
   return `${renderSimplePredatorDecision(a, source)}
-  ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a) : ''}
+  ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a, source) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
   <div class="scan-support">
@@ -8333,7 +8347,7 @@ async function runAI(){
   // ticker successfully within 15 minutes, reuse the exact analysis instead of
   // burning another group of Alpha Vantage calls.
   const fresh = getFreshTickerAnalysis(ticker);
-  if(fresh){
+  if(fresh && /completed daily close/i.test(String(fresh.priceSource||"")) && predatorCandleStatus(ticker).current){
     const a = ensureEngineDefaults(fresh.analysisData);
     const fullHtml = safeRender(()=>renderFull(ticker, a, fresh.priceSource || ""));
     const compactHtml = safeRender(()=>renderCompact(ticker, a, fresh.priceSource || ""));
@@ -8355,19 +8369,20 @@ async function runAI(){
     return;
   }
 
-  const pricePack = await getBestAvailablePrice(ticker, closes);
-  if(pricePack.price === null){
-    updateApiStatus("Price unavailable after history loaded.", "yellow");
-    output.innerHTML = "<div class='card'>Price unavailable. Try again later or check the ticker symbol.</div>";
+  // Unified with the watchlist: analyze the same verified completed daily candle.
+  // Never substitute Global Quote or intraday price for this directional authority.
+  const candleStatus = predatorCandleStatus(ticker);
+  if(!candleStatus.current || !closes.length || !Number.isFinite(Number(closes[0])) || Number(closes[0]) <= 0){
+    output.innerHTML = `<div class="card sell-alert"><div class="section-title">Daily-close analysis unavailable</div><div class="metric yellow">${escapeHtml(predatorFreshnessLabel(candleStatus))}</div><div class="metric">No BUY or WAIT assessment is authorized from unverified daily data. Retry when the completed session is available.</div></div>`;
     return;
   }
-
+  const pricePack = {price:Number(closes[0]),source:"Latest Completed Daily Close"};
   const a = analyze(closes, pricePack.price);
   saveFreshTickerAnalysis(ticker, a, pricePack.source);
-  recordLearningSnapshot(ticker, a, "Individual Fresh Analysis");
+  recordLearningSnapshot(ticker, a, "Individual Daily-Close Analysis");
 
-  const fullHtml = safeRender(()=>renderFull(ticker, a, pricePack.source || ""));
-  const compactHtml = safeRender(()=>renderCompact(ticker, a, pricePack.source || ""));
+  const fullHtml = safeRender(()=>renderFull(ticker, a, pricePack.source));
+  const compactHtml = safeRender(()=>renderCompact(ticker, a, pricePack.source));
   saveLastAnalysis(ticker, fullHtml, compactHtml, a);
   output.innerHTML = mode === "compact" ? compactHtml : fullHtml;
 }
@@ -8576,7 +8591,8 @@ async function scanList(list, title){
         <div class="card" style="padding:14px;margin-top:12px;">
           <div class="section-title">#${index+1} DAILY-CLOSE DIRECTIONAL APPROVAL</div>
           <div class="metric"><b>${r.ticker}</b> - <span class="green">${r.finalDecision.direction}</span></div>
-          <div class="metric"><b>Stock setup:</b> <span class="yellow">DAILY-CLOSE BUY APPROVED — VERIFY CURRENT PRICE AND CONTRACT</span></div>
+          <div class="metric"><b>Stock setup:</b> <span class="yellow">DAILY-CLOSE DIRECTIONAL SETUP — EXECUTION WAIT / NOT VERIFIED</span></div>
+          <div class="metric yellow"><b>Individual scan:</b> The same completed-close data should show this directional setup; its execution decision may still say WAIT until price and contract are verified.</div>
           <div class="metric"><b>Bot Confidence:</b> ${r.conviction}/100</div>
           <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
           <div class="metric"><b>Account Fit:</b> ${r.finalDecision.accountFit}</div>
