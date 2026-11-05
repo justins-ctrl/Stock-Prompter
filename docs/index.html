@@ -269,13 +269,23 @@ body.advanced-on .scan-support{display:block}
 .scan-details-button{margin-top:10px}
 @media(max-width:520px){.simple-summary-grid{grid-template-columns:1fr 1fr}}
 
+
+/* v49.23: navigation changes presentation only; original feature nodes remain intact. */
+#predatorHomeNav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}
+#predatorHomeNav button{flex:1 1 30%;font-size:12px;padding:12px 5px;min-width:90px}
+#predatorHomeNav button[aria-pressed="true"]{outline:2px solid #43eac4}
+body.predator-simple .container > .card{display:none!important}
+body.predator-simple .container > .card.predator-active{display:block!important}
+body.predator-simple .container > .subtitle,body.predator-simple #predatorBuildMarker{display:none!important}
+#predatorAdvancedToggle{margin:10px 0 20px}
+#predatorHomeHeading{font-size:15px;opacity:.8;margin-bottom:12px}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v49.21 // Unified Daily-Close Decisions // Manual Contract Review // Monthly calls and puts // manual review</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.18 • Development candidate • Manual quotes are not live-verified</div>
+    <div class="subtitle">v49.23 // Simple Home // Previous-Close Decisions // Monthly Calls & Puts</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.23 • Testing build • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -5938,6 +5948,15 @@ function saveCurrentAnalysisAsPositionThesis(){
   alert(`${ticker} persistent thesis saved.`);
 }
 
+function gradeAndReviewOneContract(){
+  gradeCurrentContract();
+  const ids=["entryUnderlyingPrice","entryUnderlyingTime","entryContractTime","entryContractTicker","entryContractType"];
+  const hasReviewData=ids.some(id=>String(document.getElementById(id)?.value||"").trim()) || !!document.getElementById("entryQuoteAcknowledged")?.checked;
+  const output=document.getElementById("entryGateResult");
+  if(hasReviewData){confirmPredatorEntry();}
+  else if(output){output.innerHTML='<div class="metric muted">Optional quote review was skipped. Fill the additional fields only if you want a manual entry review; grading does not establish an executable order.</div>';}
+}
+
 function gradeCurrentContract(){
   const output = document.getElementById("contractGradeOutput");
   const last = getLastAnalysis();
@@ -7718,7 +7737,7 @@ function renderFull(ticker, a, source=""){
   return `${renderSimplePredatorDecision(a, source)}
   ${renderContractSelectionCoach(a, source)}
   <div class="card">
-    <div class="section-title">Grade a Robinhood Contract</div>
+    <div class="section-title">One Robinhood Contract Grader</div>
     <div class="metric muted">Enter the values shown on Robinhood's contract detail screen. Select the exact expiration date and Predator will calculate DTE automatically. No extra Alpha Vantage request is used.</div>
     <div class="grid-2">
       <input id="cgStrike" type="number" step="0.01" inputmode="decimal" placeholder="Strike">
@@ -7743,9 +7762,8 @@ function renderFull(ticker, a, source=""){
       <div><label for="cgTheta" class="metric muted">Theta decay magnitude (no minus sign needed)</label><input id="cgTheta" type="number" min="0" step="0.0001" inputmode="decimal" placeholder="e.g. 0.0791"></div>
     </div>
     <input id="cgSharePrice" type="number" step="0.01" inputmode="decimal" placeholder="Current share price">
-    <button onclick="safeAction('Grade Contract', gradeCurrentContract)">GRADE THIS CONTRACT</button>
-    <div class="card">
-      <div class="section-title">Stage 2 — Manual Entry Review</div>
+    <details class="card" id="contractOptionalReview">
+      <summary>Optional: check Robinhood quote details (advanced)</summary>
       <div class="metric muted">For a WAIT setup blocked ONLY by price confirmation: copy the current underlying and option prices from Robinhood. The timestamps below must be the actual displayed quote times, not simply the time you entered the numbers. The screen will NOT override any other blocker. These are manual snapshots, not live API verification. Never place an order from this screen alone. A fresh manually entered timestamp cannot establish that the underlying data feed is live.</div>
       <label for="entryUnderlyingPrice">Current underlying price</label>
       <input id="entryUnderlyingPrice" type="number" step="0.01" inputmode="decimal" placeholder="Current stock price">
@@ -7759,11 +7777,10 @@ function renderFull(ticker, a, source=""){
       <select id="entryContractType"><option value="">Select CALL or PUT</option><option value="CALL">CALL</option><option value="PUT">PUT</option></select>
       <label class="metric muted"><input id="entryQuoteAcknowledged" type="checkbox" style="width:auto;display:inline-block;margin-right:8px;">I checked the exact ticker, option type, prices, and displayed quote times in Robinhood.</label>
       <div class="metric muted">This is a manual acknowledgement, not an independently verified live feed. Also fill out the complete contract fields above.</div>
-      <button onclick="safeAction('Verify Entry', confirmPredatorEntry)">REVIEW MANUAL ENTRY</button>
       <div id="entryGateResult"></div>
-    </div>
-
-    <div id="contractGradeOutput"></div>
+    </details>
+    <button onclick="safeAction('Grade Contract', gradeAndReviewOneContract)">GRADE THIS CONTRACT</button>
+    <div id="contractGradeOutput" aria-live="polite"></div>
   </div>
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a, source) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
@@ -8862,6 +8879,51 @@ renderJournalSummary();
 renderAlertHistory();
 clearActiveAlertsPanel();
 if(typeof renderGradeFilterSummary === 'function') renderGradeFilterSummary();
+</script>
+<script>
+(function(){
+  function initializeSimpleHome(){
+    const root=document.querySelector('.container');
+    if(!root||document.getElementById('predatorHomeNav'))return;
+    const cards=Array.from(root.children).filter(e=>e.classList&&e.classList.contains('card'));
+    const heading=(card)=>card.querySelector('.section-title')?.textContent.trim().toLowerCase()||'';
+    const account=cards.find(c=>heading(c).includes('predator account & risk control'));
+    const journal=cards.find(c=>heading(c).includes('saved positions / unified trade journal'));
+    const universe=cards.find(c=>heading(c).includes('predator strategy universes'));
+    if(!account||!journal||!universe)return;
+    // Move the existing watchlist controls, preserving their IDs, handlers and data.
+    const watchHeading=Array.from(universe.querySelectorAll('.section-title')).find(x=>x.textContent.trim()==='Target Watchlist');
+    if(!watchHeading)return;
+    const watchCard=document.createElement('div');watchCard.className='card';watchCard.id='predatorWatchlistHome';
+    watchHeading.textContent='My Watchlist';
+    let n=watchHeading;
+    while(n){const next=n.nextSibling;watchCard.appendChild(n);n=next;}
+    root.insertBefore(watchCard,root.querySelector('.card'));
+    account.id='predatorAccountHome';journal.id='predatorJournalHome';
+    const nav=document.createElement('div');nav.id='predatorHomeNav';nav.setAttribute('role','navigation');nav.setAttribute('aria-label','Predator sections');
+    const entries=[['watchlist','Watchlist',watchCard],['journal','Trade Journal',journal],['account','Account & Risk',account]];
+    let active='watchlist';let advanced=false;
+    const buttons=[];
+    const advancedButton=document.createElement('button');advancedButton.id='predatorAdvancedToggle';advancedButton.className='secondary';advancedButton.textContent='Show Advanced Tools';
+    function paint(){
+      root.classList.toggle('predator-advanced',advanced);
+      document.body.classList.toggle('predator-simple',!advanced);
+      cards.concat([watchCard]).forEach(c=>c.classList.remove('predator-active'));
+      if(!advanced){const e=entries.find(x=>x[0]===active);e[2].classList.add('predator-active');}
+      buttons.forEach(([id,b])=>b.setAttribute('aria-pressed',String(!advanced&&id===active)));
+      advancedButton.textContent=advanced?'Return to Simple Home':'Show Advanced Tools';
+      if(advanced)universe.style.display='';
+    }
+    entries.forEach(([id,label])=>{const b=document.createElement('button');b.className='secondary';b.textContent=label;b.type='button';b.addEventListener('click',()=>{advanced=false;active=id;paint();window.scrollTo(0,0)});nav.appendChild(b);buttons.push([id,b]);});
+    advancedButton.addEventListener('click',()=>{advanced=!advanced;paint();window.scrollTo(0,0)});
+    const title=root.querySelector('.title');title.insertAdjacentElement('afterend',nav);
+    nav.insertAdjacentElement('afterend',advancedButton);
+    // Advanced tools remain available without destroying DOM nodes or data.
+    paint();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initializeSimpleHome);
+  else initializeSimpleHome();
+})();
 </script>
 </body>
 </html>
