@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.20 Simple Daily-Close Decision Engine</title>
+    <title>Signal Predator AI v49.21 Unified Daily-Close Decision Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,7 +274,7 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v49.20 // Daily-Close Best Trade Consistency // Manual Contract Review // Monthly calls and puts // manual review</div>
+    <div class="subtitle">v49.21 // Unified Daily-Close Decisions // Manual Contract Review // Monthly calls and puts // manual review</div>
     <div class="metric muted" id="predatorBuildMarker">Build: v49.18 • Development candidate • Manual quotes are not live-verified</div>
 
   <div class="card">
@@ -6185,7 +6185,15 @@ function getContractSelectionCoach(a){
     rankedProfiles
   };
 }
-function renderContractSelectionCoach(a){
+function renderContractSelectionCoach(a, source=""){
+  const canonical = getUnifiedPredatorPresentation(a,source);
+  if(canonical.isDailyClose && !canonical.directional){
+    const status = canonical.headline === "WAIT" ? "WAIT — NO ENTRY YET" : "NO TRADE";
+    return `<div class="card"><div class="section-title">Adaptive Contract Coach</div><div class="metric"><b>Status:</b> <span class="${status.startsWith("WAIT")?"yellow":"red"}">${status}</span></div><div class="metric muted">No contract purchase is approved by the completed daily close. Review after the next trading close.</div></div>`;
+  }
+  if(canonical.isDailyClose && canonical.directional){
+    return `<div class="card"><div class="section-title">Adaptive Contract Coach</div><div class="metric green"><b>Daily-close direction:</b> ${escapeHtml(canonical.daily.direction)}</div><div class="metric muted">Verify the exact monthly contract, spread and premium in Robinhood before placing an order.</div></div>`;
+  }
   const c = getContractSelectionCoach(a);
 
   if(c.decision !== "BUY"){
@@ -6368,11 +6376,13 @@ function getUnifiedPredatorPresentation(a, source=""){
   const execution = getSimplePredatorDecision(a);
   const isDailyClose = /completed daily close/i.test(String(source));
   const daily = isDailyClose ? getDailyCloseScanDecision(a) : null;
-  const directional = daily && daily.screeningCandidate === true;
-  return {execution, daily, directional, isDailyClose,
-    headline: directional ? daily.direction : (execution.decision === "PASS" ? "NO TRADE" : execution.decision),
-    headlineColor: directional ? "green" : execution.color,
-    executionLabel: execution.decision === "BUY" ? "ENTRY CONDITIONS PASSED — VERIFY CONTRACT" : "WAIT — CURRENT ENTRY NOT CONFIRMED"};
+  const directional = !!(daily && daily.screeningCandidate === true);
+  const headline = directional ? daily.direction : (isDailyClose
+    ? (daily?.screeningStatus?.startsWith("WAIT") ? "WAIT" : "NO TRADE")
+    : (execution.decision === "BUY" ? execution.direction : execution.decision === "WAIT" ? "WAIT" : "NO TRADE"));
+  return {execution,daily,directional,isDailyClose,headline,
+    headlineColor:headline.startsWith("BUY")?"green":headline==="WAIT"?"yellow":"red",
+    executionLabel:headline.startsWith("BUY")?"DAILY-CLOSE APPROVED — VERIFY CONTRACT":"NO BUY APPROVAL"};
 }
 
 function renderSimplePredatorDecision(a, source=""){
@@ -6380,16 +6390,13 @@ function renderSimplePredatorDecision(a, source=""){
   const d = u.execution;
   const daily = u.daily;
   const direction = d.direction === "BUY CALL" || d.direction === "BUY PUT" ? d.direction : "NONE";
-  // One top-level decision based on completed-close screening. No intraday trigger is
-  // required for this directional signal; a broker contract is never presumed verified.
-  const decision = u.directional ? daily.direction :
-    (u.isDailyClose && daily ? (daily.screeningStatus?.startsWith("WAIT") ? "WAIT" : "NO TRADE") :
-     (d.decision === "BUY" ? d.direction : d.decision === "WAIT" ? "WAIT" : "NO TRADE"));
+  // One top-level decision based on completed-close screening. The completed daily close must confirm the entry trigger; a broker contract is never presumed verified.
+  const decision = u.headline;
   const isBuy = decision === "BUY CALL" || decision === "BUY PUT";
   const isWait = decision === "WAIT";
   const color = isBuy ? "green" : isWait ? "yellow" : "red";
   const why = isBuy
-    ? "The latest completed daily candle passed Predator's directional screening rules. This is a daily-close signal, not a verified option order."
+    ? "The latest completed daily candle passed Predator's directional screening rules. The completed daily close confirmed the required entry conditions. This is not a verified option order."
     : isWait
       ? "The completed-close setup has not passed every required condition. Do not buy yet."
       : "Predator has not approved a new option purchase. Skip this setup.";
@@ -6414,16 +6421,16 @@ function renderSimplePredatorDecision(a, source=""){
     <details><summary>Why Predator chose this decision (technical details)</summary>
       <div class="metric"><b>Monthly thesis:</b> ${escapeHtml(String(d.swingValidation?.monthlyThesis || "N/A"))}</div>
       <div class="metric"><b>Setup structure:</b> ${escapeHtml(String(d.swingValidation?.entryIntegrity?.structureState || "N/A"))}</div>
-      <div class="metric"><b>Price trigger (reference only):</b> ${escapeHtml(String(d.swingValidation?.trigger ?? "N/A"))}</div>
+      <div class="metric"><b>Completed-close price trigger:</b> ${escapeHtml(String(d.swingValidation?.trigger ?? "N/A"))}</div>
       <div class="metric"><b>Invalidation:</b> ${escapeHtml(String(d.invalidation ?? "N/A"))}</div>
-      <div class="metric"><b>Live-entry gate (not used to approve daily-close signal):</b> ${escapeHtml(String(d.decision))}</div>
+      <div class="metric"><b>Separate live-entry diagnostic (not a second decision):</b> ${escapeHtml(String(d.decision))}</div>
     </details>
   </div>`;
 }
 
 // v49.16: End-of-day directional approval. This is NOT a live order authorization.
 // Require the unchanged monthly thesis/quality/structure/affordability gates;
-// waive ONLY the newer-price trigger for a dated, completed-candle assessment.
+// require the completed-close price trigger for a dated, completed-candle assessment.
 function getDailyCloseScanDecision(a){
   const d = getSimplePredatorDecision(a);
   const swing = d.swingValidation || getSwingValidationEngine(a);
@@ -6437,13 +6444,13 @@ function getDailyCloseScanDecision(a){
   const qualityApproved = a.qualityDecision?.decision === "APPROVED";
   const locationAccepted = swing.entryIntegrity?.status !== "WAIT";
   const priceOnlyWait = swing.validation === "WAIT" && swing.blocker === "PRICE CONFIRMATION";
-  const qualified = validDirection && validLevels && d.accountFit !== "NO FIT" &&
+  const qualified = validDirection && validLevels && swing.triggerConfirmed === true && d.accountFit !== "NO FIT" &&
     getAccountFit(a, "MOMENTUM").affordable === true &&
     thesisQualified && qualityApproved && locationAccepted && swing.structureValid === true &&
     (swing.validation === "BUY" || priceOnlyWait);
   if(!qualified){
     return {...d,scanOnly:true,screeningCandidate:false,
-      screeningStatus:d.decision === "WAIT" ? "WAIT — DAILY-CLOSE CONDITIONS INCOMPLETE" : "NO TRADE",
+      screeningStatus:(d.decision === "WAIT" && swing.validation === "WAIT") ? "WAIT — DAILY-CLOSE CONDITIONS INCOMPLETE" : "NO TRADE",
       entryStatus:"NO END-OF-DAY BUY APPROVAL"};
   }
   return {...d,decision:"BUY",color:"green",screeningCandidate:true,
@@ -6475,7 +6482,7 @@ function renderSimpleDecisionSnapshot(a, source=""){
   const u=getUnifiedPredatorPresentation(a,source);
   const d=u.execution;
   const daily=u.daily;
-  const final=u.directional ? daily.direction : (u.isDailyClose && daily ? (daily.screeningStatus?.startsWith("WAIT") ? "WAIT" : "NO TRADE") : d.decision === "BUY" ? d.direction : d.decision === "WAIT" ? "WAIT" : "NO TRADE");
+  const final=u.headline;
   const buy=final==="BUY CALL" || final==="BUY PUT";
   const color=buy?"green":final==="WAIT"?"yellow":"red";
   return `<div class="card simple-summary-card"><div class="section-title">Quick Read — Same Final Decision</div><div class="simple-summary-grid"><div class="simple-summary-tile"><div class="metric"><b>Final Decision</b><br><span class="${color}">${escapeHtml(final)}</span></div></div><div class="simple-summary-tile"><div class="metric"><b>Bot Confidence (not a probability)</b><br>${safeNum(getPredatorConvictionEngine(a)?.conviction,0)}/100</div></div></div><div class="metric"><b>Action:</b> ${buy?"Check Robinhood contract details before buying; daily-close signal only.":final==="WAIT"?"Wait for the next completed daily candle.":"Skip this trade."}</div></div>`;
@@ -7709,8 +7716,7 @@ function renderFull(ticker, a, source=""){
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderSimplePredatorDecision(a, source)}
-  ${renderUniversalWheelAnalysis(a)}
-  ${renderContractSelectionCoach(a)}
+  ${renderContractSelectionCoach(a, source)}
   <div class="card">
     <div class="section-title">Grade a Robinhood Contract</div>
     <div class="metric muted">Enter the values shown on Robinhood's contract detail screen. Select the exact expiration date and Predator will calculate DTE automatically. No extra Alpha Vantage request is used.</div>
@@ -7762,8 +7768,11 @@ function renderFull(ticker, a, source=""){
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a, source) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
+  <details class="card"><summary>Advanced strategy details (optional)</summary>
+  ${renderUniversalWheelAnalysis(a)}
   ${(()=>{ const s=getSwingValidationEngine(a); return `<div class="card"><div class="section-title">Monthly Swing Validation</div><div class="metric"><b>Validation:</b> <span class="${signalClass(s.validation)}">${s.validation}</span></div><div class="metric"><b>Entry Mode:</b> ${s.entryMode}</div><div class="metric"><b>Monthly Thesis:</b> ${s.monthlyThesis}</div><div class="metric"><b>Readiness:</b> ${s.readiness}/100</div><div class="metric"><b>Blocker:</b> ${s.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${s.trigger==="N/A"?"N/A":"$"+s.trigger}</div><div class="metric"><b>Structural Invalidation:</b> ${s.invalidation==="N/A"?"N/A":"$"+s.invalidation}</div><div class="metric"><b>Trigger Confirmed:</b> ${s.triggerConfirmed?"YES":"NO"}</div><div class="metric"><b>Structure Valid:</b> ${s.structureApplicable ? (s.structureValid?"YES":"NO") : "N/A - NOT EVALUATED"}</div><div class="metric"><b>Reason:</b> ${s.reason}</div></div>`; })()}
   ${renderBuyFunnelDiagnostics(a, source)}
+  </details>
   <div class="scan-support">
     ${renderExpirationPolicyCard(a)}
     ${renderPredatorConvictionCard(a)}
