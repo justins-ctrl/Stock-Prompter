@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.17 Daily-Close Authority Consistency Candidate</title>
+    <title>Signal Predator AI v49.18 Daily-Close Best Trade Consistency Candidate</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,8 +274,8 @@ body.advanced-on .scan-support{display:block}
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v49.17 // Daily-Close Authority Consistency // Manual Contract Review // Monthly calls and puts // manual review</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.3 • Development candidate • Manual quotes are not live-verified</div>
+    <div class="subtitle">v49.18 // Daily-Close Best Trade Consistency // Manual Contract Review // Monthly calls and puts // manual review</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.18 • Development candidate • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -631,7 +631,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v49.3";
+      const PREDATOR_BUILD_ID = "v49.18";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -8599,88 +8599,53 @@ async function scanMyWatchlist(){
   await scanList(customWatchlist, "Top Watchlist Opportunities");
 }
 
+// v49.18: Best Trade uses the same completed-session authority as Watchlist Scan.
+// Never promote a daily-close setup into a live executable order.
 async function findBestTrade(){
   if(!customWatchlist.length){
     document.getElementById("output").innerHTML = "<div class='card'>Your watchlist is empty.</div>";
     return;
   }
-
-  renderThinkingCard([
-    "SCANNING WATCHLIST...",
-    "USING FINAL BUY GATE...",
-    "LOOKING FOR A TRUE BUY-READY SETUP..."
-  ]);
-
-  let best = null;
-  let waitCount = 0;
-  let noTradeCount = 0;
-
+  renderThinkingCard(["SCANNING COMPLETED DAILY CLOSES...","CHECKING MONTHLY BUY CONDITIONS...","RANKING DIRECTIONAL SETUPS — EXECUTION UNVERIFIED..."]);
+  let best = null, waitCount = 0, noTradeCount = 0, processed = 0;
+  const failures = [];
   for(let i=0; i<customWatchlist.length; i++){
     const ticker = normalizeTicker(customWatchlist[i]);
-
     let a = null;
+    // A 15-minute analysis cache is NOT proof of a current completed candle.
     const cached = getFreshTickerAnalysis(ticker);
-
-    if(cached){
+    if(cached && /completed daily close/i.test(String(cached.priceSource||"")) && predatorCandleStatus(ticker).current){
       a = ensureEngineDefaults(cached.analysisData);
     }else{
-      const closes = await getHistory(ticker);
-      if(!closes || !closes.length) continue;
-
-      const scanPrice = closes[0];
-      if(!Number.isFinite(scanPrice)) continue;
-
+      const before = predatorCandleStatus(ticker);
+      const closes = await getHistory(ticker,{forceFresh:!before.current});
+      if(!closes?.length || !predatorCandleStatus(ticker).current){
+        failures.push(ticker); continue;
+      }
+      const scanPrice = Number(closes[0]);
+      if(!Number.isFinite(scanPrice) || scanPrice <= 0){failures.push(ticker);continue;}
       a = analyze(closes, scanPrice);
       saveFreshTickerAnalysis(ticker, a, "Latest Completed Daily Close");
-      recordLearningSnapshot(ticker, a, "Find Best Trade Fresh Scan");
+      recordLearningSnapshot(ticker, a, "Find Best Trade Daily-Close Scan");
     }
-
-    const d = getSimplePredatorDecision(a);
-
-    if(d.decision === "WAIT"){
-      waitCount++;
-    }else if(d.decision === "PASS"){
-      noTradeCount++;
-    }else if(d.decision === "BUY"){
-      const rankScore =
-        safeNum(d.conviction,0) +
-        safeNum(a.alignmentScore?.score,0) +
-        safeNum(a.timeTarget?.probability,0);
-
-      if(!best || rankScore > best.rankScore){
-        best = {ticker, a, d, rankScore};
-      }
-    }
-
-    await new Promise(r => setTimeout(r, 1250));
+    processed++;
+    const d = getDailyCloseScanDecision(a);
+    if(d.screeningCandidate === true){
+      const rankScore = safeNum(d.conviction,0) + safeNum(a.alignmentScore?.score,0) + safeNum(a.timeTarget?.probability,0);
+      if(!best || rankScore > best.rankScore) best = {ticker,a,d,rankScore};
+    }else if(d.decision === "WAIT") waitCount++;
+    else noTradeCount++;
+    if(i < customWatchlist.length-1) await new Promise(r=>setTimeout(r,1250));
   }
-
-  if(!best){
-    document.getElementById("output").innerHTML = `
-      <div class="card sell-alert">
-        <div class="section-title">Best Trade Search</div>
-        <div class="final-answer-word red">NO TRADES</div>
-        <div class="final-answer-sub">No stock in your watchlist currently passes Predator's final BUY gate.</div>
-        <div class="metric"><b>WAIT / watch only:</b> ${waitCount}</div>
-        <div class="metric"><b>NO TRADE:</b> ${noTradeCount}</div>
-        <div class="metric green"><b>No additional individual scans are needed.</b></div>
-      </div>`;
+  if(processed === 0){
+    document.getElementById("output").innerHTML = `<div class="card sell-alert"><div class="section-title">Best Daily-Close Setup</div><div class="final-answer-word yellow">SCAN INCOMPLETE</div><div class="metric">No tickers had verified completed-session data. Evaluated: 0/${customWatchlist.length}. Data unavailable or stale: ${failures.length}.</div><div class="metric yellow">This is a data failure, not a NO TRADE decision.</div></div>`;
     return;
   }
-
-  document.getElementById("output").innerHTML = `
-    <div class="card hold-alert">
-      <div class="section-title">Best Trade Right Now</div>
-      <div class="final-answer-word green">BUY</div>
-      <div class="metric"><b>${best.ticker}</b> - ${best.d.direction}</div>
-      <div class="metric"><b>Bot Confidence:</b> ${best.d.conviction}/100</div>
-      <div class="metric"><b>Expiration:</b> ${best.d.expiration}</div>
-      <div class="metric"><b>Account Fit:</b> ${best.d.accountFit}</div>
-      <div class="metric"><b>Why:</b> ${best.d.reason}</div>
-      <div class="metric"><b>What to do:</b> ${best.d.action}</div>
-      <div class="metric"><b>Invalidation:</b> ${best.d.invalidation}</div>
-      <div class="metric green"><b>API Saver:</b> This analysis is cached for 15 minutes. Scanning ${best.ticker} individually during that window will reuse it without new API calls.</div>
-    </div>`;
+  if(!best){
+    document.getElementById("output").innerHTML = `<div class="card sell-alert"><div class="section-title">Best Daily-Close Setup</div><div class="final-answer-word red">NO APPROVED SETUP</div><div class="final-answer-sub">No evaluated completed daily close passed the unchanged monthly BUY screening rules. Unavailable tickers were not assessed.</div><div class="metric"><b>Successfully evaluated:</b> ${processed}/${customWatchlist.length}</div><div class="metric"><b>WAIT:</b> ${waitCount}</div><div class="metric"><b>NO TRADE:</b> ${noTradeCount}</div><div class="metric"><b>Data unavailable or stale:</b> ${failures.length}</div><div class="metric yellow">No executable BUY is verified by this scan.</div></div>`;
+    return;
+  }
+  document.getElementById("output").innerHTML = `<div class="card hold-alert"><div class="section-title">Best Daily-Close Directional Setup</div><div class="final-answer-word green">${escapeHtml(best.d.direction)} — DAILY-CLOSE APPROVED</div><div class="final-answer-sub">NOT AN EXECUTABLE ORDER. Confirm today's stock price and exact option contract, bid/ask, liquidity and risk in Robinhood before entering.</div><div class="metric"><b>Ticker:</b> ${escapeHtml(best.ticker)}</div><div class="metric"><b>Confidence:</b> ${best.d.conviction}/100</div><div class="metric"><b>Expiration preference:</b> ${escapeHtml(String(best.d.expiration||"N/A"))}</div><div class="metric"><b>Account Fit:</b> ${escapeHtml(String(best.d.accountFit||"N/A"))}</div><div class="metric"><b>Why:</b> ${escapeHtml(String(best.d.reason||""))}</div><div class="metric"><b>Next:</b> ${escapeHtml(String(best.d.action||""))}</div><div class="metric"><b>Invalidation:</b> ${escapeHtml(String(best.d.invalidation||"N/A"))}</div><div class="metric yellow"><b>Successfully evaluated:</b> ${processed}/${customWatchlist.length} | Data unavailable or stale: ${failures.length}</div></div>`;
 }
 
 // v49.3: A cache belongs to the exact contract portfolio, not merely to a ticker.
