@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.21 Unified Daily-Close Decision Engine</title>
+    <title>Signal Predator AI v49.25 Unified Daily-Close Decision Engine</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -270,7 +270,7 @@ body.advanced-on .scan-support{display:block}
 @media(max-width:520px){.simple-summary-grid{grid-template-columns:1fr 1fr}}
 
 
-/* v49.23: navigation changes presentation only; original feature nodes remain intact. */
+/* v49.25: navigation changes presentation only; original feature nodes remain intact. */
 #predatorHomeNav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}
 #predatorHomeNav button{flex:1 1 30%;font-size:12px;padding:12px 5px;min-width:90px}
 #predatorHomeNav button[aria-pressed="true"]{outline:2px solid #43eac4}
@@ -284,8 +284,8 @@ body.predator-simple .container > .subtitle,body.predator-simple #predatorBuildM
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v49.23 // Simple Home // Previous-Close Decisions // Monthly Calls & Puts</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.23 • Testing build • Manual quotes are not live-verified</div>
+    <div class="subtitle">v49.25 // Simple Home // Previous-Close Decisions // Monthly Calls & Puts</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.25 • Testing build • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -2153,7 +2153,7 @@ async function getHistory(symbol, options={}){
   const allowStaleFallback = options.allowStaleFallback !== false;
   try{
     const cached = readCachedDailyHistory(symbol, false);
-    if(cached && !forceFresh){
+    if(cached && !forceFresh && predatorCandleStatus(symbol).current){
       lastApiIssue = null;
       updateApiStatus(`Daily history loaded from cache (${Math.floor(cached.ageMs/60000)} min old).`, "green");
       return cached.closes.slice();
@@ -2403,6 +2403,21 @@ function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
 function getNextDayConfirmation(price, closes, direction, momentumEngine, expectedMove, score, grade, volatility){
   const todayClose = closes[0];
   const prevClose = closes[1] || closes[0];
+  // v49.25: time-aligned EOD confirmation. Today's completed close must
+  // confirm a trigger anchored to the PREVIOUS completed session, not itself.
+  // A prior directional thesis is required so the trigger was actionable
+  // before today's confirmation candle existed.
+  const priorWindow = closes.slice(1);
+  const prior20 = avg(priorWindow.slice(0,20));
+  const prior50 = avg(priorWindow.slice(0,50));
+  const priorMomentum = priorWindow.length > 5 && priorWindow[5] > 0
+    ? (priorWindow[0] - priorWindow[5]) / priorWindow[5] : 0;
+  const priorDirection = priorWindow.length >= 50 && Number.isFinite(prior20) && Number.isFinite(prior50)
+    ? (priorMomentum > 0.02 && prevClose > prior20 && prior20 > prior50 ? "BUY CALL"
+      : priorMomentum < -0.02 && prevClose < prior20 && prior20 < prior50 ? "BUY PUT" : "WAIT")
+    : "WAIT";
+  const priorExpectedMove = prevClose > 0 ? prevClose * 0.04 : NaN;
+  const priorSetupAligned = direction === priorDirection;
   const fiveDayHigh = Math.max(...closes.slice(0,5));
   const fiveDayLow = Math.min(...closes.slice(0,5));
   const oneDayMovePct = Math.abs((todayClose - prevClose) / prevClose) * 100;
@@ -2425,8 +2440,8 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
   else if(volatility === "COMPRESSION" && oneDayMovePct <= 2) overnightRisk = "LOW";
 
   if(direction === "BUY CALL"){
-    buyTrigger = (todayClose + expectedMove * 0.12).toFixed(2);
-    invalidation = Math.max(0.01, todayClose - expectedMove * 0.25).toFixed(2);
+    buyTrigger = (prevClose + priorExpectedMove * 0.12).toFixed(2);
+    invalidation = Math.max(0.01, prevClose - priorExpectedMove * 0.25).toFixed(2);
     if(closeLocation > 0.85 && chaseRisk === "HIGH") reversalTrap = "HIGH";
     else if(closeLocation > 0.70) reversalTrap = "MEDIUM";
 
@@ -2435,8 +2450,8 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
     if(momentumEngine.includes("BEARISH")) tomorrowRead = "INVALID UNTIL RECLAIM";
     morningChecklist = `Enter only if price holds above $${buyTrigger}. Avoid if it breaks below $${invalidation}.`;
   }else if(direction === "BUY PUT"){
-    buyTrigger = Math.max(0.01, todayClose - expectedMove * 0.12).toFixed(2);
-    invalidation = (todayClose + expectedMove * 0.25).toFixed(2);
+    buyTrigger = Math.max(0.01, prevClose - priorExpectedMove * 0.12).toFixed(2);
+    invalidation = (prevClose + priorExpectedMove * 0.25).toFixed(2);
     if(closeLocation < 0.15 && chaseRisk === "HIGH") reversalTrap = "HIGH";
     else if(closeLocation < 0.30) reversalTrap = "MEDIUM";
 
@@ -2454,7 +2469,8 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
 
   if(grade === "A+" && tomorrowRead === "NEEDS CONFIRMATION") tomorrowRead = "A+ BUT CONFIRM FIRST";
 
-  return {tomorrowRead, chaseRisk, overnightRisk, reversalTrap, buyTrigger, invalidation, morningChecklist, oneDayMovePct:oneDayMovePct.toFixed(1), fiveDayMovePct:fiveDayMovePct.toFixed(1)};
+  return {tomorrowRead, chaseRisk, overnightRisk, reversalTrap, buyTrigger, invalidation,
+    priorSetupAligned, priorDirection, triggerBasis:"PRIOR COMPLETED DAILY CLOSE", morningChecklist, oneDayMovePct:oneDayMovePct.toFixed(1), fiveDayMovePct:fiveDayMovePct.toFixed(1)};
 }
 
 
@@ -4453,6 +4469,7 @@ function getSwingValidationEngine(a){
   const invalidation = parseFloat(a.nextDay?.invalidation || "NaN");
   const price = parseFloat(a.price || "NaN");
   const entryIntegrity = getEntryIntegrityEngine(a);
+  const priorSetupAligned = a.nextDay?.priorSetupAligned === true;
 
   let structureValid = false;
   let triggerConfirmed = false;
@@ -4461,10 +4478,10 @@ function getSwingValidationEngine(a){
 
   if(Number.isFinite(price) && Number.isFinite(trigger)){
     if(direction === "BUY CALL"){
-      triggerConfirmed = price >= trigger;
+      triggerConfirmed = priorSetupAligned && price >= trigger;
       distanceToTriggerPct = ((trigger - price) / Math.max(price,0.01)) * 100;
     }else if(direction === "BUY PUT"){
-      triggerConfirmed = price <= trigger;
+      triggerConfirmed = priorSetupAligned && price <= trigger;
       distanceToTriggerPct = ((price - trigger) / Math.max(price,0.01)) * 100;
     }
   }
@@ -4507,8 +4524,8 @@ function getSwingValidationEngine(a){
   }else if(!triggerConfirmed){
     validation = "WAIT";
     entryMode = eliteMonthlyThesis ? "ELITE SETUP - TRIGGER REQUIRED" : "GOOD SETUP - TRIGGER REQUIRED";
-    blocker = "PRICE CONFIRMATION";
-    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13.3 no longer waives the entry trigger. Wait for price confirmation.`;
+    blocker = priorSetupAligned ? "PRICE CONFIRMATION" : "PRIOR-DAY DIRECTION NOT CONFIRMED";
+    reason = !priorSetupAligned ? "Previous completed session did not establish the same directional thesis. Wait for a subsequent completed close to confirm the setup." : `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13.3 no longer waives the entry trigger. Wait for price confirmation.`;
   }else if(quality !== "APPROVED"){
     validation = "WAIT";
     entryMode = "QUALITY CONFIRMATION REQUIRED";
@@ -6440,6 +6457,7 @@ function renderSimplePredatorDecision(a, source=""){
     <details><summary>Why Predator chose this decision (technical details)</summary>
       <div class="metric"><b>Monthly thesis:</b> ${escapeHtml(String(d.swingValidation?.monthlyThesis || "N/A"))}</div>
       <div class="metric"><b>Setup structure:</b> ${escapeHtml(String(d.swingValidation?.entryIntegrity?.structureState || "N/A"))}</div>
+      <div class="metric"><b>Trigger reference:</b> Previous completed daily close; confirmation evaluated on latest completed close.</div>
       <div class="metric"><b>Completed-close price trigger:</b> ${escapeHtml(String(d.swingValidation?.trigger ?? "N/A"))}</div>
       <div class="metric"><b>Invalidation:</b> ${escapeHtml(String(d.invalidation ?? "N/A"))}</div>
       <div class="metric"><b>Separate live-entry diagnostic (not a second decision):</b> ${escapeHtml(String(d.decision))}</div>
@@ -8357,9 +8375,12 @@ async function runAI(){
     "CALCULATING MONTHLY SWING SETUP..."
   ]);
 
-  const closes = await getHistory(ticker);
+  // A recent download can still contain an OLD trading candle. Force a fresh
+  // daily request when the latest completed session has not been verified.
+  const beforeStatus = predatorCandleStatus(ticker);
+  const closes = await getHistory(ticker, {forceFresh:!beforeStatus.current});
   if(!closes){
-    await runFallbackAnalysis(ticker);
+    output.innerHTML = `<div class="card sell-alert"><div class="section-title">${escapeHtml(ticker)} — DAILY DATA UNAVAILABLE</div><div class="final-answer-word yellow">DATA UNAVAILABLE</div><div class="metric">${escapeHtml(String(lastApiIssue?.message || "Daily history could not be retrieved."))}</div><div class="metric">No BUY, WAIT or NO TRADE signal can be issued without a verified completed daily candle.</div><div class="metric">Next step: Check the API status or retry after the data provider updates its daily history.</div></div>`;
     return;
   }
 
@@ -8367,7 +8388,7 @@ async function runAI(){
   // Never substitute Global Quote or intraday price for this directional authority.
   const candleStatus = predatorCandleStatus(ticker);
   if(!candleStatus.current || !closes.length || !Number.isFinite(Number(closes[0])) || Number(closes[0]) <= 0){
-    output.innerHTML = `<div class="card sell-alert"><div class="section-title">Daily-close analysis unavailable</div><div class="metric yellow">${escapeHtml(predatorFreshnessLabel(candleStatus))}</div><div class="metric">No BUY or WAIT assessment is authorized from unverified daily data. Retry when the completed session is available.</div></div>`;
+    output.innerHTML = `<div class="card sell-alert"><div class="section-title">${escapeHtml(ticker)} — Daily-close analysis unavailable</div><div class="metric yellow">${escapeHtml(predatorFreshnessLabel(candleStatus))}</div><div class="metric">Predator requested the newest available daily history, but the provider or cache still does not contain the expected completed session. This is a DATA UNAVAILABLE result, not NO TRADE. Check API status and retry after the provider updates.</div></div>`;
     return;
   }
   const pricePack = {price:Number(closes[0]),source:"Latest Completed Daily Close"};
@@ -8379,6 +8400,7 @@ async function runAI(){
   const compactHtml = safeRender(()=>renderCompact(ticker, a, pricePack.source));
   saveLastAnalysis(ticker, fullHtml, compactHtml, a);
   output.innerHTML = mode === "compact" ? compactHtml : fullHtml;
+  output.scrollIntoView?.({behavior:"smooth",block:"start"});
 }
 async function scanList(list, title){
   renderThinkingCard([
@@ -8652,7 +8674,7 @@ async function findBestTrade(){
     return;
   }
   if(!best){
-    document.getElementById("output").innerHTML = `<div class="card sell-alert"><div class="section-title">Best Daily-Close Setup</div><div class="final-answer-word red">NO APPROVED SETUP</div><div class="final-answer-sub">No evaluated completed daily close passed the unchanged monthly BUY screening rules. Unavailable tickers were not assessed.</div><div class="metric"><b>Successfully evaluated:</b> ${processed}/${customWatchlist.length}</div><div class="metric"><b>WAIT:</b> ${waitCount}</div><div class="metric"><b>NO TRADE:</b> ${noTradeCount}</div><div class="metric"><b>Data unavailable or stale:</b> ${failures.length}</div><div class="metric yellow">No executable BUY is verified by this scan.</div></div>`;
+    document.getElementById("output").innerHTML = `<div class="card sell-alert"><div class="section-title">Best Daily-Close Setup</div><div class="final-answer-word red">NO APPROVED SETUP</div><div class="final-answer-sub">No evaluated completed daily close passed the monthly BUY screening rules. This does not prove the rules are profitable or that the market has no opportunities. Unavailable tickers were not assessed.</div><div class="metric"><b>Successfully evaluated:</b> ${processed}/${customWatchlist.length}</div><div class="metric"><b>WAIT:</b> ${waitCount}</div><div class="metric"><b>NO TRADE:</b> ${noTradeCount}</div><div class="metric"><b>Data unavailable or stale:</b> ${failures.length}</div><div class="metric yellow">No executable BUY is verified by this scan.</div></div>`;
     return;
   }
   document.getElementById("output").innerHTML = `<div class="card hold-alert"><div class="section-title">Best Daily-Close Directional Setup</div><div class="final-answer-word green">${escapeHtml(best.d.direction)} — DAILY-CLOSE APPROVED</div><div class="final-answer-sub">NOT AN EXECUTABLE ORDER. Confirm today's stock price and exact option contract, bid/ask, liquidity and risk in Robinhood before entering.</div><div class="metric"><b>Ticker:</b> ${escapeHtml(best.ticker)}</div><div class="metric"><b>Confidence:</b> ${best.d.conviction}/100</div><div class="metric"><b>Expiration preference:</b> ${escapeHtml(String(best.d.expiration||"N/A"))}</div><div class="metric"><b>Account Fit:</b> ${escapeHtml(String(best.d.accountFit||"N/A"))}</div><div class="metric"><b>Why:</b> ${escapeHtml(String(best.d.reason||""))}</div><div class="metric"><b>Next:</b> ${escapeHtml(String(best.d.action||""))}</div><div class="metric"><b>Invalidation:</b> ${escapeHtml(String(best.d.invalidation||"N/A"))}</div><div class="metric yellow"><b>Successfully evaluated:</b> ${processed}/${customWatchlist.length} | Data unavailable or stale: ${failures.length}</div></div>`;
