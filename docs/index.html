@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.28 Condensed Dashboard</title>
+    <title>Signal Predator AI v49.30 Three-Tab Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -280,12 +280,20 @@ body.advanced-on .scan-support{display:block}
 #predatorCompactHome .section-title{font-size:14px}
 #predatorCompactHome .card{padding:14px}
 </style>
+<style>
+#predatorTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:15px 0 4px}
+#predatorTabs .predator-tab{margin:0;padding:12px 5px;font-size:11px;line-height:1.25;min-height:48px;border:1px solid rgba(55,255,159,.25);background:#14263b;color:#c9e9e6;box-shadow:none;border-radius:10px;letter-spacing:0}
+#predatorTabs .predator-tab.active{background:#168b68;color:#fff;border-color:#37ff9f}
+.predator-tab-panel[hidden]{display:none!important}
+.predator-tab-panel>.card{margin-top:12px}
+#predatorDiagnostics{margin-top:18px}
+</style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
     <div class="subtitle">Daily-close signals • Monthly calls and puts</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.28 • Condensed iPhone dashboard • Manual quotes are not live-verified</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.30 • Three-tab iPhone dashboard • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -8996,28 +9004,58 @@ clearActiveAlertsPanel();
 if(typeof renderGradeFilterSummary === 'function') renderGradeFilterSummary();
 </script>
 <script>
-/* v49.28 layout-only restoration: move existing nodes, never clone or delete them. */
+/* v49.30 three-tab navigation. Move existing DOM nodes; never clone or delete trading controls. */
 (function(){
-  function buildCondensedHome(){
-    const root=document.querySelector("body > .container");
-    if(!root || document.getElementById("predatorCompactHome"))return;
-    const cards=[...root.children].filter(el=>el.classList?.contains("card"));
-    const findCard=(text)=>cards.find(el=>el.querySelector(".section-title")?.textContent?.trim().toLowerCase().includes(text.toLowerCase()));
-    const home=document.createElement("div");home.id="predatorCompactHome";
-    const watch=findCard("Target Watchlist"),journal=findCard("Saved Positions / Unified Trade Journal"),account=findCard("Predator Account & Risk Control");
-    // Keep the actual watchlist, journal and account elements (and their IDs) unchanged.
-    for(const c of [watch,journal,account])if(c)home.appendChild(c);
-    const build=document.getElementById("predatorBuildMarker");
-    (build||root.children[1]||root.firstChild).after(home);
-    const advanced=document.createElement("details");advanced.id="predatorDiagnostics";
-    const summary=document.createElement("summary");summary.textContent="Advanced tools & diagnostics";advanced.appendChild(summary);
-    const skip=new Set([home,advanced,...[watch,journal,account].filter(Boolean)]);
-    // Move every other top-level card, preserving its event handlers and existing inputs.
-    for(const c of cards)if(!skip.has(c))advanced.appendChild(c);
-    root.appendChild(advanced);
+ function boot(){
+  const root=document.querySelector('body > .container');
+  if(!root||document.getElementById('predatorTabs'))return;
+  const cards=[...root.children].filter(el=>el.classList?.contains('card'));
+  const watch=cards.find(c=>c.querySelector('#watchlistInput'));
+  const journal=cards.find(c=>c.querySelector('#posTicker'));
+  const account=cards.find(c=>c.querySelector('#portfolioValue'));
+  if(!watch||!journal||!account){
+    const note=document.createElement('div');note.className='card';note.textContent='Dashboard layout could not identify all three sections. Original controls remain available below.';
+    root.insertBefore(note,root.children[3]||null);return;
   }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",buildCondensedHome,{once:true});
-  else buildCondensedHome();
+  const nav=document.createElement('nav');nav.id='predatorTabs';nav.setAttribute('aria-label','Predator main sections');
+  const sections=document.createElement('div');sections.id='predatorTabSections';
+  const entries=[['watch','Watchlist & Scan',watch],['journal','Trade Journal',journal],['account','Account & Risk',account]];
+  const panels={};const buttons={};
+  for(const [key,label,card] of entries){
+    const btn=document.createElement('button');btn.type='button';btn.className='predator-tab';btn.textContent=label;
+    btn.setAttribute('aria-controls','predator-panel-'+key);btn.addEventListener('click',()=>activate(key));nav.appendChild(btn);buttons[key]=btn;
+    const panel=document.createElement('section');panel.id='predator-panel-'+key;panel.className='predator-tab-panel';panel.setAttribute('role','tabpanel');panel.appendChild(card);sections.appendChild(panel);panels[key]=panel;
+  }
+  function activate(key){
+    for(const k of Object.keys(panels)){
+      panels[k].hidden=k!==key;buttons[k].setAttribute('aria-selected',String(k===key));buttons[k].classList.toggle('active',k===key);
+    }
+    try{sessionStorage.setItem('predator_active_tab',key)}catch(e){}
+  }
+  // Keep scan results and manual ticker analysis on the Watchlist tab.
+  // These elements were direct children of the page, not part of the watchlist card.
+  const scanOutput=document.getElementById('output');
+  const manualTicker=document.getElementById('ticker');
+  if(manualTicker && manualTicker.parentElement===root){
+    panels.watch.appendChild(manualTicker);
+    let sibling=manualTicker.nextElementSibling;
+    // Existing standalone analysis buttons directly follow the ticker input.
+    // Use a snapshot of root children to avoid moving unrelated panels.
+    for(const node of [...root.children]){
+      if(node.tagName==='BUTTON' && /Run Predator Analysis|Recheck Last Analysis/i.test(node.textContent||''))panels.watch.appendChild(node);
+    }
+  }
+  if(scanOutput)panels.watch.appendChild(scanOutput);
+  const marker=document.getElementById('predatorBuildMarker');
+  (marker||root.children[1]||root.firstChild).after(nav,sections);
+  const advanced=document.createElement('details');advanced.id='predatorDiagnostics';
+  const summary=document.createElement('summary');summary.textContent='Advanced tools & diagnostics';advanced.appendChild(summary);
+  for(const c of cards)if(!entries.some(e=>e[2]===c))advanced.appendChild(c);
+  root.appendChild(advanced);
+  let selected='watch';try{const saved=sessionStorage.getItem('predator_active_tab');if(panels[saved])selected=saved}catch(e){}
+  activate(selected);
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
 </script>
 </body>
