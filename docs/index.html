@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.27 Data Recovery</title>
+    <title>Signal Predator AI v49.28 Condensed Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -270,12 +270,22 @@ body.advanced-on .scan-support{display:block}
 @media(max-width:520px){.simple-summary-grid{grid-template-columns:1fr 1fr}}
 
 </style>
+<style>
+/* v49.28: compact-first, retains all original controls and handlers */
+#predatorCompactHome{margin-top:14px}
+#predatorCompactHome>.card{margin-top:12px}
+#predatorDiagnostics{margin-top:16px;border:1px solid rgba(55,255,159,.25);border-radius:14px;padding:12px}
+#predatorDiagnostics>summary{cursor:pointer;color:#6dffd6;font-family:Orbitron,Arial,sans-serif;font-size:13px;font-weight:700}
+#predatorDiagnostics>.card{margin-top:12px}
+#predatorCompactHome .section-title{font-size:14px}
+#predatorCompactHome .card{padding:14px}
+</style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v49.19 // Daily-Close Best Trade Consistency // Manual Contract Review // Monthly calls and puts // manual review</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.27 • Previous-close testing candidate • Manual quotes are not live-verified</div>
+    <div class="subtitle">Daily-close signals • Monthly calls and puts</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.28 • Condensed iPhone dashboard • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -8984,6 +8994,31 @@ renderJournalSummary();
 renderAlertHistory();
 clearActiveAlertsPanel();
 if(typeof renderGradeFilterSummary === 'function') renderGradeFilterSummary();
+</script>
+<script>
+/* v49.28 layout-only restoration: move existing nodes, never clone or delete them. */
+(function(){
+  function buildCondensedHome(){
+    const root=document.querySelector("body > .container");
+    if(!root || document.getElementById("predatorCompactHome"))return;
+    const cards=[...root.children].filter(el=>el.classList?.contains("card"));
+    const findCard=(text)=>cards.find(el=>el.querySelector(".section-title")?.textContent?.trim().toLowerCase().includes(text.toLowerCase()));
+    const home=document.createElement("div");home.id="predatorCompactHome";
+    const watch=findCard("Target Watchlist"),journal=findCard("Saved Positions / Unified Trade Journal"),account=findCard("Predator Account & Risk Control");
+    // Keep the actual watchlist, journal and account elements (and their IDs) unchanged.
+    for(const c of [watch,journal,account])if(c)home.appendChild(c);
+    const build=document.getElementById("predatorBuildMarker");
+    (build||root.children[1]||root.firstChild).after(home);
+    const advanced=document.createElement("details");advanced.id="predatorDiagnostics";
+    const summary=document.createElement("summary");summary.textContent="Advanced tools & diagnostics";advanced.appendChild(summary);
+    const skip=new Set([home,advanced,...[watch,journal,account].filter(Boolean)]);
+    // Move every other top-level card, preserving its event handlers and existing inputs.
+    for(const c of cards)if(!skip.has(c))advanced.appendChild(c);
+    root.appendChild(advanced);
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",buildCondensedHome,{once:true});
+  else buildCondensedHome();
+})();
 </script>
 </body>
 </html>
