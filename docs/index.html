@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.25 Unified Daily-Close Decision Engine</title>
+    <title>Signal Predator AI v49.27 Data Recovery</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -269,23 +269,13 @@ body.advanced-on .scan-support{display:block}
 .scan-details-button{margin-top:10px}
 @media(max-width:520px){.simple-summary-grid{grid-template-columns:1fr 1fr}}
 
-
-/* v49.25: navigation changes presentation only; original feature nodes remain intact. */
-#predatorHomeNav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}
-#predatorHomeNav button{flex:1 1 30%;font-size:12px;padding:12px 5px;min-width:90px}
-#predatorHomeNav button[aria-pressed="true"]{outline:2px solid #43eac4}
-body.predator-simple .container > .card{display:none!important}
-body.predator-simple .container > .card.predator-active{display:block!important}
-body.predator-simple .container > .subtitle,body.predator-simple #predatorBuildMarker{display:none!important}
-#predatorAdvancedToggle{margin:10px 0 20px}
-#predatorHomeHeading{font-size:15px;opacity:.8;margin-bottom:12px}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="title">Signal Predator AI</div>
-    <div class="subtitle">v49.25 // Simple Home // Previous-Close Decisions // Monthly Calls & Puts</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.25 • Testing build • Manual quotes are not live-verified</div>
+    <div class="subtitle">v49.19 // Daily-Close Best Trade Consistency // Manual Contract Review // Monthly calls and puts // manual review</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.27 • Previous-close testing candidate • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -746,7 +736,8 @@ function recordLearningSnapshot(ticker, analysisData, source="Predator Analysis"
   try{
     const row = buildLearningSnapshot(ticker, analysisData, source);
     if(!row) return null;
-    if(!Array.isArray(learningJournal)) loadLearningJournal();
+    if(!Array.isArray(learningJournal)) 
+loadLearningJournal();
     // Prevent accidental duplicate observations from double-clicks/re-renders.
     const recent = learningJournal.find(x=>x.ticker===row.ticker && x.source===row.source && x.decision===row.decision && x.direction===row.direction && (Date.now()-new Date(x.capturedAt||0).getTime()) < 60000);
     if(recent) return recent;
@@ -1987,7 +1978,7 @@ function classifyAlphaVantageMessage(data){
   const msg = String(data?.Note || data?.Information || data?.["Error Message"] || "");
   const lower = msg.toLowerCase();
   if(data?.["Error Message"]) return {kind:"INVALID_SYMBOL_OR_API_ERROR", message:msg};
-  if(lower.includes("rate limit") || lower.includes("frequency") || lower.includes("requests per day") || lower.includes("standard api rate limit") || lower.includes("premium")){
+  if(lower.includes("rate limit") || lower.includes("frequency") || lower.includes("requests per day") || lower.includes("standard api rate limit") || lower.includes("premium") || lower.includes("25 requests") || lower.includes("call frequency") || lower.includes("api limit")){
     return {kind:"QUOTA_OR_ENTITLEMENT", message:msg};
   }
   if(msg) return {kind:"API_MESSAGE", message:msg};
@@ -2062,7 +2053,7 @@ function predatorCandleStatus(symbol, now=new Date()){
   const candleDate=typeof row?.candleDate==="string" ? row.candleDate : null;
   const expected=predatorExpectedCompletedSession(now);
   const valid=!!candleDate && /^\d{4}-\d{2}-\d{2}$/.test(candleDate);
-  return {candleDate:valid?candleDate:null, expected, current:valid && candleDate>=expected && candleDate<=predatorEasternParts(now).year+"-"+predatorEasternParts(now).month+"-"+predatorEasternParts(now).day, source:row?.source||"unknown", checkedAt:row?.checkedAt||null};
+  return {candleDate:valid?candleDate:null, expected, current:valid && candleDate===expected, source:row?.source||"unknown", checkedAt:row?.checkedAt||null};
 }
 function predatorSaveCandleMeta(symbol,candleDate,source){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(candleDate))) return;
@@ -2100,6 +2091,17 @@ function writeCachedDailyHistory(symbol, closes){
   }catch(e){ console.warn("Daily history cache skipped:",e); }
 }
 function isQuotaStop(){ return lastApiIssue?.kind === "QUOTA_OR_ENTITLEMENT"; }
+const PREDATOR_PROVIDER_STOP_KEY = "predator_provider_stop_v4927";
+function predatorProviderStop(){
+  const v=getStore(PREDATOR_PROVIDER_STOP_KEY,null);
+  if(!v || v.day!==predatorUsageDayKey()) return null;
+  return v;
+}
+function predatorMarkProviderStop(message){
+  setStore(PREDATOR_PROVIDER_STOP_KEY,{day:predatorUsageDayKey(),message:String(message||"Alpha Vantage limit"),at:new Date().toISOString()});
+}
+function predatorClearProviderStop(){setStore(PREDATOR_PROVIDER_STOP_KEY,null);}
+
 
 async function fetchJson(url){
   const controller = new AbortController();
@@ -2112,6 +2114,7 @@ async function fetchJson(url){
     if(data.Note || data.Information || data["Error Message"]){
       const classified = classifyAlphaVantageMessage(data);
       lastApiIssue = {kind:classified.kind, message:String(classified.message), at:new Date().toISOString()};
+      if(classified.kind === "QUOTA_OR_ENTITLEMENT") predatorMarkProviderStop(classified.message);
       updatePredatorApiOutcome(classified.kind === "QUOTA_OR_ENTITLEMENT" ? "quota" : "failure");
       try{ logDataRequest("alpha", false, String(classified.message).slice(0,160)); }catch(e){}
 
@@ -2121,6 +2124,7 @@ async function fetchJson(url){
       }
     }else{
       lastApiIssue = null;
+      predatorClearProviderStop();
       updatePredatorApiOutcome("success");
       try{ logDataRequest("alpha", true, "Response received"); }catch(e){}
     }
@@ -2167,6 +2171,16 @@ async function getHistory(symbol, options={}){
       return fallback ? fallback.closes.slice() : null;
     }
 
+    // A provider stop persists for this calendar day. Do not burn another request
+    // simply because the user presses Scan again. Verified cached candles may still be used.
+    const providerStop=predatorProviderStop();
+    if(providerStop){
+      lastApiIssue={kind:"QUOTA_OR_ENTITLEMENT",message:providerStop.message,at:providerStop.at};
+      const fallback=readCachedDailyHistory(symbol,true);
+      if(fallback) return fallback.closes.slice();
+      updateApiStatus("Daily data provider limit reached. No verified history is available for this ticker.", "yellow");
+      return null;
+    }
     const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&outputsize=compact&apikey=${encodeURIComponent(apiKey)}`);
     const series = d["Time Series (Daily)"];
 
@@ -2403,21 +2417,6 @@ function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
 function getNextDayConfirmation(price, closes, direction, momentumEngine, expectedMove, score, grade, volatility){
   const todayClose = closes[0];
   const prevClose = closes[1] || closes[0];
-  // v49.25: time-aligned EOD confirmation. Today's completed close must
-  // confirm a trigger anchored to the PREVIOUS completed session, not itself.
-  // A prior directional thesis is required so the trigger was actionable
-  // before today's confirmation candle existed.
-  const priorWindow = closes.slice(1);
-  const prior20 = avg(priorWindow.slice(0,20));
-  const prior50 = avg(priorWindow.slice(0,50));
-  const priorMomentum = priorWindow.length > 5 && priorWindow[5] > 0
-    ? (priorWindow[0] - priorWindow[5]) / priorWindow[5] : 0;
-  const priorDirection = priorWindow.length >= 50 && Number.isFinite(prior20) && Number.isFinite(prior50)
-    ? (priorMomentum > 0.02 && prevClose > prior20 && prior20 > prior50 ? "BUY CALL"
-      : priorMomentum < -0.02 && prevClose < prior20 && prior20 < prior50 ? "BUY PUT" : "WAIT")
-    : "WAIT";
-  const priorExpectedMove = prevClose > 0 ? prevClose * 0.04 : NaN;
-  const priorSetupAligned = direction === priorDirection;
   const fiveDayHigh = Math.max(...closes.slice(0,5));
   const fiveDayLow = Math.min(...closes.slice(0,5));
   const oneDayMovePct = Math.abs((todayClose - prevClose) / prevClose) * 100;
@@ -2440,8 +2439,8 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
   else if(volatility === "COMPRESSION" && oneDayMovePct <= 2) overnightRisk = "LOW";
 
   if(direction === "BUY CALL"){
-    buyTrigger = (prevClose + priorExpectedMove * 0.12).toFixed(2);
-    invalidation = Math.max(0.01, prevClose - priorExpectedMove * 0.25).toFixed(2);
+    buyTrigger = (todayClose + expectedMove * 0.12).toFixed(2);
+    invalidation = Math.max(0.01, todayClose - expectedMove * 0.25).toFixed(2);
     if(closeLocation > 0.85 && chaseRisk === "HIGH") reversalTrap = "HIGH";
     else if(closeLocation > 0.70) reversalTrap = "MEDIUM";
 
@@ -2450,8 +2449,8 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
     if(momentumEngine.includes("BEARISH")) tomorrowRead = "INVALID UNTIL RECLAIM";
     morningChecklist = `Enter only if price holds above $${buyTrigger}. Avoid if it breaks below $${invalidation}.`;
   }else if(direction === "BUY PUT"){
-    buyTrigger = Math.max(0.01, prevClose - priorExpectedMove * 0.12).toFixed(2);
-    invalidation = (prevClose + priorExpectedMove * 0.25).toFixed(2);
+    buyTrigger = Math.max(0.01, todayClose - expectedMove * 0.12).toFixed(2);
+    invalidation = (todayClose + expectedMove * 0.25).toFixed(2);
     if(closeLocation < 0.15 && chaseRisk === "HIGH") reversalTrap = "HIGH";
     else if(closeLocation < 0.30) reversalTrap = "MEDIUM";
 
@@ -2469,8 +2468,7 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
 
   if(grade === "A+" && tomorrowRead === "NEEDS CONFIRMATION") tomorrowRead = "A+ BUT CONFIRM FIRST";
 
-  return {tomorrowRead, chaseRisk, overnightRisk, reversalTrap, buyTrigger, invalidation,
-    priorSetupAligned, priorDirection, triggerBasis:"PRIOR COMPLETED DAILY CLOSE", morningChecklist, oneDayMovePct:oneDayMovePct.toFixed(1), fiveDayMovePct:fiveDayMovePct.toFixed(1)};
+  return {tomorrowRead, chaseRisk, overnightRisk, reversalTrap, buyTrigger, invalidation, morningChecklist, oneDayMovePct:oneDayMovePct.toFixed(1), fiveDayMovePct:fiveDayMovePct.toFixed(1)};
 }
 
 
@@ -4469,7 +4467,6 @@ function getSwingValidationEngine(a){
   const invalidation = parseFloat(a.nextDay?.invalidation || "NaN");
   const price = parseFloat(a.price || "NaN");
   const entryIntegrity = getEntryIntegrityEngine(a);
-  const priorSetupAligned = a.nextDay?.priorSetupAligned === true;
 
   let structureValid = false;
   let triggerConfirmed = false;
@@ -4478,10 +4475,10 @@ function getSwingValidationEngine(a){
 
   if(Number.isFinite(price) && Number.isFinite(trigger)){
     if(direction === "BUY CALL"){
-      triggerConfirmed = priorSetupAligned && price >= trigger;
+      triggerConfirmed = price >= trigger;
       distanceToTriggerPct = ((trigger - price) / Math.max(price,0.01)) * 100;
     }else if(direction === "BUY PUT"){
-      triggerConfirmed = priorSetupAligned && price <= trigger;
+      triggerConfirmed = price <= trigger;
       distanceToTriggerPct = ((price - trigger) / Math.max(price,0.01)) * 100;
     }
   }
@@ -4524,8 +4521,8 @@ function getSwingValidationEngine(a){
   }else if(!triggerConfirmed){
     validation = "WAIT";
     entryMode = eliteMonthlyThesis ? "ELITE SETUP - TRIGGER REQUIRED" : "GOOD SETUP - TRIGGER REQUIRED";
-    blocker = priorSetupAligned ? "PRICE CONFIRMATION" : "PRIOR-DAY DIRECTION NOT CONFIRMED";
-    reason = !priorSetupAligned ? "Previous completed session did not establish the same directional thesis. Wait for a subsequent completed close to confirm the setup." : `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13.3 no longer waives the entry trigger. Wait for price confirmation.`;
+    blocker = "PRICE CONFIRMATION";
+    reason = `${eliteMonthlyThesis ? "Elite" : "Strong"} monthly thesis, but v47.7.13.3 no longer waives the entry trigger. Wait for price confirmation.`;
   }else if(quality !== "APPROVED"){
     validation = "WAIT";
     entryMode = "QUALITY CONFIRMATION REQUIRED";
@@ -5965,15 +5962,6 @@ function saveCurrentAnalysisAsPositionThesis(){
   alert(`${ticker} persistent thesis saved.`);
 }
 
-function gradeAndReviewOneContract(){
-  gradeCurrentContract();
-  const ids=["entryUnderlyingPrice","entryUnderlyingTime","entryContractTime","entryContractTicker","entryContractType"];
-  const hasReviewData=ids.some(id=>String(document.getElementById(id)?.value||"").trim()) || !!document.getElementById("entryQuoteAcknowledged")?.checked;
-  const output=document.getElementById("entryGateResult");
-  if(hasReviewData){confirmPredatorEntry();}
-  else if(output){output.innerHTML='<div class="metric muted">Optional quote review was skipped. Fill the additional fields only if you want a manual entry review; grading does not establish an executable order.</div>';}
-}
-
 function gradeCurrentContract(){
   const output = document.getElementById("contractGradeOutput");
   const last = getLastAnalysis();
@@ -6221,15 +6209,7 @@ function getContractSelectionCoach(a){
     rankedProfiles
   };
 }
-function renderContractSelectionCoach(a, source=""){
-  const canonical = getUnifiedPredatorPresentation(a,source);
-  if(canonical.isDailyClose && !canonical.directional){
-    const status = canonical.headline === "WAIT" ? "WAIT — NO ENTRY YET" : "NO TRADE";
-    return `<div class="card"><div class="section-title">Adaptive Contract Coach</div><div class="metric"><b>Status:</b> <span class="${status.startsWith("WAIT")?"yellow":"red"}">${status}</span></div><div class="metric muted">No contract purchase is approved by the completed daily close. Review after the next trading close.</div></div>`;
-  }
-  if(canonical.isDailyClose && canonical.directional){
-    return `<div class="card"><div class="section-title">Adaptive Contract Coach</div><div class="metric green"><b>Daily-close direction:</b> ${escapeHtml(canonical.daily.direction)}</div><div class="metric muted">Verify the exact monthly contract, spread and premium in Robinhood before placing an order.</div></div>`;
-  }
+function renderContractSelectionCoach(a){
   const c = getContractSelectionCoach(a);
 
   if(c.decision !== "BUY"){
@@ -6412,13 +6392,11 @@ function getUnifiedPredatorPresentation(a, source=""){
   const execution = getSimplePredatorDecision(a);
   const isDailyClose = /completed daily close/i.test(String(source));
   const daily = isDailyClose ? getDailyCloseScanDecision(a) : null;
-  const directional = !!(daily && daily.screeningCandidate === true);
-  const headline = directional ? daily.direction : (isDailyClose
-    ? (daily?.screeningStatus?.startsWith("WAIT") ? "WAIT" : "NO TRADE")
-    : (execution.decision === "BUY" ? execution.direction : execution.decision === "WAIT" ? "WAIT" : "NO TRADE"));
-  return {execution,daily,directional,isDailyClose,headline,
-    headlineColor:headline.startsWith("BUY")?"green":headline==="WAIT"?"yellow":"red",
-    executionLabel:headline.startsWith("BUY")?"DAILY-CLOSE APPROVED — VERIFY CONTRACT":"NO BUY APPROVAL"};
+  const directional = daily && daily.screeningCandidate === true;
+  return {execution, daily, directional, isDailyClose,
+    headline: directional ? daily.direction : (execution.decision === "PASS" ? "NO TRADE" : execution.decision),
+    headlineColor: directional ? "green" : execution.color,
+    executionLabel: execution.decision === "BUY" ? "ENTRY CONDITIONS PASSED — VERIFY CONTRACT" : "WAIT — CURRENT ENTRY NOT CONFIRMED"};
 }
 
 function renderSimplePredatorDecision(a, source=""){
@@ -6426,13 +6404,16 @@ function renderSimplePredatorDecision(a, source=""){
   const d = u.execution;
   const daily = u.daily;
   const direction = d.direction === "BUY CALL" || d.direction === "BUY PUT" ? d.direction : "NONE";
-  // One top-level decision based on completed-close screening. The completed daily close must confirm the entry trigger; a broker contract is never presumed verified.
-  const decision = u.headline;
+  // One top-level decision based on completed-close screening. No intraday trigger is
+  // required for this directional signal; a broker contract is never presumed verified.
+  const decision = u.directional ? daily.direction :
+    (u.isDailyClose && daily ? (daily.screeningStatus?.startsWith("WAIT") ? "WAIT" : "NO TRADE") :
+     (d.decision === "BUY" ? d.direction : d.decision === "WAIT" ? "WAIT" : "NO TRADE"));
   const isBuy = decision === "BUY CALL" || decision === "BUY PUT";
   const isWait = decision === "WAIT";
   const color = isBuy ? "green" : isWait ? "yellow" : "red";
   const why = isBuy
-    ? "The latest completed daily candle passed Predator's directional screening rules. The completed daily close confirmed the required entry conditions. This is not a verified option order."
+    ? "The latest completed daily candle passed Predator's directional screening rules. This is a daily-close signal, not a verified option order."
     : isWait
       ? "The completed-close setup has not passed every required condition. Do not buy yet."
       : "Predator has not approved a new option purchase. Skip this setup.";
@@ -6457,17 +6438,16 @@ function renderSimplePredatorDecision(a, source=""){
     <details><summary>Why Predator chose this decision (technical details)</summary>
       <div class="metric"><b>Monthly thesis:</b> ${escapeHtml(String(d.swingValidation?.monthlyThesis || "N/A"))}</div>
       <div class="metric"><b>Setup structure:</b> ${escapeHtml(String(d.swingValidation?.entryIntegrity?.structureState || "N/A"))}</div>
-      <div class="metric"><b>Trigger reference:</b> Previous completed daily close; confirmation evaluated on latest completed close.</div>
-      <div class="metric"><b>Completed-close price trigger:</b> ${escapeHtml(String(d.swingValidation?.trigger ?? "N/A"))}</div>
+      <div class="metric"><b>Price trigger (reference only):</b> ${escapeHtml(String(d.swingValidation?.trigger ?? "N/A"))}</div>
       <div class="metric"><b>Invalidation:</b> ${escapeHtml(String(d.invalidation ?? "N/A"))}</div>
-      <div class="metric"><b>Separate live-entry diagnostic (not a second decision):</b> ${escapeHtml(String(d.decision))}</div>
+      <div class="metric"><b>Live-entry gate (not used to approve daily-close signal):</b> ${escapeHtml(String(d.decision))}</div>
     </details>
   </div>`;
 }
 
 // v49.16: End-of-day directional approval. This is NOT a live order authorization.
 // Require the unchanged monthly thesis/quality/structure/affordability gates;
-// require the completed-close price trigger for a dated, completed-candle assessment.
+// waive ONLY the newer-price trigger for a dated, completed-candle assessment.
 function getDailyCloseScanDecision(a){
   const d = getSimplePredatorDecision(a);
   const swing = d.swingValidation || getSwingValidationEngine(a);
@@ -6481,13 +6461,13 @@ function getDailyCloseScanDecision(a){
   const qualityApproved = a.qualityDecision?.decision === "APPROVED";
   const locationAccepted = swing.entryIntegrity?.status !== "WAIT";
   const priceOnlyWait = swing.validation === "WAIT" && swing.blocker === "PRICE CONFIRMATION";
-  const qualified = validDirection && validLevels && swing.triggerConfirmed === true && d.accountFit !== "NO FIT" &&
+  const qualified = validDirection && validLevels && d.accountFit !== "NO FIT" &&
     getAccountFit(a, "MOMENTUM").affordable === true &&
     thesisQualified && qualityApproved && locationAccepted && swing.structureValid === true &&
     (swing.validation === "BUY" || priceOnlyWait);
   if(!qualified){
     return {...d,scanOnly:true,screeningCandidate:false,
-      screeningStatus:(d.decision === "WAIT" && swing.validation === "WAIT") ? "WAIT — DAILY-CLOSE CONDITIONS INCOMPLETE" : "NO TRADE",
+      screeningStatus:d.decision === "WAIT" ? "WAIT — DAILY-CLOSE CONDITIONS INCOMPLETE" : "NO TRADE",
       entryStatus:"NO END-OF-DAY BUY APPROVAL"};
   }
   return {...d,decision:"BUY",color:"green",screeningCandidate:true,
@@ -6516,13 +6496,56 @@ function renderOpportunityFunnelSummary(rows, title="Opportunity Funnel"){
 }
 
 function renderSimpleDecisionSnapshot(a, source=""){
-  const u=getUnifiedPredatorPresentation(a,source);
-  const d=u.execution;
-  const daily=u.daily;
-  const final=u.headline;
-  const buy=final==="BUY CALL" || final==="BUY PUT";
-  const color=buy?"green":final==="WAIT"?"yellow":"red";
-  return `<div class="card simple-summary-card"><div class="section-title">Quick Read — Same Final Decision</div><div class="simple-summary-grid"><div class="simple-summary-tile"><div class="metric"><b>Final Decision</b><br><span class="${color}">${escapeHtml(final)}</span></div></div><div class="simple-summary-tile"><div class="metric"><b>Bot Confidence (not a probability)</b><br>${safeNum(getPredatorConvictionEngine(a)?.conviction,0)}/100</div></div></div><div class="metric"><b>Action:</b> ${buy?"Check Robinhood contract details before buying; daily-close signal only.":final==="WAIT"?"Wait for the next completed daily candle.":"Skip this trade."}</div></div>`;
+  a = ensureEngineDefaults(a);
+
+  const unified = getUnifiedPredatorPresentation(a, source);
+  const d = unified.execution;
+  const convictionEngine = typeof getPredatorConvictionEngine === "function"
+    ? getPredatorConvictionEngine(a)
+    : {conviction:safeNum(d.conviction,50)};
+
+  const confidence = safeNum(convictionEngine.conviction, safeNum(d.conviction,50));
+  const displayDecision = unified.headline;
+
+  let decisionColor = "red";
+  if(unified.directional || d.decision === "BUY") decisionColor = "green";
+  else if(d.decision === "WAIT") decisionColor = "yellow";
+
+  let setupLabel = d.setupStatus || "N/A";
+  let entryLabel = d.entryStatus || "N/A";
+
+  let plainMeaning = "Predator does not approve a new entry.";
+  if(d.decision === "BUY"){
+    plainMeaning = "The setup and entry gate are both approved.";
+  }else if(d.decision === "WAIT"){
+    plainMeaning = "The setup is worth watching, but entry permission is not complete yet.";
+  }
+
+  if(unified.directional) plainMeaning = "Previous-close directional setup approved. Execution is not confirmed; verify the current stock price and exact Robinhood contract.";
+  return `
+    <div class="card simple-summary-card">
+      <div class="section-title">Quick Read</div>
+
+      <div class="simple-summary-grid">
+        <div class="simple-summary-tile">
+          <div class="metric"><b>Final Decision</b><br><span class="${decisionColor}">${displayDecision}</span></div>
+        </div>
+
+        <div class="simple-summary-tile">
+          <div class="metric"><b>Bot Confidence</b><br>${confidence}/100</div>
+        </div>
+
+        <div class="simple-summary-tile">
+          <div class="metric"><b>Setup</b><br>${setupLabel}</div>
+        </div>
+
+        <div class="simple-summary-tile">
+          <div class="metric"><b>Entry Status</b><br>${unified.directional ? "NOT VERIFIED — CHECK CURRENT PRICE" : entryLabel}</div>
+        </div>
+      </div>
+
+      <div class="metric"><b>Simple Meaning:</b> ${plainMeaning}</div>
+    </div>`;
 }
 
 function renderExpirationPolicyCard(a){
@@ -7753,9 +7776,10 @@ function renderFull(ticker, a, source=""){
   const riskPosture = a.score >= 85 ? "NORMAL SIZE" : a.score >= 70 ? "REDUCED SIZE" : "MICRO SIZE / WAIT";
   const discipline = a.score >= 85 ? "Setup is strong, but still respect your cap." : "Keep size light until conditions improve.";
   return `${renderSimplePredatorDecision(a, source)}
-  ${renderContractSelectionCoach(a, source)}
+  ${renderUniversalWheelAnalysis(a)}
+  ${renderContractSelectionCoach(a)}
   <div class="card">
-    <div class="section-title">One Robinhood Contract Grader</div>
+    <div class="section-title">Grade a Robinhood Contract</div>
     <div class="metric muted">Enter the values shown on Robinhood's contract detail screen. Select the exact expiration date and Predator will calculate DTE automatically. No extra Alpha Vantage request is used.</div>
     <div class="grid-2">
       <input id="cgStrike" type="number" step="0.01" inputmode="decimal" placeholder="Strike">
@@ -7780,8 +7804,9 @@ function renderFull(ticker, a, source=""){
       <div><label for="cgTheta" class="metric muted">Theta decay magnitude (no minus sign needed)</label><input id="cgTheta" type="number" min="0" step="0.0001" inputmode="decimal" placeholder="e.g. 0.0791"></div>
     </div>
     <input id="cgSharePrice" type="number" step="0.01" inputmode="decimal" placeholder="Current share price">
-    <details class="card" id="contractOptionalReview">
-      <summary>Optional: check Robinhood quote details (advanced)</summary>
+    <button onclick="safeAction('Grade Contract', gradeCurrentContract)">GRADE THIS CONTRACT</button>
+    <div class="card">
+      <div class="section-title">Stage 2 — Manual Entry Review</div>
       <div class="metric muted">For a WAIT setup blocked ONLY by price confirmation: copy the current underlying and option prices from Robinhood. The timestamps below must be the actual displayed quote times, not simply the time you entered the numbers. The screen will NOT override any other blocker. These are manual snapshots, not live API verification. Never place an order from this screen alone. A fresh manually entered timestamp cannot establish that the underlying data feed is live.</div>
       <label for="entryUnderlyingPrice">Current underlying price</label>
       <input id="entryUnderlyingPrice" type="number" step="0.01" inputmode="decimal" placeholder="Current stock price">
@@ -7795,19 +7820,17 @@ function renderFull(ticker, a, source=""){
       <select id="entryContractType"><option value="">Select CALL or PUT</option><option value="CALL">CALL</option><option value="PUT">PUT</option></select>
       <label class="metric muted"><input id="entryQuoteAcknowledged" type="checkbox" style="width:auto;display:inline-block;margin-right:8px;">I checked the exact ticker, option type, prices, and displayed quote times in Robinhood.</label>
       <div class="metric muted">This is a manual acknowledgement, not an independently verified live feed. Also fill out the complete contract fields above.</div>
+      <button onclick="safeAction('Verify Entry', confirmPredatorEntry)">REVIEW MANUAL ENTRY</button>
       <div id="entryGateResult"></div>
-    </details>
-    <button onclick="safeAction('Grade Contract', gradeAndReviewOneContract)">GRADE THIS CONTRACT</button>
-    <div id="contractGradeOutput" aria-live="polite"></div>
+    </div>
+
+    <div id="contractGradeOutput"></div>
   </div>
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a, source) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
-  <details class="card"><summary>Advanced strategy details (optional)</summary>
-  ${renderUniversalWheelAnalysis(a)}
   ${(()=>{ const s=getSwingValidationEngine(a); return `<div class="card"><div class="section-title">Monthly Swing Validation</div><div class="metric"><b>Validation:</b> <span class="${signalClass(s.validation)}">${s.validation}</span></div><div class="metric"><b>Entry Mode:</b> ${s.entryMode}</div><div class="metric"><b>Monthly Thesis:</b> ${s.monthlyThesis}</div><div class="metric"><b>Readiness:</b> ${s.readiness}/100</div><div class="metric"><b>Blocker:</b> ${s.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${s.trigger==="N/A"?"N/A":"$"+s.trigger}</div><div class="metric"><b>Structural Invalidation:</b> ${s.invalidation==="N/A"?"N/A":"$"+s.invalidation}</div><div class="metric"><b>Trigger Confirmed:</b> ${s.triggerConfirmed?"YES":"NO"}</div><div class="metric"><b>Structure Valid:</b> ${s.structureApplicable ? (s.structureValid?"YES":"NO") : "N/A - NOT EVALUATED"}</div><div class="metric"><b>Reason:</b> ${s.reason}</div></div>`; })()}
   ${renderBuyFunnelDiagnostics(a, source)}
-  </details>
   <div class="scan-support">
     ${renderExpirationPolicyCard(a)}
     ${renderPredatorConvictionCard(a)}
@@ -8370,17 +8393,14 @@ async function runAI(){
   }
 
   renderThinkingCard([
-    "TRACKING MARKET MOVEMENT...",
+    "CHECKING PREVIOUS COMPLETED CLOSE...",
     "LOCKING ONTO TARGET...",
     "CALCULATING MONTHLY SWING SETUP..."
   ]);
 
-  // A recent download can still contain an OLD trading candle. Force a fresh
-  // daily request when the latest completed session has not been verified.
-  const beforeStatus = predatorCandleStatus(ticker);
-  const closes = await getHistory(ticker, {forceFresh:!beforeStatus.current});
+  const closes = await getHistory(ticker);
   if(!closes){
-    output.innerHTML = `<div class="card sell-alert"><div class="section-title">${escapeHtml(ticker)} — DAILY DATA UNAVAILABLE</div><div class="final-answer-word yellow">DATA UNAVAILABLE</div><div class="metric">${escapeHtml(String(lastApiIssue?.message || "Daily history could not be retrieved."))}</div><div class="metric">No BUY, WAIT or NO TRADE signal can be issued without a verified completed daily candle.</div><div class="metric">Next step: Check the API status or retry after the data provider updates its daily history.</div></div>`;
+    await runFallbackAnalysis(ticker);
     return;
   }
 
@@ -8388,7 +8408,7 @@ async function runAI(){
   // Never substitute Global Quote or intraday price for this directional authority.
   const candleStatus = predatorCandleStatus(ticker);
   if(!candleStatus.current || !closes.length || !Number.isFinite(Number(closes[0])) || Number(closes[0]) <= 0){
-    output.innerHTML = `<div class="card sell-alert"><div class="section-title">${escapeHtml(ticker)} — Daily-close analysis unavailable</div><div class="metric yellow">${escapeHtml(predatorFreshnessLabel(candleStatus))}</div><div class="metric">Predator requested the newest available daily history, but the provider or cache still does not contain the expected completed session. This is a DATA UNAVAILABLE result, not NO TRADE. Check API status and retry after the provider updates.</div></div>`;
+    output.innerHTML = `<div class="card sell-alert"><div class="section-title">Daily-close analysis unavailable</div><div class="metric yellow">${escapeHtml(predatorFreshnessLabel(candleStatus))}</div><div class="metric">No BUY or WAIT assessment is authorized from unverified daily data. Retry when the completed session is available.</div></div>`;
     return;
   }
   const pricePack = {price:Number(closes[0]),source:"Latest Completed Daily Close"};
@@ -8400,7 +8420,6 @@ async function runAI(){
   const compactHtml = safeRender(()=>renderCompact(ticker, a, pricePack.source));
   saveLastAnalysis(ticker, fullHtml, compactHtml, a);
   output.innerHTML = mode === "compact" ? compactHtml : fullHtml;
-  output.scrollIntoView?.({behavior:"smooth",block:"start"});
 }
 async function scanList(list, title){
   renderThinkingCard([
@@ -8427,7 +8446,7 @@ async function scanList(list, title){
     updateApiStatus(`Scanning ${ticker} (${i+1}/${list.length})...`, "blue");
 
     const hadFreshCache = !!readCachedDailyHistory(ticker, false);
-    if(quotaStopped && !hadFreshCache){
+    if((quotaStopped || predatorProviderStop()) && !hadFreshCache){
       failures.push({ticker, stage:"API budget", message:"Not requested after Alpha Vantage quota/entitlement stop."});
       continue;
     }
@@ -8674,7 +8693,7 @@ async function findBestTrade(){
     return;
   }
   if(!best){
-    document.getElementById("output").innerHTML = `<div class="card sell-alert"><div class="section-title">Best Daily-Close Setup</div><div class="final-answer-word red">NO APPROVED SETUP</div><div class="final-answer-sub">No evaluated completed daily close passed the monthly BUY screening rules. This does not prove the rules are profitable or that the market has no opportunities. Unavailable tickers were not assessed.</div><div class="metric"><b>Successfully evaluated:</b> ${processed}/${customWatchlist.length}</div><div class="metric"><b>WAIT:</b> ${waitCount}</div><div class="metric"><b>NO TRADE:</b> ${noTradeCount}</div><div class="metric"><b>Data unavailable or stale:</b> ${failures.length}</div><div class="metric yellow">No executable BUY is verified by this scan.</div></div>`;
+    document.getElementById("output").innerHTML = `<div class="card sell-alert"><div class="section-title">Best Daily-Close Setup</div><div class="final-answer-word red">NO APPROVED SETUP</div><div class="final-answer-sub">No evaluated completed daily close passed the unchanged monthly BUY screening rules. Unavailable tickers were not assessed.</div><div class="metric"><b>Successfully evaluated:</b> ${processed}/${customWatchlist.length}</div><div class="metric"><b>WAIT:</b> ${waitCount}</div><div class="metric"><b>NO TRADE:</b> ${noTradeCount}</div><div class="metric"><b>Data unavailable or stale:</b> ${failures.length}</div><div class="metric yellow">No executable BUY is verified by this scan.</div></div>`;
     return;
   }
   document.getElementById("output").innerHTML = `<div class="card hold-alert"><div class="section-title">Best Daily-Close Directional Setup</div><div class="final-answer-word green">${escapeHtml(best.d.direction)} — DAILY-CLOSE APPROVED</div><div class="final-answer-sub">NOT AN EXECUTABLE ORDER. Confirm today's stock price and exact option contract, bid/ask, liquidity and risk in Robinhood before entering.</div><div class="metric"><b>Ticker:</b> ${escapeHtml(best.ticker)}</div><div class="metric"><b>Confidence:</b> ${best.d.conviction}/100</div><div class="metric"><b>Expiration preference:</b> ${escapeHtml(String(best.d.expiration||"N/A"))}</div><div class="metric"><b>Account Fit:</b> ${escapeHtml(String(best.d.accountFit||"N/A"))}</div><div class="metric"><b>Why:</b> ${escapeHtml(String(best.d.reason||""))}</div><div class="metric"><b>Next:</b> ${escapeHtml(String(best.d.action||""))}</div><div class="metric"><b>Invalidation:</b> ${escapeHtml(String(best.d.invalidation||"N/A"))}</div><div class="metric yellow"><b>Successfully evaluated:</b> ${processed}/${customWatchlist.length} | Data unavailable or stale: ${failures.length}</div></div>`;
@@ -8886,6 +8905,70 @@ renderContractGrader = function(a, contract={}){
   html=html.replace('This score grades the contract data you enter. It does not guarantee profit, and it does not place an order.','v48 grades the Robinhood contract values you enter. It does not read Robinhood live option-chain data, place orders, or change Predator stock BUY / WAIT / NO TRADE authority.');
   return html;
 };
+// v49.27 optional daily-history CSV recovery. Data source is explicit and dated.
+// Accepts Date,Close for one symbol or Symbol,Date,Close for many symbols.
+// Never turns an old candle into a current one.
+function predatorImportDailyCSV(){
+  const input=document.getElementById("predatorCsvFile");
+  const file=input?.files?.[0];
+  const box=document.getElementById("predatorCsvResult");
+  if(!file){if(box)box.textContent="Choose a CSV file first.";return;}
+  const reader=new FileReader();
+  reader.onerror=()=>{if(box)box.textContent="Unable to read CSV file.";};
+  reader.onload=()=>{
+    try{
+      const raw=String(reader.result||"").replace(/^\uFEFF/,"");
+      const rows=raw.split(/\r?\n/).filter(x=>x.trim()).map(x=>x.split(",").map(y=>y.trim().replace(/^"|"$/g,"")));
+      const headers=rows.shift().map(x=>x.toLowerCase().replace(/[^a-z]/g,""));
+      const dateIdx=headers.indexOf("date"), closeIdx=headers.indexOf("close"), symbolIdx=headers.indexOf("symbol")>=0?headers.indexOf("symbol"):headers.indexOf("ticker");
+      if(dateIdx<0||closeIdx<0)throw Error("CSV requires Date and Close columns.");
+      const defaultSymbol=normalizeTicker(document.getElementById("predatorCsvTicker")?.value||"");
+      if(symbolIdx<0&&!defaultSymbol)throw Error("Enter a ticker for a single-stock CSV, or include a Symbol column.");
+      const groups={};
+      for(const cols of rows){
+        const sym=normalizeTicker(symbolIdx>=0?cols[symbolIdx]:defaultSymbol);
+        const date=cols[dateIdx],price=Number(cols[closeIdx]);
+        if(!sym||!/^[A-Z][A-Z0-9.-]{0,9}$/.test(sym)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(price)||price<=0)continue;
+        const parsed=new Date(date+"T12:00:00Z");
+        if(!Number.isFinite(parsed.getTime())||parsed.toISOString().slice(0,10)!==date||date>predatorExpectedCompletedSession())continue;
+        (groups[sym] ||= []).push({date,price});
+      }
+      let imported=0, current=0, details=[];
+      for(const [sym,bars] of Object.entries(groups)){
+        const sorted=bars.sort((a,b)=>b.date.localeCompare(a.date));
+        const unique=sorted.filter((v,i,a)=>i===0||v.date!==a[i-1].date).slice(0,60);
+        if(unique.length<30){details.push(sym+": fewer than 30 bars");continue;}
+        const existing=predatorCandleStatus(sym);
+        if(existing.candleDate && existing.candleDate>unique[0].date){details.push(sym+": existing history is newer");continue;}
+        predatorSaveCandleMeta(sym,unique[0].date,"User-imported CSV (not provider verified)");
+        writeCachedDailyHistory(sym,unique.map(x=>x.price));
+        imported++;
+        if(predatorCandleStatus(sym).current)current++;
+      }
+      if(box)box.textContent=`Imported ${imported} ticker(s); ${current} have dates matching the expected completed session. Imported dates and prices are user-supplied, not independently verified. ${details.join("; ")}`;
+    }catch(e){if(box)box.textContent="Import failed: "+e.message;}
+  };
+  reader.readAsText(file);
+}
+(function(){
+ const container=document.createElement("section");
+ container.className="card";
+ container.id="predatorCsvRecovery";
+ container.innerHTML=`<div class="section-title">Daily Data Recovery (Optional)</div>
+ <p>Alpha Vantage limits can stop scans. Import dated daily closing prices from a trusted CSV export to restore local screening without additional API requests. This does not verify live option orders.</p>
+ <input id="predatorCsvTicker" placeholder="Ticker (only if CSV has no Symbol column)" aria-label="Ticker for CSV">
+ <input id="predatorCsvFile" type="file" accept=".csv,text/csv" aria-label="Daily prices CSV">
+ <button type="button" onclick="predatorImportDailyCSV()">IMPORT DAILY CSV</button>
+ <div id="predatorCsvResult" role="status"></div>
+ <p>Format: Symbol,Date,Close (multiple tickers) or Date,Close (one ticker). At least 30 dated closes per ticker. A stale candle is never accepted as a current signal.</p>`;
+ const anchor=document.getElementById("apiStatusBox");
+ const advanced=document.getElementById("advancedTools") || document.getElementById("advancedSection");
+ if(advanced)advanced.appendChild(container);
+ else if(anchor?.parentElement)anchor.parentElement.appendChild(container);
+ else document.body.appendChild(container);
+})();
+
+
 loadLearningJournal();
 renderApiKeyStatus();
 renderLearningJournalSummary();
@@ -8901,51 +8984,6 @@ renderJournalSummary();
 renderAlertHistory();
 clearActiveAlertsPanel();
 if(typeof renderGradeFilterSummary === 'function') renderGradeFilterSummary();
-</script>
-<script>
-(function(){
-  function initializeSimpleHome(){
-    const root=document.querySelector('.container');
-    if(!root||document.getElementById('predatorHomeNav'))return;
-    const cards=Array.from(root.children).filter(e=>e.classList&&e.classList.contains('card'));
-    const heading=(card)=>card.querySelector('.section-title')?.textContent.trim().toLowerCase()||'';
-    const account=cards.find(c=>heading(c).includes('predator account & risk control'));
-    const journal=cards.find(c=>heading(c).includes('saved positions / unified trade journal'));
-    const universe=cards.find(c=>heading(c).includes('predator strategy universes'));
-    if(!account||!journal||!universe)return;
-    // Move the existing watchlist controls, preserving their IDs, handlers and data.
-    const watchHeading=Array.from(universe.querySelectorAll('.section-title')).find(x=>x.textContent.trim()==='Target Watchlist');
-    if(!watchHeading)return;
-    const watchCard=document.createElement('div');watchCard.className='card';watchCard.id='predatorWatchlistHome';
-    watchHeading.textContent='My Watchlist';
-    let n=watchHeading;
-    while(n){const next=n.nextSibling;watchCard.appendChild(n);n=next;}
-    root.insertBefore(watchCard,root.querySelector('.card'));
-    account.id='predatorAccountHome';journal.id='predatorJournalHome';
-    const nav=document.createElement('div');nav.id='predatorHomeNav';nav.setAttribute('role','navigation');nav.setAttribute('aria-label','Predator sections');
-    const entries=[['watchlist','Watchlist',watchCard],['journal','Trade Journal',journal],['account','Account & Risk',account]];
-    let active='watchlist';let advanced=false;
-    const buttons=[];
-    const advancedButton=document.createElement('button');advancedButton.id='predatorAdvancedToggle';advancedButton.className='secondary';advancedButton.textContent='Show Advanced Tools';
-    function paint(){
-      root.classList.toggle('predator-advanced',advanced);
-      document.body.classList.toggle('predator-simple',!advanced);
-      cards.concat([watchCard]).forEach(c=>c.classList.remove('predator-active'));
-      if(!advanced){const e=entries.find(x=>x[0]===active);e[2].classList.add('predator-active');}
-      buttons.forEach(([id,b])=>b.setAttribute('aria-pressed',String(!advanced&&id===active)));
-      advancedButton.textContent=advanced?'Return to Simple Home':'Show Advanced Tools';
-      if(advanced)universe.style.display='';
-    }
-    entries.forEach(([id,label])=>{const b=document.createElement('button');b.className='secondary';b.textContent=label;b.type='button';b.addEventListener('click',()=>{advanced=false;active=id;paint();window.scrollTo(0,0)});nav.appendChild(b);buttons.push([id,b]);});
-    advancedButton.addEventListener('click',()=>{advanced=!advanced;paint();window.scrollTo(0,0)});
-    const title=root.querySelector('.title');title.insertAdjacentElement('afterend',nav);
-    nav.insertAdjacentElement('afterend',advancedButton);
-    // Advanced tools remain available without destroying DOM nodes or data.
-    paint();
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initializeSimpleHome);
-  else initializeSimpleHome();
-})();
 </script>
 </body>
 </html>
