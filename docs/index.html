@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.31 Three-Tab Dashboard</title>
+    <title>Signal Predator AI v49.32 Three-Tab Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -293,7 +293,7 @@ body.advanced-on .scan-support{display:block}
 <div class="container">
   <div class="title">Signal Predator AI</div>
     <div class="subtitle">Daily-close signals • Monthly calls and puts</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.31 • Three-tab iPhone dashboard • Manual quotes are not live-verified</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.32 • Prior-close trigger repair • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -649,7 +649,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v49.18";
+      const PREDATOR_BUILD_ID = "v49.32";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -2435,6 +2435,21 @@ function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
 function getNextDayConfirmation(price, closes, direction, momentumEngine, expectedMove, score, grade, volatility){
   const todayClose = closes[0];
   const prevClose = closes[1] || closes[0];
+  // v49.32: Previous-session levels are independent of today's completed close.
+  // Reconstruct yesterday's published next-session levels using the same 4%
+  // close-based move estimate. These levels confirm today's completed candle.
+  // The existing buyTrigger/invalidation below still plan the NEXT session.
+  const validPreviousClose = closes.length >= 2 && Number.isFinite(prevClose) && prevClose > 0;
+  const priorExpectedMove = validPreviousClose ? prevClose * 0.04 : NaN;
+  let completedCloseTrigger = "N/A";
+  let completedCloseInvalidation = "N/A";
+  if(validPreviousClose && direction === "BUY CALL"){
+    completedCloseTrigger = (prevClose + priorExpectedMove * 0.12).toFixed(2);
+    completedCloseInvalidation = Math.max(0.01, prevClose - priorExpectedMove * 0.25).toFixed(2);
+  }else if(validPreviousClose && direction === "BUY PUT"){
+    completedCloseTrigger = Math.max(0.01, prevClose - priorExpectedMove * 0.12).toFixed(2);
+    completedCloseInvalidation = (prevClose + priorExpectedMove * 0.25).toFixed(2);
+  }
   const fiveDayHigh = Math.max(...closes.slice(0,5));
   const fiveDayLow = Math.min(...closes.slice(0,5));
   const oneDayMovePct = Math.abs((todayClose - prevClose) / prevClose) * 100;
@@ -2486,7 +2501,11 @@ function getNextDayConfirmation(price, closes, direction, momentumEngine, expect
 
   if(grade === "A+" && tomorrowRead === "NEEDS CONFIRMATION") tomorrowRead = "A+ BUT CONFIRM FIRST";
 
-  return {tomorrowRead, chaseRisk, overnightRisk, reversalTrap, buyTrigger, invalidation, morningChecklist, oneDayMovePct:oneDayMovePct.toFixed(1), fiveDayMovePct:fiveDayMovePct.toFixed(1)};
+  return {tomorrowRead, chaseRisk, overnightRisk, reversalTrap,
+    buyTrigger, invalidation, morningChecklist,
+    completedCloseTrigger, completedCloseInvalidation,
+    completedCloseBasis: validPreviousClose ? prevClose.toFixed(2) : "N/A",
+    oneDayMovePct:oneDayMovePct.toFixed(1), fiveDayMovePct:fiveDayMovePct.toFixed(1)};
 }
 
 
@@ -4481,8 +4500,10 @@ function getSwingValidationEngine(a){
   const quality = a.qualityDecision?.decision || "N/A";
   const noTrade = a.noTradeZone?.zone || "CLEAR";
   const marketState = a.marketRegimeFilter?.state || "N/A";
-  const trigger = parseFloat(a.nextDay?.buyTrigger || "NaN");
-  const invalidation = parseFloat(a.nextDay?.invalidation || "NaN");
+  // Only compare the latest completed candle with levels calculated BEFORE it.
+  // nextDay.buyTrigger is calculated from this same candle and cannot confirm it.
+  const trigger = parseFloat(a.nextDay?.completedCloseTrigger || "NaN");
+  const invalidation = parseFloat(a.nextDay?.completedCloseInvalidation || "NaN");
   const price = parseFloat(a.price || "NaN");
   const entryIntegrity = getEntryIntegrityEngine(a);
 
@@ -4560,7 +4581,7 @@ function getSwingValidationEngine(a){
   else if(entryIntegrity.status === "CAUTION") readiness -= 5;
   readiness = Math.max(0, Math.min(100, readiness));
 
-  return {validation,entryMode,reason,blocker,readiness,structureValid,structureApplicable,triggerConfirmed,distanceToTriggerPct,distanceToInvalidationPct,trigger:Number.isFinite(trigger)?trigger.toFixed(2):"N/A",invalidation:Number.isFinite(invalidation)?invalidation.toFixed(2):"N/A",buyWindow:policy.buyWindow,monthlyThesis:eliteMonthlyThesis?"ELITE":strongMonthlyThesis?"STRONG":"WEAK",entryIntegrity};
+  return {validation,entryMode,reason,blocker,readiness,structureValid,structureApplicable,triggerConfirmed,distanceToTriggerPct,distanceToInvalidationPct,trigger:Number.isFinite(trigger)?trigger.toFixed(2):"N/A",invalidation:Number.isFinite(invalidation)?invalidation.toFixed(2):"N/A",nextSessionTrigger:a.nextDay?.buyTrigger||"N/A",nextSessionInvalidation:a.nextDay?.invalidation||"N/A",triggerBasisClose:a.nextDay?.completedCloseBasis||"N/A",buyWindow:policy.buyWindow,monthlyThesis:eliteMonthlyThesis?"ELITE":strongMonthlyThesis?"STRONG":"WEAK",entryIntegrity};
 }
 
 const PREDATOR_POSITION_THESIS_KEY = "signal_predator_position_theses_v47_7";
@@ -6334,7 +6355,7 @@ function getSimplePredatorDecision(a){
     upgrade = "Already approved.";
   }else if(swing.validation === "WAIT" || swing.validation === "BUY"){
     decision = "WAIT"; color = "yellow"; reason = swing.reason; action = "Wait. Do not buy yet.";
-    upgrade = String(swing.blocker||"").includes("PRICE") ? `Preferred trigger: $${swing.trigger}. If structure stays valid and price confirms, this can upgrade to BUY.` : "Upgrade to BUY when the remaining swing blocker clears.";
+    upgrade = String(swing.blocker||"").includes("PRICE") ? `Latest close did not confirm the prior-session trigger ($${swing.trigger}). Next-session planned trigger: $${swing.nextSessionTrigger}. Recheck after that close.` : "Upgrade to BUY when the remaining swing blocker clears.";
   }
 
   return {decision,color,direction,reason,action,upgrade,expiration,invalidation,conviction:safeNum(getPredatorConvictionEngine(a)?.conviction,0),accountFit:fit.fit,policy,swingValidation:swing,setupStatus:swing.monthlyThesis==="ELITE"?"ELITE MONTHLY SETUP":swing.monthlyThesis==="STRONG"?"GOOD MONTHLY SETUP":"WEAK / REJECTED SETUP",entryStatus:decision==="BUY"?swing.entryMode:decision==="WAIT"?"ENTRY NOT APPROVED YET":"NO ENTRY"};
@@ -6422,14 +6443,14 @@ function renderSimplePredatorDecision(a, source=""){
   const d = u.execution;
   const daily = u.daily;
   const direction = d.direction === "BUY CALL" || d.direction === "BUY PUT" ? d.direction : "NONE";
-  // One top-level decision based on completed-close screening. No intraday trigger is
-  // required for this directional signal; a broker contract is never presumed verified.
+  // One top-level decision. Confirmation uses the preceding session's levels;
+  // a broker option contract is never presumed verified.
   const decision = u.headline;
   const isBuy = decision === "BUY CALL" || decision === "BUY PUT";
   const isWait = decision === "WAIT";
   const color = isBuy ? "green" : isWait ? "yellow" : "red";
   const why = isBuy
-    ? "The latest completed daily candle passed Predator's directional screening rules. This is a daily-close signal, not a verified option order."
+    ? "The latest completed close passed the monthly entry gates and a trigger set from the prior close. The option contract is not verified."
     : isWait
       ? "The completed-close setup has not passed every required condition. Do not buy yet."
       : "Predator has not approved a new option purchase. Skip this setup.";
@@ -6454,34 +6475,34 @@ function renderSimplePredatorDecision(a, source=""){
     <details><summary>Why Predator chose this decision (technical details)</summary>
       <div class="metric"><b>Monthly thesis:</b> ${escapeHtml(String(d.swingValidation?.monthlyThesis || "N/A"))}</div>
       <div class="metric"><b>Setup structure:</b> ${escapeHtml(String(d.swingValidation?.entryIntegrity?.structureState || "N/A"))}</div>
-      <div class="metric"><b>Price trigger (reference only):</b> ${escapeHtml(String(d.swingValidation?.trigger ?? "N/A"))}</div>
+      <div class="metric"><b>Trigger tested against the latest close:</b> ${escapeHtml(String(d.swingValidation?.trigger ?? "N/A"))}</div>
+      <div class="metric"><b>Next-session planned trigger:</b> ${escapeHtml(String(d.swingValidation?.nextSessionTrigger ?? "N/A"))}</div>
       <div class="metric"><b>Invalidation:</b> ${escapeHtml(String(d.invalidation ?? "N/A"))}</div>
-      <div class="metric"><b>Live-entry gate (not used to approve daily-close signal):</b> ${escapeHtml(String(d.decision))}</div>
+      <div class="metric"><b>Completed-close stock signal:</b> ${escapeHtml(String(d.decision))}</div>
+      <div class="metric"><b>Broker order execution:</b> UNVERIFIED — check the exact contract independently.</div>
     </details>
   </div>`;
 }
 
-// v49.16: End-of-day directional approval. This is NOT a live order authorization.
-// Require the unchanged monthly thesis/quality/structure/affordability gates;
-// waive ONLY the newer-price trigger for a dated, completed-candle assessment.
-// v49.31: One final daily-close decision. A directional thesis is not a BUY
-// until all existing monthly entry gates, including the completed-close trigger,
-// have passed. No intraday quotes are required for this test.
+// v49.32: One final completed-close decision. The tested trigger was calculated
+// from the PRECEDING session; monthly/quality/risk gates remain unchanged.
+// This is NOT a broker-verified option purchase authorization.
 function getDailyCloseScanDecision(a){
   const d=getSimplePredatorDecision(a);
   const swing=d.swingValidation || getSwingValidationEngine(a);
   const direction=d.direction;
   const directional=direction === "BUY CALL" || direction === "BUY PUT";
   const buy=directional && swing.validation === "BUY" && d.decision === "BUY";
-  const waiting=directional && swing.validation === "WAIT";
+  // An unaffordable stock setup is NO TRADE, not WAIT, even if the swing gate waits.
+  const waiting=directional && swing.validation === "WAIT" && d.decision === "WAIT";
   const decision=buy ? "BUY" : waiting ? "WAIT" : "NO TRADE";
   const blocker=String(swing.blocker || "SETUP QUALITY");
   const trigger=String(swing.trigger || "N/A");
   const reason=buy
     ? "The completed daily candle passed the monthly thesis, price-trigger and entry gates. Confirm the actual option contract in Robinhood before placing an order."
     : waiting
-      ? `A ${direction.replace("BUY ","")} setup exists, but ${blocker.toLowerCase()} is not confirmed using the latest completed close${blocker === "PRICE CONFIRMATION" ? ` (required trigger $${trigger})` : ""}. Do not enter yet.`
-      : "The latest completed daily candle did not pass all required monthly entry conditions.";
+      ? `A ${direction.replace("BUY ","")} setup exists, but ${blocker.toLowerCase()} is not confirmed using the latest completed close${blocker === "PRICE CONFIRMATION" ? ` (prior-session trigger $${trigger}; next-session plan $${swing.nextSessionTrigger})` : ""}. Do not enter yet.`
+      : d.reason || "The latest completed daily candle did not pass all required monthly entry conditions.";
   return {...d,decision,color:buy?"green":waiting?"yellow":"red",screeningCandidate:buy,
     screeningStatus:buy?`${direction} — ALL DAILY-CLOSE ENTRY GATES PASSED`:waiting?`WAIT — ${direction.replace("BUY ","")} SETUP`:`NO TRADE`,
     reason,action:buy?"Verify current price, contract, expiration, bid/ask and risk in Robinhood before ordering.":"Wait for a new completed daily candle and rerun the analysis.",
@@ -6490,20 +6511,20 @@ function getDailyCloseScanDecision(a){
 }
 
 function getOpportunityFunnelRow(a){
-  const d = getSimplePredatorDecision(a);
+  const d = getDailyCloseScanDecision(a);
   const s = d.swingValidation || getSwingValidationEngine(a);
-  return {decision:d.decision,blocker:s.blocker||"UNKNOWN",blockerDetail:s.blocker === "NO-TRADE ZONE" ? `${a.noTradeZone?.zone||"UNKNOWN"}: ${a.noTradeZone?.reason||""}` : s.reason,readiness:s.readiness||0,direction:d.direction,trigger:s.trigger||"N/A",invalidation:s.invalidation||"N/A",expiration:d.expiration,reason:d.reason};
+  return {decision:d.decision,screeningCandidate:d.screeningCandidate===true,blocker:s.blocker||"UNKNOWN",blockerDetail:s.blocker === "NO-TRADE ZONE" ? `${a.noTradeZone?.zone||"UNKNOWN"}: ${a.noTradeZone?.reason||""}` : s.reason,readiness:s.readiness||0,direction:d.direction,trigger:s.trigger||"N/A",invalidation:s.invalidation||"N/A",expiration:d.expiration,reason:d.reason};
 }
 
 function renderOpportunityFunnelSummary(rows, title="Opportunity Funnel"){
   rows = Array.isArray(rows) ? rows : [];
-  const counts = {BUY:0,WAIT:0,PASS:0};
+  const counts = {BUY:0,WAIT:0,"NO TRADE":0};
   const screeningCandidates = rows.filter(r=>r.screeningCandidate === true).length;
   const blockers = {};
   rows.forEach(r=>{ counts[r.decision]=(counts[r.decision]||0)+1; const b=r.blocker === "NO-TRADE ZONE" ? `NO-TRADE ZONE / ${String(r.blockerDetail||"UNKNOWN").split(":")[0]}` : r.blocker||"UNKNOWN"; blockers[b]=(blockers[b]||0)+1; });
   const topBlocker = Object.entries(blockers).sort((a,b)=>b[1]-a[1])[0];
   const nearMisses = rows.filter(r=>r.decision==="WAIT").sort((a,b)=>b.readiness-a.readiness).slice(0,3);
-  return `<div class="card"><div class="section-title">${title}</div><div class="metric"><b>Live BUY execution verified:</b> 0 (daily-close scan)</div><div class="metric"><b>Daily-close BUY approvals (execution unverified):</b> ${screeningCandidates}</div><div class="metric"><b>WAIT:</b> ${counts.WAIT||0}</div><div class="metric"><b>NO TRADE:</b> ${counts.PASS||0}</div><div class="metric"><b>Most Common Blocker:</b> ${topBlocker?`${topBlocker[0]} (${topBlocker[1]})`:"NONE"}</div>${nearMisses.length?`<div class="divider"></div><div class="section-title">Closest Near-Misses</div>${nearMisses.map(r=>`<div class="card" style="padding:10px;margin-top:8px;"><div class="metric"><b>${r.ticker||""}</b> ${r.direction} - ${r.readiness}% READY</div><div class="metric"><b>Blocker:</b> ${r.blocker}</div><div class="metric"><b>Blocker detail:</b> ${escapeHtml(String(r.blockerDetail||""))}</div><div class="metric"><b>Preferred Trigger:</b> ${r.trigger==="N/A"?"N/A":"$"+r.trigger}</div><div class="metric"><b>Invalidation:</b> ${r.invalidation==="N/A"?"N/A":"$"+r.invalidation}</div><div class="metric"><b>Why:</b> ${r.reason}</div></div>`).join("")}`:""}</div>`;
+  return `<div class="card"><div class="section-title">${title}</div><div class="metric"><b>Live BUY execution verified:</b> 0 (daily-close scan)</div><div class="metric"><b>Daily-close BUY approvals (execution unverified):</b> ${screeningCandidates}</div><div class="metric"><b>WAIT:</b> ${counts.WAIT||0}</div><div class="metric"><b>NO TRADE:</b> ${counts["NO TRADE"]||0}</div><div class="metric"><b>Most Common Blocker:</b> ${topBlocker?`${topBlocker[0]} (${topBlocker[1]})`:"NONE"}</div>${nearMisses.length?`<div class="divider"></div><div class="section-title">Closest Near-Misses</div>${nearMisses.map(r=>`<div class="card" style="padding:10px;margin-top:8px;"><div class="metric"><b>${r.ticker||""}</b> ${r.direction} - ${r.readiness}% READY</div><div class="metric"><b>Blocker:</b> ${r.blocker}</div><div class="metric"><b>Blocker detail:</b> ${escapeHtml(String(r.blockerDetail||""))}</div><div class="metric"><b>Completed-close trigger:</b> ${r.trigger==="N/A"?"N/A":"$"+r.trigger}</div><div class="metric"><b>Invalidation:</b> ${r.invalidation==="N/A"?"N/A":"$"+r.invalidation}</div><div class="metric"><b>Why:</b> ${r.reason}</div></div>`).join("")}`:""}</div>`;
 }
 
 function renderSimpleDecisionSnapshot(a, source=""){
@@ -7841,7 +7862,7 @@ function renderFull(ticker, a, source=""){
   ${typeof renderSimpleDecisionSnapshot === 'function' ? renderSimpleDecisionSnapshot(a, source) : ''}
   ${typeof renderApiWarningOnly === 'function' ? renderApiWarningOnly() : ''}
   ${typeof renderAdvancedScanToggle === 'function' ? renderAdvancedScanToggle() : ''}
-  ${(()=>{ const s=getSwingValidationEngine(a); return `<div class="card"><div class="section-title">Monthly Swing Validation</div><div class="metric"><b>Validation:</b> <span class="${signalClass(s.validation)}">${s.validation}</span></div><div class="metric"><b>Entry Mode:</b> ${s.entryMode}</div><div class="metric"><b>Monthly Thesis:</b> ${s.monthlyThesis}</div><div class="metric"><b>Readiness:</b> ${s.readiness}/100</div><div class="metric"><b>Blocker:</b> ${s.blocker}</div><div class="metric"><b>Preferred Trigger:</b> ${s.trigger==="N/A"?"N/A":"$"+s.trigger}</div><div class="metric"><b>Structural Invalidation:</b> ${s.invalidation==="N/A"?"N/A":"$"+s.invalidation}</div><div class="metric"><b>Trigger Confirmed:</b> ${s.triggerConfirmed?"YES":"NO"}</div><div class="metric"><b>Structure Valid:</b> ${s.structureApplicable ? (s.structureValid?"YES":"NO") : "N/A - NOT EVALUATED"}</div><div class="metric"><b>Reason:</b> ${s.reason}</div></div>`; })()}
+  ${(()=>{ const s=getSwingValidationEngine(a); return `<div class="card"><div class="section-title">Monthly Swing Validation</div><div class="metric"><b>Validation:</b> <span class="${signalClass(s.validation)}">${s.validation}</span></div><div class="metric"><b>Entry Mode:</b> ${s.entryMode}</div><div class="metric"><b>Monthly Thesis:</b> ${s.monthlyThesis}</div><div class="metric"><b>Readiness:</b> ${s.readiness}/100</div><div class="metric"><b>Blocker:</b> ${s.blocker}</div><div class="metric"><b>Completed-Close Trigger:</b> ${s.trigger==="N/A"?"N/A":"$"+s.trigger}</div><div class="metric"><b>Next-Session Planned Trigger:</b> ${s.nextSessionTrigger==="N/A"?"N/A":"$"+s.nextSessionTrigger}</div><div class="metric"><b>Structural Invalidation:</b> ${s.invalidation==="N/A"?"N/A":"$"+s.invalidation}</div><div class="metric"><b>Trigger Confirmed:</b> ${s.triggerConfirmed?"YES":"NO"}</div><div class="metric"><b>Structure Valid:</b> ${s.structureApplicable ? (s.structureValid?"YES":"NO") : "N/A - NOT EVALUATED"}</div><div class="metric"><b>Reason:</b> ${s.reason}</div></div>`; })()}
   ${renderBuyFunnelDiagnostics(a, source)}
   <div class="scan-support">
     ${renderExpirationPolicyCard(a)}
@@ -8625,7 +8646,7 @@ async function scanList(list, title){
       <div class="section-title">${title}</div>
       <div class="final-answer-word green">${topBuys.length === 1 ? "1 DAILY-CLOSE ENTRY APPROVAL" : topBuys.length + " DAILY-CLOSE ENTRY APPROVALS"}</div>
       <div class="final-answer-sub">
-        DAILY-CLOSE ENTRY APPROVAL — NOT AN ORDER APPROVAL. The completed candle passed the existing monthly thesis gates without requiring a newer trigger. Current price, option contract, bid/ask and fill are NOT verified. Check Robinhood before any order.
+        DAILY-CLOSE ENTRY APPROVAL — NOT AN ORDER APPROVAL. The completed candle passed the monthly thesis gates AND its independent prior-session trigger. Current price, option contract, bid/ask and fill are NOT verified. Check Robinhood before any order.
       </div>
 
       <div class="metric"><b>Successfully analyzed:</b> ${processed}/${attempted}</div>
@@ -8638,8 +8659,8 @@ async function scanList(list, title){
         <div class="card" style="padding:14px;margin-top:12px;">
           <div class="section-title">#${index+1} DAILY-CLOSE ENTRY APPROVAL</div>
           <div class="metric"><b>${r.ticker}</b> - <span class="green">${r.finalDecision.direction}</span></div>
-          <div class="metric"><b>Stock setup:</b> <span class="yellow">DAILY-CLOSE DIRECTIONAL SETUP — EXECUTION WAIT / NOT VERIFIED</span></div>
-          <div class="metric yellow"><b>Individual scan:</b> The same completed-close data should show this directional setup; its execution decision may still say WAIT until price and contract are verified.</div>
+          <div class="metric"><b>Stock signal:</b> <span class="green">${r.finalDecision.direction} — DAILY-CLOSE APPROVED</span></div>
+          <div class="metric yellow"><b>Individual analysis:</b> With the same dated completed close and account settings, individual analysis shows the same BUY CALL/PUT stock signal. Verify current price and the exact Robinhood contract before placing any order.</div>
           <div class="metric"><b>Bot Confidence:</b> ${r.conviction}/100</div>
           <div class="metric"><b>Expiration:</b> ${r.finalDecision.expiration}</div>
           <div class="metric"><b>Account Fit:</b> ${r.finalDecision.accountFit}</div>
