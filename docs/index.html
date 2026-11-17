@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.34 Three-Tab Dashboard</title>
+    <title>Signal Predator AI v49.35 Three-Tab Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -293,7 +293,7 @@ body.advanced-on .scan-support{display:block}
 <div class="container">
   <div class="title">Signal Predator AI</div>
     <div class="subtitle">Daily-close signals • Monthly calls and puts</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.34 • Prior-close trigger repair • Manual quotes are not live-verified</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.35 • Prior-close trigger repair • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -649,7 +649,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v49.34";
+      const PREDATOR_BUILD_ID = "v49.35";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -2085,13 +2085,33 @@ function predatorExpectedCompletedSession(now=new Date()){
   }
   throw new Error("Cannot determine last completed exchange session");
 }
+function predatorPreviousTradingSession(iso){
+  const day=new Date(`${iso}T12:00:00Z`);
+  for(let i=0;i<14;i++){
+    day.setUTCDate(day.getUTCDate()-1);
+    const date=day.toISOString().slice(0,10);
+    if(![0,6].includes(day.getUTCDay()) && !predatorExchangeHoliday(date))return date;
+  }
+  throw new Error("Cannot determine previous trading session");
+}
 function predatorCandleStatus(symbol, now=new Date()){
   const meta=getStore(PREDATOR_CANDLE_META_KEY,{});
   const row=meta?.[normalizeTicker(symbol)];
   const candleDate=typeof row?.candleDate==="string" ? row.candleDate : null;
   const expected=predatorExpectedCompletedSession(now);
   const valid=!!candleDate && /^\d{4}-\d{2}-\d{2}$/.test(candleDate);
-  return {candleDate:valid?candleDate:null, expected, current:valid && candleDate===expected, source:row?.source||"unknown", checkedAt:row?.checkedAt||null};
+  const eastern=predatorEasternParts(now);
+  const today=`${eastern.year}-${eastern.month}-${eastern.day}`;
+  // A newer-than-conservative-expected bar is legitimate only after the
+  // regular 16:00 ET close. Allow 15 minutes for a completed daily feed.
+  // Never treat a future-dated bar or today's unfinished bar as completed.
+  const minutes=Number(eastern.hour)*60+Number(eastern.minute);
+  const todayCompleted=minutes>=16*60+15;
+  const latestAllowed=todayCompleted ? today : predatorPreviousTradingSession(today);
+  const current=valid && candleDate>=expected && candleDate<=latestAllowed &&
+    !predatorExchangeHoliday(candleDate) &&
+    ![0,6].includes(new Date(`${candleDate}T12:00:00Z`).getUTCDay());
+  return {candleDate:valid?candleDate:null, expected, latestAllowed, current, source:row?.source||"unknown", checkedAt:row?.checkedAt||null};
 }
 function predatorSaveCandleMeta(symbol,candleDate,source){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(candleDate))) return;
@@ -2100,7 +2120,7 @@ function predatorSaveCandleMeta(symbol,candleDate,source){
   setStore(PREDATOR_CANDLE_META_KEY,Object.fromEntries(Object.entries(meta).slice(-60)));
 }
 function predatorFreshnessLabel(status){
-  return `Newest completed candle: ${status.candleDate||"UNKNOWN"} | Expected by conservative session check: ${status.expected} | ${status.current?"CURRENT DAILY CLOSE":"STALE / UNVERIFIED"}`;
+  return `Newest completed candle: ${status.candleDate||"UNKNOWN"} | Minimum expected: ${status.expected} | Latest completed permitted: ${status.latestAllowed} | ${status.current?"CURRENT DAILY CLOSE":"STALE / UNVERIFIED"}`;
 }
 function getDailyHistoryCache(){
   const c = getStore(PREDATOR_DAILY_HISTORY_CACHE_KEY, {});
@@ -2468,7 +2488,7 @@ function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
 function getNextDayConfirmation(price, closes, direction, momentumEngine, expectedMove, score, grade, volatility){
   const todayClose = closes[0];
   const prevClose = closes[1] || closes[0];
-  // v49.34: Previous-session levels are independent of today's completed close.
+  // v49.35: Previous-session levels are independent of today's completed close.
   // Reconstruct yesterday's published next-session levels using the same 4%
   // close-based move estimate. These levels confirm today's completed candle.
   // The existing buyTrigger/invalidation below still plan the NEXT session.
@@ -6517,7 +6537,7 @@ function renderSimplePredatorDecision(a, source=""){
   </div>`;
 }
 
-// v49.34: One final completed-close decision. The tested trigger was calculated
+// v49.35: One final completed-close decision. The tested trigger was calculated
 // from the PRECEDING session; monthly/quality/risk gates remain unchanged.
 // This is NOT a broker-verified option purchase authorization.
 function getDailyCloseScanDecision(a){
