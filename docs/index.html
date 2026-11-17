@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.32 Three-Tab Dashboard</title>
+    <title>Signal Predator AI v49.33 Three-Tab Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -293,7 +293,7 @@ body.advanced-on .scan-support{display:block}
 <div class="container">
   <div class="title">Signal Predator AI</div>
     <div class="subtitle">Daily-close signals • Monthly calls and puts</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.32 • Prior-close trigger repair • Manual quotes are not live-verified</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.33 • Prior-close trigger repair • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -649,7 +649,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v49.32";
+      const PREDATOR_BUILD_ID = "v49.33";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -1995,12 +1995,15 @@ function updatePredatorApiOutcome(outcome){
 function classifyAlphaVantageMessage(data){
   const msg = String(data?.Note || data?.Information || data?.["Error Message"] || "");
   const lower = msg.toLowerCase();
-  if(data?.["Error Message"]) return {kind:"INVALID_SYMBOL_OR_API_ERROR", message:msg};
-  if(lower.includes("rate limit") || lower.includes("frequency") || lower.includes("requests per day") || lower.includes("standard api rate limit") || lower.includes("premium") || lower.includes("25 requests") || lower.includes("call frequency") || lower.includes("api limit")){
-    return {kind:"QUOTA_OR_ENTITLEMENT", message:msg};
-  }
-  if(msg) return {kind:"API_MESSAGE", message:msg};
-  return {kind:"NONE", message:""};
+  if(!msg) return {kind:"NONE",message:""};
+  // Entitlement failures are not daily quota failures: retrying tomorrow cannot fix them.
+  if(/premium|subscription|subscribe|not available for free|not supported by your plan|premium endpoint|premium api/i.test(lower))
+    return {kind:"ENDPOINT_ENTITLEMENT",message:msg};
+  if(/invalid api key|apikey is invalid|invalid api call|invalid symbol|invalid ticker/i.test(lower) || data?.["Error Message"])
+    return {kind:"INVALID_SYMBOL_OR_API_ERROR",message:msg};
+  if(/rate limit|call frequency|requests per day|requests today|25 requests|api limit|too many requests|standard api rate limit|daily limit|per minute|per day|call volume/i.test(lower))
+    return {kind:"PROVIDER_RATE_LIMIT",message:msg};
+  return {kind:"API_MESSAGE",message:msg};
 }
 // v48.3: Candle date, not download/cache time, is the source of freshness authority.
 // Daily bars are completed-session data. US exchange holidays are conservatively
@@ -2108,7 +2111,7 @@ function writeCachedDailyHistory(symbol, closes){
     setStore(PREDATOR_DAILY_HISTORY_CACHE_KEY,Object.fromEntries(entries));
   }catch(e){ console.warn("Daily history cache skipped:",e); }
 }
-function isQuotaStop(){ return lastApiIssue?.kind === "QUOTA_OR_ENTITLEMENT"; }
+function isQuotaStop(){ return lastApiIssue?.kind === "PROVIDER_RATE_LIMIT"; }
 const PREDATOR_PROVIDER_STOP_KEY = "predator_provider_stop_v4927";
 function predatorProviderStop(){
   const v=getStore(PREDATOR_PROVIDER_STOP_KEY,null);
@@ -2116,10 +2119,16 @@ function predatorProviderStop(){
   return v;
 }
 function predatorMarkProviderStop(message){
-  setStore(PREDATOR_PROVIDER_STOP_KEY,{day:predatorUsageDayKey(),message:String(message||"Alpha Vantage limit"),at:new Date().toISOString()});
+  setStore(PREDATOR_PROVIDER_STOP_KEY,{day:predatorUsageDayKey(),kind:"PROVIDER_RATE_LIMIT",message:String(message||"Alpha Vantage rate limit"),at:new Date().toISOString()});
 }
 function predatorClearProviderStop(){setStore(PREDATOR_PROVIDER_STOP_KEY,null);}
-
+function predatorDataStopDescription(){
+  const stop=predatorProviderStop();
+  if(stop) return `PROVIDER RATE LIMIT — ${stop.message}`;
+  const issue=lastApiIssue;
+  if(!issue) return "NONE";
+  return `${issue.kind}: ${issue.message}`;
+}
 
 async function fetchJson(url){
   const controller = new AbortController();
@@ -2132,8 +2141,8 @@ async function fetchJson(url){
     if(data.Note || data.Information || data["Error Message"]){
       const classified = classifyAlphaVantageMessage(data);
       lastApiIssue = {kind:classified.kind, message:String(classified.message), at:new Date().toISOString()};
-      if(classified.kind === "QUOTA_OR_ENTITLEMENT") predatorMarkProviderStop(classified.message);
-      updatePredatorApiOutcome(classified.kind === "QUOTA_OR_ENTITLEMENT" ? "quota" : "failure");
+      if(classified.kind === "PROVIDER_RATE_LIMIT") predatorMarkProviderStop(classified.message);
+      updatePredatorApiOutcome(classified.kind === "PROVIDER_RATE_LIMIT" ? "quota" : "failure");
       try{ logDataRequest("alpha", false, String(classified.message).slice(0,160)); }catch(e){}
 
       const box = document.getElementById("apiStatusBox");
@@ -2193,10 +2202,10 @@ async function getHistory(symbol, options={}){
     // simply because the user presses Scan again. Verified cached candles may still be used.
     const providerStop=predatorProviderStop();
     if(providerStop){
-      lastApiIssue={kind:"QUOTA_OR_ENTITLEMENT",message:providerStop.message,at:providerStop.at};
+      lastApiIssue={kind:"PROVIDER_RATE_LIMIT",message:providerStop.message,at:providerStop.at};
       const fallback=readCachedDailyHistory(symbol,true);
       if(fallback) return fallback.closes.slice();
-      updateApiStatus("Daily data provider limit reached. No verified history is available for this ticker.", "yellow");
+      updateApiStatus("PROVIDER RATE LIMIT: Alpha Vantage rejected a request. No verified history is available for this ticker.", "yellow");
       return null;
     }
     const d = await fetchJson(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&outputsize=compact&apikey=${encodeURIComponent(apiKey)}`);
@@ -2205,11 +2214,11 @@ async function getHistory(symbol, options={}){
     if(!series){
       const fallback = allowStaleFallback ? readCachedDailyHistory(symbol, true) : null;
       if(fallback && isQuotaStop()){
-        updateApiStatus(`API quota/entitlement stop. Using cached daily history (${Math.floor(fallback.ageMs/3600000)}h old) for screening only.`, "yellow");
+        updateApiStatus(`Provider rate limit. Using cached daily history (${Math.floor(fallback.ageMs/3600000)}h old) for screening only.`, "yellow");
         return fallback.closes.slice();
       }
       if(d.Note || d.Information){
-        updateApiStatus(isQuotaStop() ? "Alpha Vantage quota/entitlement limit reached. Further fresh requests stopped." : "Alpha Vantage message returned.", "yellow");
+        updateApiStatus(`${lastApiIssue?.kind||"API_MESSAGE"}: ${String(lastApiIssue?.message||"Alpha Vantage message returned.").slice(0,180)}`, "yellow");
       }else if(d["Error Message"]){
         updateApiStatus("Invalid ticker or API error.", "red");
       }else{
@@ -2435,7 +2444,7 @@ function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
 function getNextDayConfirmation(price, closes, direction, momentumEngine, expectedMove, score, grade, volatility){
   const todayClose = closes[0];
   const prevClose = closes[1] || closes[0];
-  // v49.32: Previous-session levels are independent of today's completed close.
+  // v49.33: Previous-session levels are independent of today's completed close.
   // Reconstruct yesterday's published next-session levels using the same 4%
   // close-based move estimate. These levels confirm today's completed candle.
   // The existing buyTrigger/invalidation below still plan the NEXT session.
@@ -6484,7 +6493,7 @@ function renderSimplePredatorDecision(a, source=""){
   </div>`;
 }
 
-// v49.32: One final completed-close decision. The tested trigger was calculated
+// v49.33: One final completed-close decision. The tested trigger was calculated
 // from the PRECEDING session; monthly/quality/risk gates remain unchanged.
 // This is NOT a broker-verified option purchase authorization.
 function getDailyCloseScanDecision(a){
@@ -8125,11 +8134,11 @@ function renderApiWarningOnly(){
   let detail = "One or more market-data requests returned an incomplete response.";
   let action = "Predator will use only data that passed validation.";
 
-  if(/limit|frequency|rate|too many requests|call volume|thank you for using alpha vantage/i.test(message)){
+  if(issue.kind === "PROVIDER_RATE_LIMIT"){
     title = "API LIMIT WARNING";
     detail = "Alpha Vantage reported a rate or usage limit.";
     action = "Pause new API-heavy scans. Use cached rechecks when available, then retry later.";
-  }else if(/premium|subscribe|higher api call frequency/i.test(message)){
+  }else if(issue.kind === "ENDPOINT_ENTITLEMENT"){
     title = "API ENDPOINT WARNING";
     detail = "Alpha Vantage returned a premium-access message for a requested endpoint.";
     action = "Predator will fall back when possible. Do not treat missing data as a trading signal.";
@@ -8142,6 +8151,8 @@ function renderApiWarningOnly(){
   return `
     <div class="card weak-alert">
       <div class="section-title">${title}</div>
+      <div class="metric"><b>Provider classification:</b> ${escapeHtml(issue.kind)}</div>
+      <div class="metric"><b>Provider response:</b> ${escapeHtml(message.slice(0,500))}</div>
       <div class="metric"><b>What happened:</b> ${escapeHtml(detail)}</div>
       <div class="metric"><b>What to do:</b> ${escapeHtml(action)}</div>
       <div class="metric muted">Predator will continue using validated cached data when available. Missing data is not a trading signal.</div>
@@ -8153,10 +8164,8 @@ function renderApiFailureDiagnostic(ticker, extraMessage=""){
   const issueText = extraMessage || issue?.message || "Historical market data did not load.";
   const lower = String(issueText).toLowerCase();
 
-  const likelyLimit =
-    /limit|frequency|call volume|rate|too many requests|thank you for using alpha vantage/i.test(issueText);
-  const likelyPremium =
-    /premium|subscribe|higher api call frequency/i.test(issueText);
+  const likelyLimit = issue?.kind === "PROVIDER_RATE_LIMIT";
+  const likelyPremium = issue?.kind === "ENDPOINT_ENTITLEMENT";
   const likelyTicker =
     /invalid api call|invalid symbol|symbol/i.test(issueText);
 
@@ -8478,9 +8487,9 @@ async function scanList(list, title){
     const ticker = normalizeTicker(list[i]);
     updateApiStatus(`Scanning ${ticker} (${i+1}/${list.length})...`, "blue");
 
-    const hadFreshCache = !!readCachedDailyHistory(ticker, false);
+    const hadFreshCache = !!readCachedDailyHistory(ticker, false) && predatorCandleStatus(ticker).current;
     if((quotaStopped || predatorProviderStop()) && !hadFreshCache){
-      failures.push({ticker, stage:"API budget", message:"Not requested after Alpha Vantage quota/entitlement stop."});
+      failures.push({ticker, stage:"API budget", message:"Not requested after confirmed Alpha Vantage rate limit. Cached candle is not verified current."});
       continue;
     }
     // Only force an API refresh if the latest completed candle is unverified.
@@ -8595,7 +8604,7 @@ async function scanList(list, title){
         <div class="metric"><b>Data failures:</b> ${failures.length}</div>
         <div class="metric"><b>Latest issue:</b> ${lastFailure ? `${lastFailure.ticker} - ${lastFailure.stage}: ${String(lastFailure.message).slice(0,220)}` : "Unknown data failure"}</div>
         <div class="metric red"><b>Do not interpret this as NO TRADES.</b></div>
-        <div class="metric"><b>What to do:</b> Check the API warning/status. Predator now stops additional fresh requests after a quota/entitlement response and reuses cached daily history when available. A data failure is never a trading signal.</div>
+        <div class="metric"><b>What to do:</b> Check the API warning/status. Predator now stops additional fresh requests after a rate-limit response and reuses cached daily history when available. A data failure is never a trading signal.</div>
       </div>`;
     return;
   }
