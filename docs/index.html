@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.35 Three-Tab Dashboard</title>
+    <title>Signal Predator AI v49.36 Three-Tab Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -293,7 +293,7 @@ body.advanced-on .scan-support{display:block}
 <div class="container">
   <div class="title">Signal Predator AI</div>
     <div class="subtitle">Daily-close signals • Monthly calls and puts</div>
-    <div class="metric muted" id="predatorBuildMarker">Build: v49.35 • Prior-close trigger repair • Manual quotes are not live-verified</div>
+    <div class="metric muted" id="predatorBuildMarker">Build: v49.36 • Prior-close trigger repair • Manual quotes are not live-verified</div>
 
   <div class="card">
     <div class="section-title">Predator Console</div>
@@ -649,7 +649,7 @@ function normalizeTicker(ticker){
 }
 
 // v47.9 - Separate candidate universes and read-only calibration research.
-      const PREDATOR_BUILD_ID = "v49.35";
+      const PREDATOR_BUILD_ID = "v49.36";
 const PREDATOR_BUY_UNIVERSE = Object.freeze(["SPY","QQQ","IWM","NVDA","AMD","AAPL","AMZN","META","MSFT","TSLA","INTC","BAC","XLF","SOFI","HOOD","MARA","HIMS","RIVN","U","CCL","AAL","PFE","F","ARKK","SMH"]);
 const PREDATOR_SELL_UNIVERSE = Object.freeze(["F","SOFI","PFE","CCL","AAL","BAC","INTC","RIVN","U","MARA"]);
 const PREDATOR_UNIVERSE_BATCH_SIZE = 15;
@@ -1992,8 +1992,15 @@ function updatePredatorApiOutcome(outcome){
   setStore(PREDATOR_API_USAGE_KEY,u);
   return u;
 }
+function predatorSafeProviderText(value){
+  let msg=String(value??"");
+  const key=typeof getAlphaVantageKey==="function" ? String(getAlphaVantageKey()||"") : "";
+  if(key && key.length>=6) msg=msg.split(key).join("[REDACTED API KEY]");
+  return msg.replace(/(api\s*key\s*(?:as|is|:|=)\s*)([A-Z0-9]{8,})/gi,"$1[REDACTED API KEY]")
+    .replace(/(apikey=)[^&\s]+/gi,"$1[REDACTED]");
+}
 function classifyAlphaVantageMessage(data){
-  const msg = String(data?.Note || data?.Information || data?.["Error Message"] || "");
+  const msg = predatorSafeProviderText(data?.Note || data?.Information || data?.["Error Message"] || "");
   const lower = msg.toLowerCase();
   if(!msg) return {kind:"NONE",message:""};
   // Rate-limit messages frequently advertise premium plans. That advertisement
@@ -2160,7 +2167,7 @@ function predatorProviderStop(){
   return v;
 }
 function predatorMarkProviderStop(message){
-  const msg=String(message||"Alpha Vantage rate limit");
+  const msg=predatorSafeProviderText(message||"Alpha Vantage rate limit");
   // Provider's 1-request-per-second warning is a pacing rejection, not
   // proof that the entire daily allowance is exhausted.
   const pacing=/1 request per second|spreading out your free api requests|per minute|call frequency/i.test(msg) && !/25 requests per day|daily limit|requests per day/i.test(msg);
@@ -2169,10 +2176,10 @@ function predatorMarkProviderStop(message){
 function predatorClearProviderStop(){setStore(PREDATOR_PROVIDER_STOP_KEY,null);}
 function predatorDataStopDescription(){
   const stop=predatorProviderStop();
-  if(stop) return `PROVIDER RATE LIMIT — ${stop.message}`;
+  if(stop) return `PROVIDER RATE LIMIT — ${predatorSafeProviderText(stop.message)}`;
   const issue=lastApiIssue;
   if(!issue) return "NONE";
-  return `${issue.kind}: ${issue.message}`;
+  return `${issue.kind}: ${predatorSafeProviderText(issue.message)}`;
 }
 
 async function fetchJson(url){
@@ -2209,7 +2216,7 @@ async function fetchJson(url){
     };
     const box = document.getElementById("apiStatusBox");
     if(box){
-      box.innerHTML = `<div class="metric"><b>API Request Failed:</b> ${escapeHtml(lastApiIssue.message)}</div>`;
+      box.innerHTML = `<div class="metric"><b>API Request Failed:</b> ${escapeHtml(predatorSafeProviderText(lastApiIssue.message))}</div>`;
     }
     updatePredatorApiOutcome("failure");
     try{ logDataRequest("alpha", false, lastApiIssue.message); }catch(e){}
@@ -2262,7 +2269,7 @@ async function getHistory(symbol, options={}){
         return fallback.closes.slice();
       }
       if(d.Note || d.Information){
-        updateApiStatus(`${lastApiIssue?.kind||"API_MESSAGE"}: ${String(lastApiIssue?.message||"Alpha Vantage message returned.").slice(0,180)}`, "yellow");
+        updateApiStatus(`${lastApiIssue?.kind||"API_MESSAGE"}: ${predatorSafeProviderText(lastApiIssue?.message||"Alpha Vantage message returned.").slice(0,180)}`, "yellow");
       }else if(d["Error Message"]){
         updateApiStatus("Invalid ticker or API error.", "red");
       }else{
@@ -2488,7 +2495,7 @@ function getProfitScaling(status, approxPnLPercent, dte, timeTarget){
 function getNextDayConfirmation(price, closes, direction, momentumEngine, expectedMove, score, grade, volatility){
   const todayClose = closes[0];
   const prevClose = closes[1] || closes[0];
-  // v49.35: Previous-session levels are independent of today's completed close.
+  // v49.36: Previous-session levels are independent of today's completed close.
   // Reconstruct yesterday's published next-session levels using the same 4%
   // close-based move estimate. These levels confirm today's completed candle.
   // The existing buyTrigger/invalidation below still plan the NEXT session.
@@ -6537,7 +6544,7 @@ function renderSimplePredatorDecision(a, source=""){
   </div>`;
 }
 
-// v49.35: One final completed-close decision. The tested trigger was calculated
+// v49.36: One final completed-close decision. The tested trigger was calculated
 // from the PRECEDING session; monthly/quality/risk gates remain unchanged.
 // This is NOT a broker-verified option purchase authorization.
 function getDailyCloseScanDecision(a){
@@ -8171,7 +8178,7 @@ function renderApiWarningOnly(){
   const issue = lastApiIssue;
   if(!issue) return "";
 
-  const message = String(issue.message || "Market data warning.");
+  const message = predatorSafeProviderText(issue.message || "Market data warning.");
   const lower = message.toLowerCase();
 
   let title = "DATA WARNING";
@@ -8205,7 +8212,7 @@ function renderApiWarningOnly(){
 
 function renderApiFailureDiagnostic(ticker, extraMessage=""){
   const issue = lastApiIssue;
-  const issueText = extraMessage || issue?.message || "Historical market data did not load.";
+  const issueText = predatorSafeProviderText(extraMessage || issue?.message || "Historical market data did not load.");
   const lower = String(issueText).toLowerCase();
 
   const likelyLimit = issue?.kind === "PROVIDER_RATE_LIMIT";
@@ -8264,7 +8271,7 @@ async function runFallbackAnalysis(ticker){
 }
 
 const PREDATOR_SCAN_CACHE_KEY = "signal_predator_fresh_scan_cache";
-const PREDATOR_SCAN_CACHE_TTL_MS = 15 * 60 * 1000;
+const PREDATOR_SCAN_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // v49.36: session authority comes from candle date, not elapsed minutes
 
 function getFreshScanCache(){
   const cache = getStore(PREDATOR_SCAN_CACHE_KEY, {});
@@ -8281,9 +8288,14 @@ function saveFreshTickerAnalysis(ticker, analysisData, priceSource="Previous Sca
     const symbol = normalizeTicker(ticker);
     if(!symbol || !analysisData) return;
     const cache = getFreshScanCache();
+    const status=predatorCandleStatus(symbol);
+    const existing=cache[symbol];
+    // First successful analysis for a completed trading session is immutable.
+    if(existing?.analysisData && existing.candleDate===status.candleDate && status.current) return;
     cache[symbol] = {
       ticker:symbol,
       savedAt:new Date().toISOString(),
+      candleDate:status.candleDate,
       analysisData,
       priceSource
     };
@@ -8307,7 +8319,9 @@ function getFreshTickerAnalysis(ticker){
     if(!item || !item.analysisData || !item.savedAt) return null;
 
     const ageMs = Date.now() - new Date(item.savedAt).getTime();
-    if(!Number.isFinite(ageMs) || ageMs < 0 || ageMs > PREDATOR_SCAN_CACHE_TTL_MS){
+    const status=predatorCandleStatus(symbol);
+    if(!Number.isFinite(ageMs) || ageMs < 0 || ageMs > PREDATOR_SCAN_CACHE_TTL_MS ||
+       !status.current || !item.candleDate || item.candleDate!==status.candleDate){
       return null;
     }
 
@@ -8465,7 +8479,7 @@ async function runAI(){
   }
 
   // API SAVER: if Find Best Trade / Watchlist / Momentum already analyzed this
-  // ticker successfully within 15 minutes, reuse the exact analysis instead of
+  // ticker for this completed trading session, reuse the exact analysis instead of
   // burning another group of Alpha Vantage calls.
   const fresh = getFreshTickerAnalysis(ticker);
   if(fresh && /completed daily close/i.test(String(fresh.priceSource||"")) && predatorCandleStatus(ticker).current){
@@ -8531,7 +8545,9 @@ async function scanList(list, title){
     const ticker = normalizeTicker(list[i]);
     updateApiStatus(`Scanning ${ticker} (${i+1}/${list.length})...`, "blue");
 
-    const hadFreshCache = !!readCachedDailyHistory(ticker, false) && predatorCandleStatus(ticker).current;
+    const savedAnalysis=getFreshTickerAnalysis(ticker);
+    const sameSessionAnalysis=!!savedAnalysis && /completed daily close/i.test(String(savedAnalysis.priceSource||""));
+    const hadFreshCache = sameSessionAnalysis || (!!readCachedDailyHistory(ticker, false) && predatorCandleStatus(ticker).current);
     if((quotaStopped || predatorProviderStop()) && !hadFreshCache){
       failures.push({ticker, stage:"API budget", message:"Not requested after confirmed Alpha Vantage rate limit. Cached candle is not verified current."});
       continue;
@@ -8539,14 +8555,14 @@ async function scanList(list, title){
     // Only force an API refresh if the latest completed candle is unverified.
     // This avoids burning free-tier requests on known-current daily bars.
     const beforeStatus=predatorCandleStatus(ticker);
-    const closes = await getHistory(ticker,{forceFresh:!beforeStatus.current});
+    const closes = sameSessionAnalysis ? [Number(savedAnalysis.analysisData.price)] : await getHistory(ticker,{forceFresh:!beforeStatus.current});
     if(hadFreshCache && closes?.length) cacheHits++;
     if(isQuotaStop()) quotaStopped = true;
     if(!closes || !closes.length){
       failures.push({
         ticker,
         stage:"Daily history",
-        message:lastApiIssue?.message || "Daily history unavailable."
+        message:predatorSafeProviderText(lastApiIssue?.message || "Daily history unavailable.")
       });
       continue;
     }
@@ -8571,9 +8587,11 @@ async function scanList(list, title){
       continue;
     }
 
-    const a = analyze(closes, scanPrice);
-    saveFreshTickerAnalysis(ticker, a, "Latest Completed Daily Close");
-    recordLearningSnapshot(ticker, a, `${title} Screening Scan`);
+    const a = sameSessionAnalysis ? ensureEngineDefaults(savedAnalysis.analysisData) : analyze(closes, scanPrice);
+    if(!sameSessionAnalysis){
+      saveFreshTickerAnalysis(ticker, a, "Latest Completed Daily Close");
+      recordLearningSnapshot(ticker, a, `${title} Screening Scan`);
+    }
     const finalDecision = getDailyCloseScanDecision(a);
     const funnel = getOpportunityFunnelRow(a);
     funnel.screeningCandidate = finalDecision.screeningCandidate === true;
@@ -8630,6 +8648,7 @@ async function scanList(list, title){
 
   const freshnessText = `Verified current completed daily candles: ${processed}/${attempted} | Stale or unverified: ${staleRows.length} | Expected completed session: ${predatorExpectedCompletedSession()}`;
   const scanLimitText = "BUY requires all daily-close entry gates, including the price trigger. Broker option-contract prices and execution remain unverified.";
+  const failureDetails = failures.length ? `<details class="card" style="margin-top:12px"><summary>Unclassified tickers — ${failures.length} data failures (tap for details)</summary>${failures.map(f=>`<div class="metric"><b>${escapeHtml(f.ticker)} — ${escapeHtml(f.stage)}:</b> ${escapeHtml(predatorSafeProviderText(f.message).slice(0,240))}</div>`).join("")}<div class="metric muted">DATA UNAVAILABLE is not a trading decision. Previously verified same-session analyses remain reusable without an API call.</div></details>` : "";
 
   // CRITICAL: zero successfully processed tickers is DATA FAILURE, never "NO TRADES".
   if(processed === 0){
@@ -8646,7 +8665,7 @@ async function scanList(list, title){
         <div class="metric"><b>Data efficiency:</b> ${apiBudgetText}</div>
         <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div><div class="metric yellow"><b>Entry verification:</b> ${scanLimitText}</div>
         <div class="metric"><b>Data failures:</b> ${failures.length}</div>
-        <div class="metric"><b>Latest issue:</b> ${lastFailure ? `${lastFailure.ticker} - ${lastFailure.stage}: ${String(lastFailure.message).slice(0,220)}` : "Unknown data failure"}</div>
+        <div class="metric"><b>Latest issue:</b> ${lastFailure ? `${escapeHtml(lastFailure.ticker)} - ${escapeHtml(lastFailure.stage)}: ${escapeHtml(predatorSafeProviderText(lastFailure.message).slice(0,220))}` : "Unknown data failure"}</div>${failureDetails}
         <div class="metric red"><b>Do not interpret this as NO TRADES.</b></div>
         <div class="metric"><b>What to do:</b> Check the API warning/status. Predator now stops additional fresh requests after a rate-limit response and reuses cached daily history when available. A data failure is never a trading signal.</div>
       </div>`;
@@ -8671,7 +8690,7 @@ async function scanList(list, title){
         <div class="metric"><b>BUY entry verified:</b> 0</div><div class="metric"><b>Daily-close BUY approvals:</b> 0</div>
         <div class="metric"><b>WAIT / watch only:</b> ${waits.length}</div>
         <div class="metric"><b>NO TRADE:</b> ${noTrades.length}</div>
-        ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length}</div>` : ""}
+        ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length}</div>${failureDetails}` : ""}
         <div class="metric ${completeScan ? "green" : "yellow"}"><b>${completeScan ? "All tickers had dated completed-session data; live contract verification is still required." : "Do not assume the failed tickers are NO TRADE."}</b></div>
 
         ${renderOpportunityFunnelSummary(funnelRows, "Monthly Buy Opportunity Funnel")}
@@ -8706,7 +8725,7 @@ async function scanList(list, title){
       <div class="metric"><b>Executable BUY entries verified:</b> 0</div>
       <div class="metric"><b>Daily-close BUY approvals requiring broker checks:</b> ${buys.length}</div>
       <div class="metric yellow"><b>Freshness:</b> ${freshnessText}</div><div class="metric yellow"><b>Entry verification:</b> ${scanLimitText}</div>
-      ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length} - failed names were not classified.</div>` : ""}
+      ${failures.length ? `<div class="metric yellow"><b>Data failures:</b> ${failures.length} - details below.</div>${failureDetails}` : ""}
 
       ${topBuys.map((r,index)=>`
         <div class="card" style="padding:14px;margin-top:12px;">
