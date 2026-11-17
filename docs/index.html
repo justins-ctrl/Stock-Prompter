@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-    <title>Signal Predator AI v49.36 Three-Tab Dashboard</title>
+    <title>Signal Predator AI v49.37 Three-Tab Dashboard</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -8271,68 +8271,92 @@ async function runFallbackAnalysis(ticker){
 }
 
 const PREDATOR_SCAN_CACHE_KEY = "signal_predator_fresh_scan_cache";
-const PREDATOR_SCAN_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // v49.36: session authority comes from candle date, not elapsed minutes
-
-function getFreshScanCache(){
-  const cache = getStore(PREDATOR_SCAN_CACHE_KEY, {});
-  return cache && typeof cache === "object" ? cache : {};
-}
-
-function saveFreshTickerAnalysis(ticker, analysisData, priceSource="Previous Scan"){
+// Keep historical analyses for diagnostics; only a verified current candle can authorize BUY.
+const PREDATOR_SCAN_CACHE_TTL_MS = 35 * 24 * 60 * 60 * 1000;
+const PREDATOR_CACHE_AUDIT_KEY = "signal_predator_cache_audit_v4937";
+function predatorCacheAudit(symbol,reason){
   try{
-    if(analysisData){
-      // A completed analysis is valid. Clear a stale warning left by an optional
-      // quote/intraday request so it does not visually contradict the final answer.
-      lastApiIssue = null;
-    }
-    const symbol = normalizeTicker(ticker);
-    if(!symbol || !analysisData) return;
-    const cache = getFreshScanCache();
-    const status=predatorCandleStatus(symbol);
-    const existing=cache[symbol];
-    // First successful analysis for a completed trading session is immutable.
-    if(existing?.analysisData && existing.candleDate===status.candleDate && status.current) return;
-    cache[symbol] = {
-      ticker:symbol,
-      savedAt:new Date().toISOString(),
-      candleDate:status.candleDate,
-      analysisData,
-      priceSource
-    };
-
-    // Keep storage bounded.
-    const entries = Object.entries(cache)
-      .sort((a,b)=>new Date(b[1]?.savedAt||0)-new Date(a[1]?.savedAt||0))
-      .slice(0,30);
-
-    setStore(PREDATOR_SCAN_CACHE_KEY, Object.fromEntries(entries));
-  }catch(e){
-    console.warn("Fresh scan cache skipped:", e);
-  }
+    const all=getStore(PREDATOR_CACHE_AUDIT_KEY,{});
+    all[normalizeTicker(symbol)]={reason,at:new Date().toISOString()};
+    setStore(PREDATOR_CACHE_AUDIT_KEY,Object.fromEntries(Object.entries(all).slice(-40)));
+  }catch(e){}
 }
-
+function getFreshScanCache(){
+  const cache=getStore(PREDATOR_SCAN_CACHE_KEY,{});
+  return cache && typeof cache==="object" && !Array.isArray(cache) ? cache : {};
+}
+function predatorVerifiedAnalysisCandle(symbol,item){
+  const status=predatorCandleStatus(symbol);
+  if(!status.current || !status.candleDate)return {date:null,reason:"Candle not verified current"};
+  if(item.candleDate){
+    return item.candleDate===status.candleDate ? {date:item.candleDate,reason:"Verified matching candle"} : {date:null,reason:"Different completed session"};
+  }
+  // Legacy v49.35 entry: migrate ONLY when independently dated history and
+  // provider candle metadata predate the analysis and agree on the closing price.
+  const history=getDailyHistoryCache()?.[symbol];
+  const meta=getStore(PREDATOR_CANDLE_META_KEY,{})?.[symbol];
+  const analysisTime=Date.parse(item.savedAt||"");
+  const historyTime=Date.parse(history?.savedAt||"");
+  const metaTime=Date.parse(meta?.checkedAt||"");
+  const analysisPrice=Number(item.analysisData?.price);
+  const historyPrice=Number(history?.closes?.[0]);
+  if(!Number.isFinite(analysisTime)||!Number.isFinite(historyTime)||!Number.isFinite(metaTime)||
+     historyTime>analysisTime+2000||metaTime>analysisTime+2000||
+     history?.candleDate!==status.candleDate||meta?.candleDate!==status.candleDate||
+     !Number.isFinite(analysisPrice)||!Number.isFinite(historyPrice)||
+     Math.abs(analysisPrice-historyPrice)>Math.max(.005,historyPrice*.00001)){
+    return {date:null,reason:"Legacy entry lacks provable candle date"};
+  }
+  return {date:status.candleDate,reason:"Verified legacy migration"};
+}
+function saveFreshTickerAnalysis(ticker,analysisData,priceSource="Previous Scan"){
+  try{
+    if(analysisData)lastApiIssue=null;
+    const symbol=normalizeTicker(ticker);
+    if(!symbol||!analysisData)return;
+    const status=predatorCandleStatus(symbol);
+    if(!status.current||!status.candleDate){predatorCacheAudit(symbol,"Save rejected: completed candle unverified");return;}
+    const cache=getFreshScanCache();
+    const existing=cache[symbol];
+    if(existing?.analysisData){
+      const verified=predatorVerifiedAnalysisCandle(symbol,existing);
+      if(verified.date===status.candleDate){
+        if(!existing.candleDate){existing.candleDate=verified.date;setStore(PREDATOR_SCAN_CACHE_KEY,cache);}
+        predatorCacheAudit(symbol,"First analysis retained for "+status.candleDate);
+        return;
+      }
+    }
+    cache[symbol]={ticker:symbol,savedAt:new Date().toISOString(),candleDate:status.candleDate,analysisData,priceSource};
+    const entries=Object.entries(cache).sort((a,b)=>Date.parse(b[1]?.savedAt||0)-Date.parse(a[1]?.savedAt||0)).slice(0,40);
+    setStore(PREDATOR_SCAN_CACHE_KEY,Object.fromEntries(entries));
+    predatorCacheAudit(symbol,"Saved verified analysis for "+status.candleDate);
+  }catch(e){console.warn("Fresh scan cache skipped:",e);}
+}
 function getFreshTickerAnalysis(ticker){
   try{
-    const symbol = normalizeTicker(ticker);
-    const cache = getFreshScanCache();
-    const item = cache[symbol];
-    if(!item || !item.analysisData || !item.savedAt) return null;
-
-    const ageMs = Date.now() - new Date(item.savedAt).getTime();
-    const status=predatorCandleStatus(symbol);
-    if(!Number.isFinite(ageMs) || ageMs < 0 || ageMs > PREDATOR_SCAN_CACHE_TTL_MS ||
-       !status.current || !item.candleDate || item.candleDate!==status.candleDate){
-      return null;
+    const symbol=normalizeTicker(ticker);
+    const cache=getFreshScanCache();
+    const item=cache[symbol];
+    if(!item?.analysisData||!item?.savedAt){predatorCacheAudit(symbol,"No saved analysis");return null;}
+    const ageMs=Date.now()-Date.parse(item.savedAt);
+    if(!Number.isFinite(ageMs)||ageMs<0||ageMs>PREDATOR_SCAN_CACHE_TTL_MS){predatorCacheAudit(symbol,"Saved analysis expired");return null;}
+    const verified=predatorVerifiedAnalysisCandle(symbol,item);
+    if(!verified.date){predatorCacheAudit(symbol,verified.reason);return null;}
+    if(!item.candleDate){
+      item.candleDate=verified.date;
+      cache[symbol]=item;
+      setStore(PREDATOR_SCAN_CACHE_KEY,cache);
     }
-
-    return {
-      ...item,
-      ageMs,
-      ageMinutes:Math.max(0, Math.floor(ageMs/60000))
-    };
-  }catch(e){
-    return null;
-  }
+    predatorCacheAudit(symbol,verified.reason);
+    return {...item,candleDate:verified.date,ageMs,ageMinutes:Math.max(0,Math.floor(ageMs/60000))};
+  }catch(e){return null;}
+}
+function predatorSavedAnalysisStatus(ticker){
+  const symbol=normalizeTicker(ticker);
+  const item=getFreshScanCache()[symbol];
+  const audit=getStore(PREDATOR_CACHE_AUDIT_KEY,{})?.[symbol];
+  return {ticker:symbol,candleDate:item?.candleDate||null,savedAt:item?.savedAt||null,
+    reason:audit?.reason||"Not checked",current:!!getFreshTickerAnalysis(symbol)};
 }
 
 function renderFreshDataNotice(cacheItem){
@@ -8549,7 +8573,7 @@ async function scanList(list, title){
     const sameSessionAnalysis=!!savedAnalysis && /completed daily close/i.test(String(savedAnalysis.priceSource||""));
     const hadFreshCache = sameSessionAnalysis || (!!readCachedDailyHistory(ticker, false) && predatorCandleStatus(ticker).current);
     if((quotaStopped || predatorProviderStop()) && !hadFreshCache){
-      failures.push({ticker, stage:"API budget", message:"Not requested after confirmed Alpha Vantage rate limit. Cached candle is not verified current."});
+      failures.push({ticker, stage:"API budget", message:"Not requested after confirmed Alpha Vantage rate limit. Cache: "+escapeHtml(getStore(PREDATOR_CACHE_AUDIT_KEY,{})?.[ticker]?.reason||"No verified same-session analysis")});
       continue;
     }
     // Only force an API refresh if the latest completed candle is unverified.
